@@ -59,7 +59,7 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
         camera.framerate = float(rate)
         self.wfile.write('OK\n')
 
-    def do_shoot_now(self)
+    def do_shoot_now(self):
         stream = io.BytesIO()
         camera.capture(stream)
         images.append(stream)
