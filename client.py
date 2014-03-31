@@ -58,7 +58,7 @@ class CompoundPiCmd(cmdline.Cmd):
         responses = self.responses()
         self.pprint_table(
             [('Address', 'Response')] +
-            [(address, response.strip()) for (address, response) in response.items()]
+            [(address, response.strip()) for (address, response) in responses.items()]
             )
 
 
