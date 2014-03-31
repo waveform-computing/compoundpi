@@ -19,7 +19,7 @@ class CompoundPiCmd(cmdline.Cmd):
         self.broadcast_address = '192.168.255.255'
         self.broadcast_port = 8000
         self.client_timeout = 10
-        self.client_count = 1
+        self.client_count = 2
         self.server_port = 8000
         # Set up a broadcast capable UDP socket
         self.broadcast_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -58,7 +58,7 @@ class CompoundPiCmd(cmdline.Cmd):
         responses = self.responses()
         self.pprint_table(
             [('Address', 'Response')] +
-            [(address, response.strip()) for (address, response) in responses.items()]
+            [('%s:%d' % address, response.strip()) for (address, response) in responses.items()]
             )
 
 
