@@ -49,7 +49,8 @@ import cmd
 import readline
 import locale
 from textwrap import TextWrapper
-from termsize import terminal_size
+
+from compoundpi.termsize import terminal_size
 
 COLOR_BOLD    = '\033[1m'
 COLOR_BLACK   = '\033[30m'
