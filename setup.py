@@ -61,7 +61,7 @@ def main():
         setup(
             name                 = compoundpi.__project__,
             version              = compoundpi.__version__,
-            description          = compoundpi.__description__,
+            description          = compoundpi.__doc__,
             long_description     = readme.read(),
             classifiers          = compoundpi.__classifiers__,
             author               = compoundpi.__author__,
