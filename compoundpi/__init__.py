@@ -1,3 +1,19 @@
+# Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
+#
+# This file is part of compoundpi.
+#
+# compoundpi is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# compoundpi is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# compoundpi.  If not, see <http://www.gnu.org/licenses/>.
+
 "A project for controlling multiple Pi camera modules simultaneously"
 
 import sys

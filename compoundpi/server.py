@@ -1,5 +1,29 @@
 #!/usr/bin/env python
 
+# Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
+#
+# This file is part of compoundpi.
+#
+# compoundpi is free software: you can redistribute it and/or modify it under the
+# terms of the GNU General Public License as published by the Free Software
+# Foundation, either version 3 of the License, or (at your option) any later
+# version.
+#
+# compoundpi is distributed in the hope that it will be useful, but WITHOUT ANY
+# WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR
+# A PARTICULAR PURPOSE.  See the GNU General Public License for more details.
+#
+# You should have received a copy of the GNU General Public License along with
+# compoundpi.  If not, see <http://www.gnu.org/licenses/>.
+
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 import sys
 import io
 import fractions
@@ -95,7 +119,12 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
         sys.exit(0)
 
 
-if __name__ == '__main__':
+def main(args=None):
+    if args is None:
+        args = sys.argv[1:]
     server = SocketServer.UDPServer(('0.0.0.0', 8000), CameraRequestHandler)
     server.serve_forever()
 
+
+if __name__ == '__main__':
+    main()
