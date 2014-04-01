@@ -122,6 +122,18 @@ class CompoundPiCmd(compoundpi.cmdline.Cmd):
             )
 
     def do_resolution(self, arg=''):
+        """
+        Sets the rseolution on one or more Pi's.
+
+        Syntax: resolution width height [address]...
+
+        The resolution command is used to set the capture resolution of the
+        camera on all or some of the Pi's on the subnet. If no address is
+        specified then all Pi's will be targetted.
+
+        cpi> resolution 640 480
+        cpi> resolution 1280 720 192.168.0.54
+        """
         arg = arg.split()
         width, height, addresses = arg[0], arg[1], arg[2:]
         width, height = int(width), int(height)
