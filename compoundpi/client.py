@@ -26,21 +26,20 @@ str = type('')
 
 import sys
 import re
-import cmdline
 import datetime
 import time
 import select
 import socket
 import SocketServer
 
-from cmdline import COLOR_RED, COLOR_BOLD, COLOR_RESET
+import compoundpi.cmdline
 
-class CompoundPiCmd(cmdline.Cmd):
+class CompoundPiCmd(compoundpi.cmdline.Cmd):
 
     prompt = 'cpi> '
 
     def __init__(self):
-        cmdline.Cmd.__init__(self)
+        compoundpi.cmdline.Cmd.__init__(self)
         self.pprint('CompoundPi Client')
         self.pprint('Type "help" for more information')
         self.broadcast_address = '192.168.255.255'
@@ -73,11 +72,11 @@ class CompoundPiCmd(cmdline.Cmd):
                 if len(result) == count:
                     break
         if len(result) < count:
-            sys.stdout.write(COLOR_RED + COLOR_BOLD)
+            sys.stdout.write(compoundpi.cmdline.COLOR_RED + compoundpi.cmdline.COLOR_BOLD)
             self.pprint(
                 'Missing response from %d clients' % (
                     count - len(result)))
-            sys.stdout.write(COLOR_RESET)
+            sys.stdout.write(compoundpi.cmdline.COLOR_RESET)
         return result
 
     def do_config(self, arg=''):
