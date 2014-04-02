@@ -49,8 +49,8 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
                 'STATUS':      self.do_status,
                 'RESOLUTION':  self.do_resolution,
                 'FRAMERATE':   self.do_framerate,
-                'SHOOT-NOW':   self.do_shoot_now,
-                'SHOOT-AT':    self.do_shoot_at,
+                'SHOOT':       self.do_shoot,
+                'SHOOTAT':     self.do_shoot_at,
                 'SEND':        self.do_send,
                 'LIST':        self.do_list,
                 'CLEAR':       self.do_clear,
@@ -80,19 +80,19 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
         self.wfile.write('OK\n')
 
     def do_framerate(self, rate):
-        camera.framerate = float(rate)
+        camera.framerate = fractions.Fraction(rate)
         self.wfile.write('OK\n')
 
-    def do_shoot_now(self):
+    def do_shoot(self):
         stream = io.BytesIO()
-        camera.capture(stream)
+        camera.capture(stream, format='jpeg')
         images.append(stream)
         self.wfile.write('OK\n')
 
     def do_shoot_at(self, timestamp):
         delay = datetime.datetime.strptime('%Y-%m-%d %H:%M:%S.%f') - datetime.datetime.now()
         time.sleep(delay.seconds)
-        self.do_shoot_now()
+        self.do_shoot()
 
     def do_send(self, image):
         stream = images[int(image)]

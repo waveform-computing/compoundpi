@@ -26,7 +26,7 @@ __author_email__ = 'dave@waveform.org.uk'
 __url__          = 'http://compoundpi.readthedocs.org/'
 __platforms__    = 'ALL',
 
-__requires__ = []
+__requires__ = ['ipaddr']
 
 __extra_requires__ = {
     'client': [],
