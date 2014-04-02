@@ -66,6 +66,7 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError(
                 'Address "%s" does not belong to the configured network '
                 '"%s"' % (a, self.network))
+        return a
 
     def parse_address_range(self, s):
         if not '-' in s:
@@ -102,9 +103,11 @@ class CompoundPiCmd(Cmd):
     def broadcast(self, data):
         self.send(data, [self.network.broadcast])
 
-    def responses(self, servers=None):
+    def responses(self, servers=None, count=0):
         if servers is None:
             servers = self.servers
+        if not count:
+            count = len(servers)
         if not servers:
             servers = self.network
         result = {}
@@ -122,13 +125,11 @@ class CompoundPiCmd(Cmd):
                     self.pprint('Ignoring response from %s' % address)
                 else:
                     result[address] = data
-                    if not isinstance(servers, ipaddr.IPv4Network):
-                        if len(result) == len(servers):
-                            break
-        if not isinstance(servers, ipaddr.IPv4Network):
-            if len(result) < len(servers):
-                self.pprint('Missing response from %d servers' % (
-                    len(servers) - len(result)))
+                    if len(result) == count:
+                        break
+        if len(result) < count:
+            self.pprint('Missing response from %d servers' % (
+                len(servers) - len(result)))
         return result
 
     def transact(self, data, addresses):
@@ -205,10 +206,16 @@ class CompoundPiCmd(Cmd):
         cpi> find 20
         """
         if arg:
-            raise CmdSyntaxError('Unexpected argument "%s"' % arg)
-        # XXX Implement count
+            try:
+                count = int(arg)
+            except ValueError:
+                raise CmdSyntaxError('Invalid find count "%s"' % arg)
+            if count < 1:
+                raise CmdSyntaxError('Invalid find count "%d"' % arg)
+        else:
+            count = 0
         self.broadcast('PING\n')
-        responses = self.responses()
+        responses = self.responses(count=count)
         for address, response in responses.items():
             if response.strip() != 'PONG':
                 self.pprint('Ignoring bogus response from %s' % address)
@@ -376,19 +383,43 @@ class CompoundPiCmd(Cmd):
 
         Syntax: capture [addresses]
 
-        The 'capture' command causes the servers to capture an image and send
-        it to the client. If no addresses are specified, a broadcast message to
-        all defined servers will be used in which case the timestamp of the
-        captured images are likely to be extremely close together. If addresses
-        are specified, unicast messages will be sent to each server in turn.
-        While this is still reasonably quick there will be a measurable
-        difference between the timestamps of the last and first captures.
+        The 'capture' command causes the servers to capture an image. Note
+        that this does not cause the captured images to be sent to the client.
+        See the 'download' command for more information.
+
+        If no addresses are specified, a broadcast message to all defined
+        servers will be used in which case the timestamp of the captured images
+        are likely to be extremely close together. If addresses are specified,
+        unicast messages will be sent to each server in turn.  While this is
+        still reasonably quick there will be a measurable difference between
+        the timestamps of the last and first captures.
+
+        See also: download, list, clear.
 
         cpi> capture
         cpi> capture 192.168.0.1
         cpi> capture 192.168.0.50-192.168.0.53
         """
         responses = self.transact('SHOOT\n', arg)
+        for address, response in responses.items():
+            if response.strip() == 'OK':
+                self.pprint('Captured image on %s' % address)
+            else:
+                self.pprint('Failed to capture image on %s:' % address)
+                self.pprint(response.strip())
+
+    def do_download(self, arg=''):
+        """
+        Downloads captured images from the defined servers.
+
+        Syntax: download [addresses]
+
+        The 'download' command causes each server to send its captured images
+        to the client. Servers are contacted consecutively to avoid saturating
+        the network bandwidth. Once images are successfully downloaded from a
+        server, they are wiped from the server.
+        """
+        pass
 
 
 def main(args=None):
