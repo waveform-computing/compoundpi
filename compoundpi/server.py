@@ -55,6 +55,7 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
                 'LIST':        self.do_list,
                 'CLEAR':       self.do_clear,
                 'QUIT':        self.do_quit,
+                'BLINK':       self.do_blink,
                 }[command[0]]
         except KeyError:
             self.wfile.write('UNKNOWN COMMAND\n')
@@ -69,6 +70,13 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
 
     def do_ping(self):
         self.wfile.write('PONG\n')
+
+    def do_blink(self):
+        self.wfile.write('OK\n')
+        for i in range(5):
+            camera.led = False
+            time.sleep(1)
+            camera.led = True
 
     def do_status(self):
         self.wfile.write('RESOLUTION %d %d\n' % (camera.resolution[0], camera.resolution[1]))

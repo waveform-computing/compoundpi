@@ -30,11 +30,35 @@ import datetime
 import fractions
 import time
 import select
+import struct
 import socket
 import SocketServer
 import ipaddr
 
 from compoundpi.cmdline import Cmd, CmdSyntaxError, CmdError
+
+
+class CompoundPiDownloadHandler(SocketServer.BaseRequestHandler):
+    def handle(self):
+        # XXX Check for unreasonable size (>10Mb)
+        # XXX Add timestamp to protocol
+        size = struct.unpack('<L', self.request.recv(4))
+        filename = '%s-%s.jpg' % (
+                self.client_address[0],
+                datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+        # XXX Check for silly filename
+        with io.open(filename, 'wb') as output:
+            while size > 0:
+                data = self.request.recv(1024)
+                output.write(data)
+                size -= len(data)
+
+
+class CompoundPiDownloadServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
+    def __init__(self, cmd):
+        self.cmd = cmd
+        super(CompoundPiDownloadServer, self).__init__(
+                ('0.0.0.0', cmd.client_port), CompoundPiDownloadHandler)
 
 
 class CompoundPiCmd(Cmd):
@@ -56,6 +80,15 @@ class CompoundPiCmd(Cmd):
         # Set up a broadcast capable UDP socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        # Set up a threading download server
+        self.server = CompoundPiDownloadServer(self)
+        self.server_thread = threading.Thread(target=self.server.serve_forever)
+        self.server_thread.daemon = True
+        self.server_thread.start()
+
+    def postloop(self):
+        Cmd.postloop(self)
+        self.server.shutdown()
 
     def parse_address(self, s):
         try:
@@ -200,7 +233,7 @@ class CompoundPiCmd(Cmd):
         specified, the command will display an error if the expected number of
         Pi's is not located.
 
-        See also: add, remove, servers.
+        See also: add, remove, servers, identify.
 
         cpi> find
         cpi> find 20
@@ -420,6 +453,33 @@ class CompoundPiCmd(Cmd):
         server, they are wiped from the server.
         """
         pass
+
+    def do_identify(self, arg):
+        """
+        Blink the LED on the specified servers.
+
+        Syntax: identify [addresses]
+
+        The 'identify' command can be used to locatea specific Pi server (or
+        servers) by their address. It sends a command causing the camera's LED
+        to blink on and off for 5 seconds. If no addresses are specified, the
+        command will be sent to all defined servers (this can be useful after
+        the 'find' command to determine whether any Pi's failed to respond due
+        to network issues).
+
+        See also: find.
+
+        cpi> identify
+        cpi> identify 192.168.0.1
+        cpi> identify 192.168.0.3-192.168.0.5
+        """
+        responses = self.transact('BLINK\n', arg)
+        for address, response in responses.items():
+            if response.strip() == 'OK':
+                self.pprint('Identified %s' % address)
+            else:
+                self.pprint('Failed identify %s:' % address)
+                self.pprint(response.strip())
 
 
 def main(args=None):
