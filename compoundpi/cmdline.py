@@ -35,22 +35,11 @@ base class. The extra facilities provided are:
  * An enhanced do_help method which extracts documentation from do_ docstrings
 """
 
-from __future__ import (
-    unicode_literals,
-    absolute_import,
-    print_function,
-    division,
-    )
-str = type('')
-
 import os
 import re
 import cmd
 import readline
-import locale
 from textwrap import TextWrapper
-
-from compoundpi.termsize import terminal_size
 
 COLOR_BOLD    = '\033[1m'
 COLOR_BLACK   = '\033[30m'
@@ -62,7 +51,6 @@ COLOR_MAGENTA = '\033[35m'
 COLOR_CYAN    = '\033[36m'
 COLOR_WHITE   = '\033[37m'
 COLOR_RESET   = '\033[0m'
-ENCODING = locale.getdefaultlocale()[1]
 
 __all__ = [
     'CmdError',
@@ -85,6 +73,7 @@ class Cmd(cmd.Cmd):
 
     def __init__(self, color_prompt=True):
         cmd.Cmd.__init__(self)
+        self._width = None
         self._wrapper = TextWrapper()
         self.color_prompt = color_prompt
         self.base_prompt = self.prompt
@@ -116,7 +105,7 @@ class Cmd(cmd.Cmd):
         """
         try:
             start, finish = (int(i) for i in s.split('-', 1))
-        except ValueError, exc:
+        except ValueError as exc:
             raise CmdSyntaxError(exc)
         if finish < start:
             raise CmdSyntaxError(
@@ -139,7 +128,7 @@ class Cmd(cmd.Cmd):
             else:
                 try:
                     result.append(int(i))
-                except ValueError, exc:
+                except ValueError as exc:
                     raise CmdSyntaxError(exc)
         return result
 
@@ -192,8 +181,7 @@ class Cmd(cmd.Cmd):
         # Reset the prompt to its uncolored variant for the benefit of any
         # command handlers that don't expect ANSI color sequences in it
         self.prompt = self.base_prompt
-        # Ensure input is given as unicode
-        return line.decode(ENCODING)
+        return line
 
     def postcmd(self, stop, line):
         # Set the prompt back to its colored variant, if required
@@ -210,8 +198,22 @@ class Cmd(cmd.Cmd):
         # of them
         try:
             return cmd.Cmd.onecmd(self, line)
-        except CmdError, exc:
-            self.pprint(unicode(exc) + '\n')
+        except CmdError as exc:
+            self.pprint(str(exc) + '\n')
+
+    def _get_width(self):
+        if self._width:
+            return self._width
+        else:
+            try:
+                result = int(os.environ['COLUMNS'])
+            except (KeyError, ValueError):
+                result = 80
+            return result - 2
+    def _set_width(self, value):
+        self._width = value
+    width = property(
+        _get_width, _set_width, doc="Determine or set the terminal width")
 
     whitespace_re = re.compile(r'\s+$')
     def wrap(self, s, newline=True, wrap=True, initial_indent='',
@@ -225,7 +227,7 @@ class Cmd(cmd.Cmd):
             if match:
                 suffix = match.group()
         if wrap:
-            self._wrapper.width = terminal_size()[0] - 2
+            self._wrapper.width = self.width
             self._wrapper.initial_indent = initial_indent
             self._wrapper.subsequent_indent = subsequent_indent
             s = self._wrapper.fill(s)
@@ -236,17 +238,13 @@ class Cmd(cmd.Cmd):
         lines = self.wrap(prompt, newline=False).split('\n')
         prompt = lines[-1]
         s = ''.join(line + '\n' for line in lines[:-1])
-        if isinstance(s, unicode):
-            s = s.encode(ENCODING)
         self.stdout.write(s)
-        return raw_input(prompt).decode(ENCODING).strip()
+        return input(prompt).strip()
 
     def pprint(self, s, newline=True, wrap=True,
             initial_indent='', subsequent_indent=''):
         "Pretty-prints text to the terminal"
         s = self.wrap(s, newline, wrap, initial_indent, subsequent_indent)
-        if isinstance(s, unicode):
-            s = s.encode(ENCODING)
         self.stdout.write(s)
 
     def pprint_table(self, data, header_rows=1, footer_rows=0):
@@ -255,7 +253,7 @@ class Cmd(cmd.Cmd):
         # a quick trick for transposing a list of lists, assuming each row in
         # data is of equal length
         lengths = [
-            max(len(unicode(item)) for item in row)
+            max(len(str(item)) for item in row)
             for row in zip(*data)
         ]
         # Take a copy of data that we can insert header and footer lines into
@@ -308,7 +306,7 @@ class Cmd(cmd.Cmd):
             # wider than one third of the terminal width
             maxlen = min(
                 max(len(command) for (command, help) in commands) + 2,
-                terminal_size()[0] / 3
+                self.width / 3
             )
             indent = ' ' * maxlen
             for (command, help_text) in commands:

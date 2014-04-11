@@ -70,9 +70,9 @@ class CompoundPiServer(TerminalApplication):
             '-d', '--daemon', dest='daemon', action='store_true',
             help='if specified, start as a background daemon')
 
-    def main(self, options, args):
+    def main(self, args):
         address = socket.getaddrinfo(
-            options.bind, options.port, type=socket.SOCK_DGRAM)[0][-1]
+            args.bind, args.port, type=socket.SOCK_DGRAM)[0][-1]
         self.server = socketserver.UDPServer(address, CameraRequestHandler)
         self.server.images = []
         self.server.camera = picamera.PiCamera()

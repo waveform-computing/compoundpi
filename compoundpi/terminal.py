@@ -84,7 +84,7 @@ class TerminalApplication(object):
             log_level=logging.WARNING
             )
         self.parser.add_argument('--version', action='version',
-            version=__version__)
+            version=version)
         if config_files:
             self.config = configparser.ConfigParser(interpolation=None)
             self.config_files = config_files
@@ -207,7 +207,7 @@ class TerminalApplication(object):
                     logging.critical(msg)
             return 1
 
-    def main(self, options, args):
+    def main(self, args):
         "Called as the main body of the utility"
         raise NotImplementedError
 

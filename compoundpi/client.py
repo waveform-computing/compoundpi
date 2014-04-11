@@ -50,7 +50,7 @@ class CompoundPiClient(TerminalApplication):
     def __init__(self):
         super(CompoundPiClient, self).__init__(__version__)
 
-    def main(self, options, args):
+    def main(self, args):
         proc = CompoundPiCmd()
         proc.cmdloop()
 
@@ -322,7 +322,7 @@ class CompoundPiCmd(Cmd):
                     address,
                     '%sx%s' % (match.group('width'), match.group('height')),
                     '%sfps' % match.group('rate'),
-                    datetime.fromtimestamp(float(match.group('time'))).,
+                    datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )
                 for (address, match) in responses
@@ -353,7 +353,7 @@ class CompoundPiCmd(Cmd):
         try:
             width, height = arg[0].lower().split('x')
             width, height = int(width), int(height)
-        except TypeError, ValueError:
+        except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid resolution "%s"' % arg[0])
         responses = self.transact(
                 'RESOLUTION %d %d\n' % (width, height),
@@ -391,7 +391,7 @@ class CompoundPiCmd(Cmd):
         arg = arg.split(' ', 1)
         try:
             rate = fractions.Fraction(rate)
-        except TypeError, ValueError:
+        except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid framerate "%s"' % arg[0])
         responses = self.transact(
                 'FRAMERATE %s\n' % rate,
