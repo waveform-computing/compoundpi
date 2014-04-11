@@ -24,6 +24,7 @@ from __future__ import (
     print_function,
     division,
     )
+_str = str
 str = type('')
 
 import sys
@@ -32,6 +33,7 @@ import io
 import fractions
 import struct
 import time
+import logging
 import threading
 import socket
 import SocketServer as socketserver
@@ -95,6 +97,8 @@ class CompoundPiServer(TerminalApplication):
 class CameraRequestHandler(socketserver.DatagramRequestHandler):
     def handle(self):
         data = self.request[0].strip()
+        logging.debug('<< %s:%d %s' % (
+            self.client_address[0], self.client_address[1], data))
         command = data.split(' ')
         try:
             handler = {
@@ -110,18 +114,21 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 'BLINK':       self.do_blink,
                 }[command[0]]
         except KeyError:
-            self.wfile.write('UNKNOWN COMMAND\n')
+            logging.warning(
+                'Unknown command %s from %s' % (data, self.client_address[0]))
+            self.wfile.write('UNKNOWN COMMAND')
         else:
             try:
                 handler(*command[1:])
+                self.wfile.write('OK')
             except Exception as exc:
-                print('%s:%d > %s' % (
-                    self.client_address[0], self.client_address[1], data))
-                print(str(exc))
-                self.wfile.write('ERROR %s\n' % str(exc))
+                logging.error(str(exc))
+                self.wfile.write('ERROR %s' % str(exc))
+        logging.debug('>> %s:%d %s' % (
+            self.client_address[0], self.client_address[1], self.wfile.getvalue().strip()))
 
     def do_ping(self):
-        self.wfile.write('PONG\n')
+        pass
 
     def blink_led(self, timeout):
         try:
@@ -140,7 +147,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         # waiting for our response. The actual flashing is taken care of in
         # a background thread
         self.server.camera.led = False
-        self.wfile.write('OK\n')
         thread = threading.Thread(target=self.blink_led, args=(5,))
         thread.daemon = True
         thread.start()
@@ -155,11 +161,9 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_resolution(self, width, height):
         self.server.camera.resolution = (int(width), int(height))
-        self.wfile.write('OK\n')
 
     def do_framerate(self, rate):
         self.server.camera.framerate = fractions.Fraction(rate)
-        self.wfile.write('OK\n')
 
     def stream_generator(self, count):
         for i in range(count):
@@ -169,14 +173,16 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_capture(self, sync=0, count=1, use_video_port=False):
         self.server.camera.led = False
-        delay = time.time() - float(sync)
-        if delay > 0:
+        sync = float(sync)
+        if sync != 0.0:
+            delay = time.time() - sync
+            if delay <= 0.0:
+                raise ValueError('Sync time in past')
             time.sleep(delay)
         self.server.camera.capture_sequence(
             self.stream_generator(int(count)), format='jpeg',
             use_video_port=bool(use_video_port))
         self.server.camera.led = True
-        self.wfile.write('OK\n')
 
     def do_send(self, image, port):
         timestamp, stream = self.server.images[int(image)]
@@ -185,7 +191,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         client_file = client_sock.makefile('wb')
         try:
             stream.seek(0, io.SEEK_END)
-            client_file.write(struct.pack('<L', stream.tell()))
+            client_file.write(struct.pack(_str('<L'), stream.tell()))
             stream.seek(0)
             client_file.write(stream.read())
         finally:
@@ -197,7 +203,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_clear(self):
         del self.server.images[:]
-        self.wfile.write('OK\n')
 
     def do_quit(self):
         sys.exit(0)
