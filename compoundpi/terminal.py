@@ -38,8 +38,9 @@ import argparse
 import textwrap
 import logging
 import locale
-import ConfigParser as configparser
 import traceback
+
+from . import configparser
 
 try:
     # Optionally import argcomplete (for auto-completion) if it's installed

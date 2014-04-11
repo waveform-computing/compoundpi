@@ -39,8 +39,8 @@ import SocketServer as socketserver
 import picamera
 import daemon
 
-from compoundpi import __version__
-from compoundpi.terminal import TerminalApplication
+from . import __version__
+from .terminal import TerminalApplication
 
 
 class CompoundPiServer(TerminalApplication):
@@ -68,21 +68,21 @@ class CompoundPiServer(TerminalApplication):
             port=8000,
             daemon=False,
             )
-        self.parser.add_option(
+        self.parser.add_argument(
             '-b', '--bind', dest='bind', action='store',
             help='specifies the address to listen on for packets '
             '(default: %default)')
-        self.parser.add_option(
+        self.parser.add_argument(
             '-p', '--port', dest='port', action='store',
             help='specifies the UDP port for the server to listen on '
             '(default: %default)')
-        self.parser.add_option(
+        self.parser.add_argument(
             '-d', '--daemon', dest='daemon', action='store_true',
             help='if specified, start as a background daemon')
 
     def main(self, args):
         address = socket.getaddrinfo(
-            args.bind, args.port, type=socket.SOCK_DGRAM)[0][-1]
+            args.bind, args.port, 0, socket.SOCK_DGRAM)[0][-1]
         self.server = socketserver.UDPServer(address, CameraRequestHandler)
         self.server.images = []
         self.server.camera = picamera.PiCamera()
@@ -92,7 +92,7 @@ class CompoundPiServer(TerminalApplication):
             self.server.camera.close()
 
 
-class CameraRequestHandler(SocketServer.DatagramRequestHandler):
+class CameraRequestHandler(socketserver.DatagramRequestHandler):
     def handle(self):
         data = self.request[0].strip()
         command = data.split(' ')
@@ -172,7 +172,7 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
         delay = time.time() - float(sync)
         if delay > 0:
             time.sleep(delay)
-int(port)self.server.camera.capture_sequence(
+        self.server.camera.capture_sequence(
             self.stream_generator(int(count)), format='jpeg',
             use_video_port=bool(use_video_port))
         self.server.camera.led = True

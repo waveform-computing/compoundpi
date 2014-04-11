@@ -42,9 +42,9 @@ try:
 except ImportError:
     from ipaddr import IPv4Address, IPv4Network
 
-from compoundpi import __version__
-from compoundpi.terminal import TerminalApplication
-from compoundpi.cmdline import Cmd, CmdSyntaxError, CmdError
+from . import __version__
+from .terminal import TerminalApplication
+from .cmdline import Cmd, CmdSyntaxError, CmdError
 
 
 class CompoundPiClient(TerminalApplication):
