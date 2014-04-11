@@ -16,6 +16,14 @@
 
 "A project for controlling multiple Pi camera modules simultaneously"
 
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 import sys
 
 __project__      = 'compoundpi'
@@ -26,7 +34,7 @@ __author_email__ = 'dave@waveform.org.uk'
 __url__          = 'http://compoundpi.readthedocs.org/'
 __platforms__    = 'ALL',
 
-__requires__ = []
+__requires__ = ['ipaddr']
 
 __extra_requires__ = {
     'client': [],

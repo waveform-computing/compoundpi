@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
 #
@@ -16,6 +16,16 @@
 # You should have received a copy of the GNU General Public License along with
 # compoundpi.  If not, see <http://www.gnu.org/licenses/>.
 
+"Implements the client terminal interface"
+
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 import io
 import sys
 import re
@@ -26,10 +36,13 @@ import threading
 import select
 import struct
 import socket
-import socketserver
+import SocketServer as socketserver
+try:
+    from ipaddress import IPv4Address, IPv4Network
+except ImportError:
+    from ipaddr import IPv4Address, IPv4Network
 
 from compoundpi import __version__
-from compoundpi.ipaddr import IPv4Address, IPv4Network
 from compoundpi.terminal import TerminalApplication
 from compoundpi.cmdline import Cmd, CmdSyntaxError, CmdError
 

@@ -16,6 +16,14 @@
 # You should have received a copy of the GNU General Public License along with
 # compoundpi.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 """
 Enhanced version of the standard Python Cmd command line interpreter.
 

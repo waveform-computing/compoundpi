@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
 #
@@ -24,13 +24,21 @@ to command line applications: a help screen, universal file globbing, response
 file handling, and common logging configuration and options.
 """
 
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 import sys
 import os
 import argparse
 import textwrap
 import logging
 import locale
-import configparser
+import ConfigParser as configparser
 import traceback
 
 try:

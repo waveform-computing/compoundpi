@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+#!/usr/bin/env python
 
 # Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
 #
@@ -16,6 +16,16 @@
 # You should have received a copy of the GNU General Public License along with
 # compoundpi.  If not, see <http://www.gnu.org/licenses/>.
 
+"Implements the camera daemon"
+
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 import sys
 import os
 import io
@@ -24,7 +34,7 @@ import struct
 import time
 import threading
 import socket
-import socketserver
+import SocketServer as socketserver
 
 import picamera
 import daemon
