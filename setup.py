@@ -31,7 +31,7 @@ from setuptools import setup, find_packages
 if sys.version_info[0] == 2:
     if not sys.version_info >= (2, 7):
         raise ValueError('This application requires Python 2.7 or above')
-elif sys.version[0] == 3:
+elif sys.version_info[0] == 3:
     if not sys.version_info >= (3, 2):
         raise ValueError('This application requires Python 3.2 or above')
 else:
