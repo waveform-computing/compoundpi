@@ -22,7 +22,6 @@ import io
 import fractions
 import struct
 import time
-import datetime
 import threading
 import socket
 import socketserver
@@ -140,10 +139,8 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
         self.wfile.write('RESOLUTION %d %d\n' % (
             self.server.camera.resolution[0],
             self.server.camera.resolution[1]))
-        self.wfile.write('FRAMERATE %.2f\n' %
-            self.server.camera.framerate)
-        self.wfile.write('TIMESTAMP %s\n' %
-            datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S.%f'))
+        self.wfile.write('FRAMERATE %.2f\n' % self.server.camera.framerate)
+        self.wfile.write('TIMESTAMP %f\n' % time.time())
         self.wfile.write('IMAGES %d\n' % len(self.server.images))
 
     def do_resolution(self, width, height):
@@ -157,7 +154,7 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
     def stream_generator(self, count):
         for i in range(count):
             stream = io.BytesIO()
-            self.server.images.append((datetime.datetime.now(), stream))
+            self.server.images.append((time.time(), stream))
             yield stream
 
     def do_capture(self, sync=0, count=1, use_video_port=False):
@@ -165,20 +162,20 @@ class CameraRequestHandler(SocketServer.DatagramRequestHandler):
         delay = time.time() - float(sync)
         if delay > 0:
             time.sleep(delay)
-        self.server.camera.capture_sequence(
+int(port)self.server.camera.capture_sequence(
             self.stream_generator(int(count)), format='jpeg',
             use_video_port=bool(use_video_port))
         self.server.camera.led = True
         self.wfile.write('OK\n')
 
-    def do_send(self, image):
+    def do_send(self, image, port):
         timestamp, stream = self.server.images[int(image)]
         client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_sock.connect((self.client_address[0], 8000))
+        client_sock.connect((self.client_address[0], int(port)))
         client_file = client_sock.makefile('wb')
         try:
             stream.seek(0, io.SEEK_END)
-            client_file.write(struct.pack(_str('<L'), stream.tell()))
+            client_file.write(struct.pack('<L', stream.tell()))
             stream.seek(0)
             client_file.write(stream.read())
         finally:
