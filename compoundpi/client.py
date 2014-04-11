@@ -24,6 +24,7 @@ from __future__ import (
     print_function,
     division,
     )
+_str = str
 str = type('')
 
 import sys
@@ -163,6 +164,9 @@ class CompoundPiCmd(Cmd):
         self.capture_count = 1
         self.video_port = False
         self.output = '/tmp'
+
+    def preloop(self):
+        Cmd.preloop(self)
         # Set up a broadcast capable UDP socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
@@ -171,10 +175,10 @@ class CompoundPiCmd(Cmd):
             str(self.bind), self.client_port, 0, socket.SOCK_STREAM)[0][-1]
         self.server = CompoundPiDownloadServer(address, CompoundPiDownloadHandler)
         self.server.cmd = self
+        self.server_event = threading.Event()
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
-        self.server_event = threading.Event()
 
     def postloop(self):
         Cmd.postloop(self)
@@ -246,9 +250,9 @@ class CompoundPiCmd(Cmd):
                 elif address in result:
                     self.pprint('Ignoring double response from %s' % address)
                 elif address not in servers:
-                    self.pprint('Ignoring response from %s' % address)
+                    self.pprint('Ignoring unexpected response from %s' % address)
                 else:
-                    result[address] = data
+                    result[address] = data.strip()
                     if len(result) == count:
                         break
         if len(result) < count:
@@ -265,7 +269,16 @@ class CompoundPiCmd(Cmd):
             if not addresses:
                 self.no_servers()
             self.broadcast(data)
-        return self.responses(addresses)
+        result = self.responses(addresses)
+        failed = [
+            str(address) for (address, response) in result.items()
+            if response.splitlines()[-1] != 'OK'
+            ]
+        if failed:
+            raise CmdError(
+                'Command "%s" failed on %d servers: %s' % (
+                    data, len(failed), ', '.join(failed)))
+        return result
 
     def do_config(self, arg=''):
         """
@@ -344,10 +357,10 @@ class CompoundPiCmd(Cmd):
                 raise CmdSyntaxError('Invalid find count "%d"' % arg)
         else:
             count = 0
-        self.broadcast('PING\n')
+        self.broadcast('PING')
         responses = self.responses(count=count)
         for address, response in responses.items():
-            if response.strip() != 'PONG':
+            if response.strip() != 'OK':
                 self.pprint('Ignoring bogus response from %s' % address)
                 del responses[address]
         if responses:
@@ -375,9 +388,11 @@ class CompoundPiCmd(Cmd):
         """
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to add')
+        # XXX Check server with PING
         self.servers |= self.parse_address_list(arg)
 
     def complete_add(self, text, line, start, finish):
+        # XXX This is wrong - should be addresses in network that *aren't* in self.servers
         return self.complete_server(text, line, start, finish)
 
     def do_remove(self, arg):
@@ -408,7 +423,8 @@ class CompoundPiCmd(Cmd):
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(\.\d+)?)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
-            r'IMAGES (?P<images>\d{,3})\n')
+            r'IMAGES (?P<images>\d{,3})\n'
+            r'OK')
     def do_status(self, arg=''):
         """
         Retrieves status from the defined servers.
@@ -424,8 +440,8 @@ class CompoundPiCmd(Cmd):
         cpi> status
         """
         responses = [
-            (address, self.status_re.match(data))
-            for (address, data) in self.transact('STATUS\n', arg).items()
+            (address, data, self.status_re.match(data))
+            for (address, data) in self.transact('STATUS', arg).items()
             ]
         self.pprint_table(
             [('Address', 'Resolution', 'Framerate', 'Timestamp', 'Images')] +
@@ -437,8 +453,12 @@ class CompoundPiCmd(Cmd):
                     datetime.datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )
-                for (address, match) in responses
+                for (address, data, match) in responses
+                if match
                 ])
+        for (address, data, match) in responses:
+            if not match:
+                self.pprint('Invalid response from %s:\n%s' % (address, data))
 
     def complete_status(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -471,15 +491,8 @@ class CompoundPiCmd(Cmd):
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid resolution "%s"' % arg[0])
         responses = self.transact(
-                'RESOLUTION %d %d\n' % (width, height),
+                'RESOLUTION %d %d' % (width, height),
                 arg[1] if len(arg) > 1 else '')
-        for address, response in responses.items():
-            if response.strip() == 'OK':
-                self.pprint('Changed resolution to %dx%d on %s' % (
-                    width, height, address))
-            else:
-                self.pprint('Failed to change resolution on %s:' % address)
-                self.pprint(response.strip())
 
     def do_framerate(self, arg):
         """
@@ -509,14 +522,8 @@ class CompoundPiCmd(Cmd):
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid framerate "%s"' % arg[0])
         responses = self.transact(
-                'FRAMERATE %s\n' % rate,
+                'FRAMERATE %s' % rate,
                 arg[1] if len(arg) > 1 else '')
-        for address, response in responses.items():
-            if response.strip() == 'OK':
-                self.pprint('Changed framerate to %s on %s' % (rate, address))
-            else:
-                self.pprint('Failed to change framerate on %s:' % address)
-                self.pprint(response.strip())
 
     def do_capture(self, arg=''):
         """
@@ -541,13 +548,8 @@ class CompoundPiCmd(Cmd):
         cpi> capture 192.168.0.1
         cpi> capture 192.168.0.50-192.168.0.53
         """
-        responses = self.transact('CAPTURE 0 1 0\n', arg)
-        for address, response in responses.items():
-            if response.strip() == 'OK':
-                self.pprint('Captured image on %s' % address)
-            else:
-                self.pprint('Failed to capture image on %s:' % address)
-                self.pprint(response.strip())
+        # XXX Use capture_delay, capture_count, video_port
+        responses = self.transact('CAPTURE 0 1 0', arg)
 
     def complete_capture(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -571,12 +573,14 @@ class CompoundPiCmd(Cmd):
                 self.no_servers()
         for address in addresses:
             self.server_event.clear()
-            self.unicast('SEND 0 %d\n' % self.client_port, address)
-            if not self.server_event.wait(30):
+            # XXX Use LIST to determine available images
+            # XXX SEND all available images
+            self.transact('SEND 0 %d' % self.client_port, address)
+            if not self.server_event.wait(self.timeout):
                 raise CmdError(
                     'Timed out waiting for image transfer from %s' % address)
             self.pprint('Downloaded image from %s' % address)
-            self.unicast('CLEAR\n', address)
+            self.transact('CLEAR', address)
 
     def complete_download(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -600,13 +604,7 @@ class CompoundPiCmd(Cmd):
         cpi> identify 192.168.0.1
         cpi> identify 192.168.0.3-192.168.0.5
         """
-        responses = self.transact('BLINK\n', arg)
-        for address, response in responses.items():
-            if response.strip() == 'OK':
-                self.pprint('Identified %s' % address)
-            else:
-                self.pprint('Failed identify %s:' % address)
-                self.pprint(response.strip())
+        responses = self.transact('BLINK', arg)
 
     def complete_identify(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -617,7 +615,8 @@ class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
         try:
             # XXX Check for unreasonable size (>10Mb)
             # XXX Add timestamp to protocol
-            size = struct.unpack('<L', self.request.recv(4))[0]
+            # XXX Write output to user selected path
+            size = struct.unpack(_str('<L'), self.request.recv(4))[0]
             filename = '%s-%s.jpg' % (
                     self.client_address[0],
                     datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
