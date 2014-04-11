@@ -335,7 +335,7 @@ class CompoundPiCmd(Cmd):
                     address,
                     '%sx%s' % (match.group('width'), match.group('height')),
                     '%sfps' % match.group('rate'),
-                    datetime.fromtimestamp(float(match.group('time'))),
+                    datetime.datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )
                 for (address, match) in responses
