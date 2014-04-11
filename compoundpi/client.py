@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 # Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
 #
@@ -16,41 +16,43 @@
 # You should have received a copy of the GNU General Public License along with
 # compoundpi.  If not, see <http://www.gnu.org/licenses/>.
 
+import io
 import sys
 import re
 import datetime
 import fractions
 import time
+import threading
 import select
 import struct
 import socket
-import SocketServer
-import ipaddr
+import socketserver
 
+from compoundpi import __version__
+from compoundpi.ipaddr import IPv4Address, IPv4Network
+from compoundpi.terminal import TerminalApplication
 from compoundpi.cmdline import Cmd, CmdSyntaxError, CmdError
 
 
-class CompoundPiDownloadHandler(SocketServer.BaseRequestHandler):
-    def handle(self):
-        # XXX Check for unreasonable size (>10Mb)
-        # XXX Add timestamp to protocol
-        size = struct.unpack('<L', self.request.recv(4))
-        filename = '%s-%s.jpg' % (
-                self.client_address[0],
-                datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-        # XXX Check for silly filename
-        with io.open(filename, 'wb') as output:
-            while size > 0:
-                data = self.request.recv(1024)
-                output.write(data)
-                size -= len(data)
+class CompoundPiClient(TerminalApplication):
+    """
+    %prog [options]
 
+    This is the CompoundPi client application which provides a command line
+    interface through which you can query and interact with any Pi's running
+    the CompoundPi server on your configured subnet. Use the "help" command
+    within the application for information on the available commands. The
+    application can be configured via command line switches, a configuration
+    file (defaults to ~/.cpid.conf), or through the interactive command line
+    itself.
+    """
 
-class CompoundPiDownloadServer(SocketServer.ThreadingMixIn, SocketServer.TCPServer):
-    def __init__(self, cmd):
-        self.cmd = cmd
-        super(CompoundPiDownloadServer, self).__init__(
-                ('0.0.0.0', cmd.client_port), CompoundPiDownloadHandler)
+    def __init__(self):
+        super(CompoundPiClient, self).__init__(__version__)
+
+    def main(self, options, args):
+        proc = CompoundPiCmd()
+        proc.cmdloop()
 
 
 class CompoundPiCmd(Cmd):
@@ -64,7 +66,7 @@ class CompoundPiCmd(Cmd):
             'Type "help" for more information, '
             'or "find" to locate Pi servers')
         self.servers = set()
-        self.network = ipaddr.IPv4Network('192.168.0.0/16')
+        self.network = IPv4Network('192.168.0.0/16')
         self.client_port = 8000
         self.server_port = 8000
         self.timeout = 5
@@ -73,10 +75,13 @@ class CompoundPiCmd(Cmd):
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         # Set up a threading download server
-        self.server = CompoundPiDownloadServer(self)
+        self.server = CompoundPiDownloadServer(
+            ('0.0.0.0', self.client_port), CompoundPiDownloadHandler)
+        self.server.cmd = self
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
         self.server_thread.start()
+        self.server_event = threading.Event()
 
     def postloop(self):
         Cmd.postloop(self)
@@ -84,7 +89,7 @@ class CompoundPiCmd(Cmd):
 
     def parse_address(self, s):
         try:
-            a = ipaddr.IPv4Address(s.strip())
+            a = IPv4Address(s.strip())
         except ValueError:
             raise CmdSyntaxError('Invalid address "%s"' % s)
         if not a in self.network:
@@ -107,10 +112,7 @@ class CompoundPiCmd(Cmd):
         for i in s.split(','):
             if '-' in i:
                 start, finish = self.parse_address_range(i)
-                result |= {
-                        ipaddr.IPv4Address(a)
-                        for a in range(start, finish + 1)
-                        }
+                result |= {IPv4Address(a) for a in range(start, finish + 1)}
             else:
                 result.add(self.parse_address(i))
         return result
@@ -119,14 +121,11 @@ class CompoundPiCmd(Cmd):
         raise CmdError(
                 "You must define servers first (see help for 'find' and 'add')")
 
-    def send(self, data, addresses):
-        if isinstance(addresses, str):
-            addresses = [address]
-        for address in addresses:
-            self.socket.sendto(data, (str(address), self.server_port))
+    def unicast(self, data, address):
+        self.socket.sendto(data, (str(address), self.server_port))
 
     def broadcast(self, data):
-        self.send(data, [self.network.broadcast])
+        self.socket.sendto(data, (str(self.network.broadcast), self.server_port))
 
     def responses(self, servers=None, count=0):
         if servers is None:
@@ -141,7 +140,7 @@ class CompoundPiCmd(Cmd):
             if select.select([self.socket], [], [], 1)[0]:
                 data, address = self.socket.recvfrom(512)
                 address, port = address
-                address = ipaddr.IPv4Address(address)
+                address = IPv4Address(address)
                 if port != self.server_port:
                     self.pprint('Ignoring response from wrong port %s:%d' % (address, port))
                 elif address in result:
@@ -153,14 +152,14 @@ class CompoundPiCmd(Cmd):
                     if len(result) == count:
                         break
         if len(result) < count:
-            self.pprint('Missing response from %d servers' % (
-                len(servers) - len(result)))
+            self.pprint('Missing response from %d servers' % (count - len(result)))
         return result
 
     def transact(self, data, addresses):
         if addresses:
             addresses = self.parse_address_list(addresses)
-            self.send(data, addresses)
+            for address in addresses:
+                self.unicast(data, address)
         else:
             addresses = self.servers
             if not addresses:
@@ -295,8 +294,9 @@ class CompoundPiCmd(Cmd):
 
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
-            r'FRAMERATE (?P<rate>\d+(.\d+)?)\n'
-            r'TIMESTAMP (?P<time>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}.\d{6})\n')
+            r'FRAMERATE (?P<rate>\d+(\.\d+)?)\n'
+            r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
+            r'IMAGES (?P<images>\d{,3})\n')
     def do_status(self, arg=''):
         """
         Retrieves status from the defined servers.
@@ -316,13 +316,14 @@ class CompoundPiCmd(Cmd):
             for (address, data) in self.transact('STATUS\n', arg).items()
             ]
         self.pprint_table(
-            [('Address', 'Resolution', 'Framerate', 'Timestamp')] +
+            [('Address', 'Resolution', 'Framerate', 'Timestamp', 'Images')] +
             [
                 (
                     address,
                     '%sx%s' % (match.group('width'), match.group('height')),
                     '%sfps' % match.group('rate'),
-                    match.group('time')
+                    datetime.fromtimestamp(float(match.group('time'))).,
+                    int(match.group('images')),
                     )
                 for (address, match) in responses
                 ])
@@ -425,7 +426,7 @@ class CompoundPiCmd(Cmd):
         cpi> capture 192.168.0.1
         cpi> capture 192.168.0.50-192.168.0.53
         """
-        responses = self.transact('SHOOT\n', arg)
+        responses = self.transact('CAPTURE 0 1 0\n', arg)
         for address, response in responses.items():
             if response.strip() == 'OK':
                 self.pprint('Captured image on %s' % address)
@@ -444,7 +445,20 @@ class CompoundPiCmd(Cmd):
         the network bandwidth. Once images are successfully downloaded from a
         server, they are wiped from the server.
         """
-        pass
+        if arg:
+            addresses = self.parse_address_list(arg)
+        else:
+            addresses = self.servers
+            if not addresses:
+                self.no_servers()
+        for address in addresses:
+            self.server_event.clear()
+            self.unicast('SEND 0 %d\n' % self.client_port, address)
+            if not self.server_event.wait(30):
+                raise CmdError(
+                    'Timed out waiting for image transfer from %s' % address)
+            self.pprint('Downloaded image from %s' % address)
+            self.unicast('CLEAR\n', address)
 
     def do_identify(self, arg):
         """
@@ -474,12 +488,27 @@ class CompoundPiCmd(Cmd):
                 self.pprint(response.strip())
 
 
-def main(args=None):
-    if args is None:
-        args = sys.argv[1:]
-    proc = CompoundPiCmd()
-    proc.cmdloop()
+class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
+    def handle(self):
+        try:
+            # XXX Check for unreasonable size (>10Mb)
+            # XXX Add timestamp to protocol
+            size = struct.unpack('<L', self.request.recv(4))[0]
+            filename = '%s-%s.jpg' % (
+                    self.client_address[0],
+                    datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+            # XXX Check for silly filename
+            with io.open(filename, 'wb') as output:
+                while size > 0:
+                    data = self.request.recv(1024)
+                    output.write(data)
+                    size -= len(data)
+        finally:
+            self.server.cmd.server_event.set()
 
 
-if __name__ == '__main__':
-    main()
+class CompoundPiDownloadServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    pass
+
+
+main = CompoundPiClient()
