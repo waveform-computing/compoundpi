@@ -196,7 +196,7 @@ class TerminalApplication(object):
         elif issubclass(exc_type, (KeyboardInterrupt,)):
             # Exit with 2 if the user deliberately terminates with Ctrl+C
             return 2
-        elif issubclass(exc_type, (optparse.OptParseError,)):
+        elif issubclass(exc_type, (argparse.ArgumentError,)):
             # For option parser errors output the error along with a message
             # indicating how the help page can be displayed
             logging.critical(str(exc_value))

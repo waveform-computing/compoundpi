@@ -26,8 +26,9 @@ from __future__ import (
     )
 str = type('')
 
-import io
 import sys
+import io
+import os
 import re
 import datetime
 import fractions
@@ -47,24 +48,98 @@ from .terminal import TerminalApplication
 from .cmdline import Cmd, CmdSyntaxError, CmdError
 
 
+def service(s):
+    try:
+        return int(s)
+    except ValueError:
+        return socket.servbyname(s)
+
+
 class CompoundPiClient(TerminalApplication):
     """
-    %prog [options]
-
     This is the CompoundPi client application which provides a command line
     interface through which you can query and interact with any Pi's running
     the CompoundPi server on your configured subnet. Use the "help" command
     within the application for information on the available commands. The
     application can be configured via command line switches, a configuration
-    file (defaults to ~/.cpid.conf), or through the interactive command line
+    file (defaults to ~/.cpid.ini), or through the interactive command line
     itself.
     """
 
     def __init__(self):
-        super(CompoundPiClient, self).__init__(__version__)
+        super(CompoundPiClient, self).__init__(
+            version=__version__,
+            config_files=[
+                '/etc/cpi.ini',
+                '/usr/local/etc/cpi.ini',
+                os.path.expanduser('~/.cpi.ini'),
+                ],
+            config_bools=[
+                'video_port',
+                ],
+            )
+        self.parser.set_defaults(
+            network=IPv4Network('192.168.0.0/16'),
+            client_port=5647,
+            server_port=5647,
+            timeout=5,
+            capture_delay=0,
+            capture_count=1,
+            video_port=False,
+            bind='0.0.0.0',
+            output='/tmp',
+            )
+        self.parser.add_argument(
+            '-o', '--output', dest='output', action='store', metavar='PATH',
+            help='specifies the directory that downloaded images will be '
+            'written to (default: %(default)s)')
+        self.parser.add_argument(
+            '-n', '--network', dest='network', action='store',
+            type=IPv4Network, help='specifies the network that the servers '
+            'belong to (default: %(default)s)')
+        self.parser.add_argument(
+            '-p', '--server-port', dest='server_port', action='store',
+            type=service, metavar='PORT',
+            help='specifies the port that the servers are listening on '
+            '(default: %(default)d)')
+        self.parser.add_argument(
+            '-b', '--bind', dest='bind', action='store',
+            type=IPv4Address, metavar='ADDRESS',
+            help='specifies the address that the client listens on for '
+            'downloads (default: %(default)s)')
+        self.parser.add_argument(
+            '--client-port', dest='client_port', action='store',
+            type=service, metavar='PORT',
+            help='specifies the port that the client listens on for downloads '
+            '(default: %(default)d)')
+        self.parser.add_argument(
+            '-t', '--timeout', dest='timeout', action='store', type=int,
+            metavar='SECS', help='specifies the timeout (in seconds) for '
+            'network transactions (default: %(default)d)')
+        self.parser.add_argument(
+            '--capture-delay', dest='capture_delay', action='store', type=int,
+            metavar='SECS', help='specifies the delay (in seconds) used to '
+            'synchronize captures. This must be less than the network delay '
+            '(default: %(default)d)')
+        self.parser.add_argument(
+            '--capture-count', dest='capture_count', action='store', type=int,
+            metavar='NUM', help='specifies the number of consecutive pictures '
+            'to capture when requested (default: %(default)d)')
+        self.parser.add_argument(
+            '--video-port', dest='video_port', action='store_true',
+            help="if specified, use the camera's video port for rapid capture")
 
     def main(self, args):
         proc = CompoundPiCmd()
+        proc.network = args.network
+        proc.server_port = args.server_port
+        proc.bind = args.bind
+        proc.client_port = args.client_port
+        proc.timeout = args.timeout
+        proc.capture_delay = args.capture_delay
+        proc.capture_count = args.capture_count
+        proc.video_port = args.video_port
+        proc.output = args.output
         proc.cmdloop()
 
 
@@ -80,16 +155,21 @@ class CompoundPiCmd(Cmd):
             'or "find" to locate Pi servers')
         self.servers = set()
         self.network = IPv4Network('192.168.0.0/16')
-        self.client_port = 8000
-        self.server_port = 8000
+        self.server_port = 5647
+        self.bind = IPv4Address('0.0.0.0')
+        self.client_port = 5647
         self.timeout = 5
-        self.path = '/tmp'
+        self.capture_delay = 0
+        self.capture_count = 1
+        self.video_port = False
+        self.output = '/tmp'
         # Set up a broadcast capable UDP socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         # Set up a threading download server
-        self.server = CompoundPiDownloadServer(
-            ('0.0.0.0', self.client_port), CompoundPiDownloadHandler)
+        address = socket.getaddrinfo(
+            str(self.bind), self.client_port, 0, socket.SOCK_STREAM)[0][-1]
+        self.server = CompoundPiDownloadServer(address, CompoundPiDownloadHandler)
         self.server.cmd = self
         self.server_thread = threading.Thread(target=self.server.serve_forever)
         self.server_thread.daemon = True
@@ -129,6 +209,13 @@ class CompoundPiCmd(Cmd):
             else:
                 result.add(self.parse_address(i))
         return result
+
+    def complete_server(self, text, line, start, finish):
+        return [
+            str(server)
+            for server in self.servers
+            if str(server).startswith(text)
+            ]
 
     def no_servers(self):
         raise CmdError(
@@ -189,16 +276,22 @@ class CompoundPiCmd(Cmd):
         The config command is used to display the current client configuration.
         Use the related "set" command to alter the configuration.
 
+        See also: set.
+
         cpi> config
         """
         self.pprint_table(
             [('Setting', 'Value')] +
             [(name, getattr(self, name)) for name in (
                 'network',
-                'timeout',
-                'client_port',
                 'server_port',
-                'path',
+                'bind',
+                'client_port',
+                'timeout',
+                'capture_delay',
+                'capture_count',
+                'video_port',
+                'output',
                 )]
             )
 
@@ -284,6 +377,9 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError('You must specify address(es) to add')
         self.servers |= self.parse_address_list(arg)
 
+    def complete_add(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
+
     def do_remove(self, arg):
         """
         Remove addresses from the list of servers.
@@ -304,6 +400,9 @@ class CompoundPiCmd(Cmd):
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to remove')
         self.servers -= self.parse_address_list(arg)
+
+    def complete_remove(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
 
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
@@ -340,6 +439,9 @@ class CompoundPiCmd(Cmd):
                     )
                 for (address, match) in responses
                 ])
+
+    def complete_status(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
 
     def do_resolution(self, arg):
         """
@@ -447,6 +549,9 @@ class CompoundPiCmd(Cmd):
                 self.pprint('Failed to capture image on %s:' % address)
                 self.pprint(response.strip())
 
+    def complete_capture(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
+
     def do_download(self, arg=''):
         """
         Downloads captured images from the defined servers.
@@ -472,6 +577,9 @@ class CompoundPiCmd(Cmd):
                     'Timed out waiting for image transfer from %s' % address)
             self.pprint('Downloaded image from %s' % address)
             self.unicast('CLEAR\n', address)
+
+    def complete_download(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
 
     def do_identify(self, arg):
         """
@@ -499,6 +607,9 @@ class CompoundPiCmd(Cmd):
             else:
                 self.pprint('Failed identify %s:' % address)
                 self.pprint(response.strip())
+
+    def complete_identify(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
 
 
 class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):

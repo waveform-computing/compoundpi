@@ -170,7 +170,7 @@ class Cmd(cmd.Cmd):
             item
             for item in os.listdir(os.path.expanduser(path))
             if item.startswith(text)
-        ]
+            ]
 
     def default(self, line):
         raise CmdSyntaxError('Syntax error: {}'.format(line))

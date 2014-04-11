@@ -48,7 +48,7 @@ class CompoundPiServer(TerminalApplication):
     This is the server daemon for the CompoundPi application. Starting the
     application with no arguments starts the server in the foreground. The
     server can be configured through command line arguments or a configuration
-    file (which defaults to /etc/cpid.conf).
+    file (which defaults to /etc/cpid.ini).
     """
 
     def __init__(self):
@@ -65,17 +65,17 @@ class CompoundPiServer(TerminalApplication):
             )
         self.parser.set_defaults(
             bind='0.0.0.0',
-            port=8000,
+            port=5647,
             daemon=False,
             )
         self.parser.add_argument(
-            '-b', '--bind', dest='bind', action='store',
+            '-b', '--bind', dest='bind', action='store', metavar='ADDRESS',
             help='specifies the address to listen on for packets '
-            '(default: %default)')
+            '(default: %(default)s)')
         self.parser.add_argument(
             '-p', '--port', dest='port', action='store',
             help='specifies the UDP port for the server to listen on '
-            '(default: %default)')
+            '(default: %(default)d)')
         self.parser.add_argument(
             '-d', '--daemon', dest='daemon', action='store_true',
             help='if specified, start as a background daemon')
