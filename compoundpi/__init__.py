@@ -58,7 +58,6 @@ __classifiers__ = [
     'Operating System :: POSIX',
     'Operating System :: Unix',
     'Programming Language :: Python :: 2.7',
-    'Programming Language :: Python :: 3',
     'Topic :: Multimedia :: Graphics :: Capture',
     'Topic :: Scientific/Engineering',
     ]
