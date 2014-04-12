@@ -26,6 +26,12 @@ from __future__ import (
     )
 _str = str
 str = type('')
+class dict3(dict):
+    keys = dict.viewkeys
+    values = dict.viewvalues
+    items = dict.viewitems
+dict = dict3
+range = xrange
 
 import sys
 import io
@@ -238,7 +244,7 @@ class CompoundPiCmd(Cmd):
             count = len(servers)
         if not servers:
             servers = self.network
-        result = {}
+        result = dict()
         start = time.time()
         while time.time() - start < self.timeout:
             if select.select([self.socket], [], [], 1)[0]:
@@ -255,8 +261,6 @@ class CompoundPiCmd(Cmd):
                     result[address] = data.strip()
                     if len(result) == count:
                         break
-        if len(result) < count:
-            self.pprint('Missing response from %d servers' % (count - len(result)))
         return result
 
     def transact(self, data, addresses):
@@ -269,15 +273,21 @@ class CompoundPiCmd(Cmd):
             if not addresses:
                 self.no_servers()
             self.broadcast(data)
-        result = self.responses(addresses)
-        failed = [
-            str(address) for (address, response) in result.items()
-            if response.splitlines()[-1] != 'OK'
-            ]
+        responses = self.responses(addresses)
+        failed = False
+        for address in addresses:
+            try:
+                response = responses[address]
+            except KeyError:
+                failed = True
+                self.pprint('Missing response from %s' % address)
+            else:
+                if response.splitlines()[-1].strip() != 'OK':
+                    failed = True
+                    self.pprint(
+                        'Unexpected response from %s: %r' % (address, response))
         if failed:
-            raise CmdError(
-                'Command "%s" failed on %d servers: %s' % (
-                    data, len(failed), ', '.join(failed)))
+            raise CmdError('Failed to execute successfully on all servers')
         return result
 
     def do_config(self, arg=''):
@@ -388,8 +398,7 @@ class CompoundPiCmd(Cmd):
         """
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to add')
-        # XXX Check server with PING
-        self.servers |= self.parse_address_list(arg)
+        self.servers |= self.transact('PING', arg).keys()
 
     def complete_add(self, text, line, start, finish):
         # XXX This is wrong - should be addresses in network that *aren't* in self.servers
@@ -490,7 +499,7 @@ class CompoundPiCmd(Cmd):
             width, height = int(width), int(height)
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid resolution "%s"' % arg[0])
-        responses = self.transact(
+        self.transact(
                 'RESOLUTION %d %d' % (width, height),
                 arg[1] if len(arg) > 1 else '')
 
@@ -521,7 +530,7 @@ class CompoundPiCmd(Cmd):
             rate = fractions.Fraction(rate)
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid framerate "%s"' % arg[0])
-        responses = self.transact(
+        self.transact(
                 'FRAMERATE %s' % rate,
                 arg[1] if len(arg) > 1 else '')
 
@@ -548,8 +557,12 @@ class CompoundPiCmd(Cmd):
         cpi> capture 192.168.0.1
         cpi> capture 192.168.0.50-192.168.0.53
         """
-        # XXX Use capture_delay, capture_count, video_port
-        responses = self.transact('CAPTURE 0 1 0', arg)
+        cmd = 'CAPTURE %d %d'
+        params = [self.capture_count, self.video_port]
+        if self.capture_delay:
+            cmd += ' %f'
+            params.append(time.time() + self.capture_delay)
+        self.transact(cmd % params, arg)
 
     def complete_capture(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -572,14 +585,15 @@ class CompoundPiCmd(Cmd):
             if not addresses:
                 self.no_servers()
         for address in addresses:
-            self.server_event.clear()
-            # XXX Use LIST to determine available images
-            # XXX SEND all available images
-            self.transact('SEND 0 %d' % self.client_port, address)
-            if not self.server_event.wait(self.timeout):
-                raise CmdError(
-                    'Timed out waiting for image transfer from %s' % address)
-            self.pprint('Downloaded image from %s' % address)
+            response = self.transact('LIST', address)[address]
+            response = response.strip().splitlines()[:-1]
+            for index, image_details in enumerate(response):
+                self.server_event.clear()
+                self.transact('SEND %d %d' % (index, self.client_port), address)
+                if not self.server_event.wait(self.timeout):
+                    raise CmdError(
+                        'Timed out waiting for image transfer from %s' % address)
+                self.pprint('Downloaded image %d from %s' % (index, address))
             self.transact('CLEAR', address)
 
     def complete_download(self, text, line, start, finish):
@@ -613,14 +627,16 @@ class CompoundPiCmd(Cmd):
 class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
-            # XXX Check for unreasonable size (>10Mb)
-            # XXX Add timestamp to protocol
-            # XXX Write output to user selected path
-            size = struct.unpack(_str('<L'), self.request.recv(4))[0]
-            filename = '%s-%s.jpg' % (
+            timestamp, size = struct.unpack(_str('<dL'), self.request.recv(12))
+            # Guard against something sending a ridiculously large file
+            if size > 10*1024*1024:
+                raise ValueError('Image is unreasonably large: %d' % size)
+            timestamp = datetime.datetime.fromtimestamp(timestamp)
+            filename = os.path.join(
+                self.server.cmd.output, '%s-%s.jpg' % (
+                    timestamp.strftime('%Y%m%d%H%M%S%f'),
                     self.client_address[0],
-                    datetime.datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
-            # XXX Check for silly filename
+                ))
             with io.open(filename, 'wb') as output:
                 while size > 0:
                     data = self.request.recv(1024)
