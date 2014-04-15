@@ -132,11 +132,11 @@ class CompoundPiServer(TerminalApplication):
         logging.info('Exiting daemon context')
 
     def terminate(self, signum, frame):
-        logging.info('Recevied SIGTERM')
+        logging.info('Recevied SIGTERM signal')
         self.server.shutdown()
 
     def interrupt(self, signum, frame):
-        logging.info('Received SIGINT')
+        logging.info('Received SIGINT signal')
         self.server.shutdown()
 
 
@@ -235,17 +235,16 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         self.server.camera.led = False
         try:
             if sync is not None:
-                delay = float(sync) - time.time()
+                delay = sync - time.time()
                 if delay <= 0.0:
                     raise ValueError('Sync time in past')
-                logging.info('Syncing in %.2fs', delay)
                 time.sleep(delay)
-            logging.info(
-                    'Capturing %d images from %s port',
-                    count, 'video' if use_video_port else 'still')
             self.server.camera.capture_sequence(
                 self.stream_generator(count), format='jpeg',
                 use_video_port=use_video_port)
+            logging.info(
+                    'Captured %d images from %s port',
+                    count, 'video' if use_video_port else 'still')
         finally:
             self.server.camera.led = True
 
@@ -277,7 +276,8 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         del self.server.images[:]
 
     def do_quit(self):
-        sys.exit(0)
+        logging.info('Received QUIT command')
+        self.server.shutdown()
 
 
 main = CompoundPiServer()
