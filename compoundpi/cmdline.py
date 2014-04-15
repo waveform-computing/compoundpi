@@ -1,4 +1,4 @@
-# vim: set et sw=4 sts=4:
+# vim: set et sw=4 sts=4 fileencoding=utf-8:
 
 # Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
 #

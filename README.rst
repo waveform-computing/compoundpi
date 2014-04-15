@@ -4,9 +4,9 @@
 Compound Pi
 ===========
 
-This application provides a means for controlling multiple `cameras`_ attached
-to `Raspberry Pi`_'s all of which are attached to the same subnet. Broadcast
-UDP packets are utilized to permit near-simultaneous triggering of all attach
+This project provides a means for controlling multiple `cameras`_ attached to
+`Raspberry Pi`_'s all of which are attached to the same subnet. Broadcast UDP
+packets are utilized to permit near-simultaneous triggering of all attach
 cameras.
 
 The code is licensed under the `GPL v3`_ or above. Packages can be
