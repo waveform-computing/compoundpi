@@ -72,7 +72,7 @@ def main():
                 for c in compoundpi.__classifiers__
                 if c.startswith('License ::')
                 ][0],
-            keywords             = ' '.join(compoundpi.__keywords__),
+            keywords             = compoundpi.__keywords__,
             packages             = find_packages(),
             package_data         = {},
             include_package_data = True,
