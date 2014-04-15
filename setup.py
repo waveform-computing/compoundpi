@@ -79,7 +79,6 @@ def main():
             platforms            = compoundpi.__platforms__,
             install_requires     = compoundpi.__requires__,
             extras_require       = compoundpi.__extra_requires__,
-            zip_safe             = True,
             entry_points         = compoundpi.__entry_points__,
             )
 
