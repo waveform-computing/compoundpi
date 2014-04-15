@@ -207,7 +207,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             client_sock.close()
 
     def do_list(self):
-        for timestamp, stream in self.server.images.items():
+        for timestamp, stream in self.server.images:
             stream.seek(0, io.SEEK_END)
             self.wfile.write('%f %d\n' % (timestamp, stream.tell()))
 
