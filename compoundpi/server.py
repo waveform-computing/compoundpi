@@ -44,7 +44,6 @@ import resource
 
 import daemon
 import RPi.GPIO as GPIO
-import picamera
 
 from . import __version__
 from .terminal import TerminalApplication
@@ -124,29 +123,16 @@ class CompoundPiServer(TerminalApplication):
             help='if specified, start as a background daemon')
 
     def main(self, args):
-        # We must set up the listening socket before forking as a daemon to
-        # ensure that we can open a privileged port (if the user has selected
-        # one). Same goes for setting up GPIO which requires an mmap handle
-        # to /dev/mem (only accessible as root). Once we fork to a background
-        # daemon we drop privileges
         address = socket.getaddrinfo(
             args.bind, args.port, 0, socket.SOCK_DGRAM)[0][-1]
         self.server = socketserver.UDPServer(address, CameraRequestHandler)
-        # Force GPIO to initialize (requires opening /dev/mem which can usually
-        # only be done by root, hence we need to do it before dropping
-        # privileges)
-        logging.info('Initializing GPIO')
+        # Test GPIO before entering the daemon context (GPIO access usually
+        # requires root privileges for access to /dev/mem - better to bomb out
+        # earlier than later)
         GPIO.setmode(GPIO.BCM)
         GPIO.gpio_function(5)
-        # Force the camera to initialize. This usually doesn't require root but
-        # does require membership in the "video" group due to the requirement
-        # to access /dev/vchiq (which we won't have after dropping privileges)
-        logging.info('Initializing camera')
-        self.server.images = []
-        self.server.camera = picamera.PiCamera()
-        # Ensure the server's socket, any log file, stderr (if not forking),
-        # /dev/mem, and /dev/vchiq stay open
-        files_preserve = [self.server.socket, dev_mem_fd(), dev_vchiq_fd()]
+        # Ensure the server's socket, any log file, and stderr (if not forking)
+        files_preserve = [self.server.socket]
         for handler in logging.getLogger().handlers:
             if isinstance(handler, logging.FileHandler):
                 files_preserve.append(handler.stream)
@@ -163,6 +149,13 @@ class CompoundPiServer(TerminalApplication):
                     signal.SIGINT:  self.interrupt,
                     }
                 ):
+            # picamera has to be imported here (currently) partly because the
+            # camera doesn't like forks after initialization, and partly
+            # because the author stupidly runs bcm_host_init on module import
+            import picamera
+            logging.info('Initializing camera')
+            self.server.images = []
+            self.server.camera = picamera.PiCamera()
             try:
                 logging.info('Starting server thread')
                 thread = threading.Thread(target=self.server.serve_forever)
@@ -242,7 +235,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         # we can, then send OK and return to ensure the client doesn't timeout
         # waiting for our response. The actual flashing is taken care of in
         # a background thread
-        #self.server.camera.led = False
+        self.server.camera.led = False
         logging.info('Starting blink thread')
         thread = threading.Thread(target=self.blink_led, args=(5,))
         thread.daemon = True
@@ -273,7 +266,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             yield stream
 
     def do_capture(self, count=1, use_video_port=False, sync=None):
-        #self.server.camera.led = False
+        count = int(count)
+        use_video_port = bool(use_video_port)
+        sync = float(sync) if sync else None
+        self.server.camera.led = False
         try:
             if sync is not None:
                 delay = float(sync) - time.time()
@@ -281,10 +277,12 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                     raise ValueError('Sync time in past')
                 logging.info('Syncing in %.2fs', delay)
                 time.sleep(delay)
-            logging.info('Capturing %d images', count)
+            logging.info(
+                    'Capturing %d images from %s port',
+                    count, 'video' if use_video_port else 'still')
             self.server.camera.capture_sequence(
-                self.stream_generator(int(count)), format='jpeg',
-                use_video_port=bool(use_video_port))
+                self.stream_generator(count), format='jpeg',
+                use_video_port=use_video_port)
         finally:
             self.server.camera.led = True
 
