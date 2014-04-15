@@ -38,7 +38,7 @@ __requires__ = ['ipaddr']
 
 __extra_requires__ = {
     'client': [],
-    'server': ['picamera', 'rpi.gpio', 'daemon'],
+    'server': ['picamera', 'rpi.gpio', 'python-daemon'],
     'doc':    ['sphinx'],
     }
 
