@@ -26,12 +26,9 @@ from __future__ import (
     )
 _str = str
 str = type('')
-class dict3(dict):
-    keys = dict.viewkeys
-    values = dict.viewvalues
-    items = dict.viewitems
-dict = dict3
 range = xrange
+# Py3: correct super-class calls
+# Py3: remove getattr, setattr methods
 
 import sys
 import io
@@ -61,6 +58,40 @@ def service(s):
     except ValueError:
         return socket.servbyname(s)
 
+def address(s):
+    host, port = s.rsplit(':', 1)
+    return socket.getaddrinfo(host, service(port), 0, socket.SOCK_STREAM)[0][-1]
+
+def network(s):
+    return IPv4Network(s)
+
+def zero_or_more(s):
+    result = int(s)
+    if result < 0:
+        raise ValueError('Value must be 0 or more')
+    return result
+
+def one_or_more(s):
+    result = int(s)
+    if result < 1:
+        raise ValueError('Value must be 1 or more')
+    return result
+
+def path(s):
+    if not os.path.exists(s):
+        raise ValueError('%s does not exist' % s)
+    if not os.path.isdir(s):
+        raise ValueError('%s is not a directory' % s)
+    return s
+
+def boolean(s):
+    s = s.strip().lower()
+    if s in {'true', 't', 'yes', 'y', 'on', '1'}:
+        return True
+    elif s in {'false', 'f', 'no', 'n', 'off', '0'}:
+        return False
+    raise ValueError('%s is not a valid boolean' % s)
+
 
 class CompoundPiClient(TerminalApplication):
     """
@@ -86,14 +117,13 @@ class CompoundPiClient(TerminalApplication):
                 ],
             )
         self.parser.set_defaults(
-            network=IPv4Network('192.168.0.0/16'),
-            client_port=5647,
-            server_port=5647,
+            network='192.168.0.0/16',
+            port=5647,
+            bind='0.0.0.0:5647',
             timeout=5,
             capture_delay=0,
             capture_count=1,
             video_port=False,
-            bind='0.0.0.0',
             output='/tmp',
             )
         self.parser.add_argument(
@@ -102,23 +132,18 @@ class CompoundPiClient(TerminalApplication):
             'written to (default: %(default)s)')
         self.parser.add_argument(
             '-n', '--network', dest='network', action='store',
-            type=IPv4Network, help='specifies the network that the servers '
+            type=network, help='specifies the network that the servers '
             'belong to (default: %(default)s)')
         self.parser.add_argument(
-            '-p', '--server-port', dest='server_port', action='store',
-            type=service, metavar='PORT',
+            '-p', '--port', dest='port', action='store', type=service,
+            metavar='PORT',
             help='specifies the port that the servers are listening on '
             '(default: %(default)d)')
         self.parser.add_argument(
             '-b', '--bind', dest='bind', action='store',
-            type=IPv4Address, metavar='ADDRESS',
-            help='specifies the address that the client listens on for '
-            'downloads (default: %(default)s)')
-        self.parser.add_argument(
-            '--client-port', dest='client_port', action='store',
-            type=service, metavar='PORT',
-            help='specifies the port that the client listens on for downloads '
-            '(default: %(default)d)')
+            type=address, metavar='ADDRESS:PORT',
+            help='specifies the address and port that the client listens on '
+            'for downloads (default: %(default)s)')
         self.parser.add_argument(
             '-t', '--timeout', dest='timeout', action='store', type=int,
             metavar='SECS', help='specifies the timeout (in seconds) for '
@@ -139,9 +164,8 @@ class CompoundPiClient(TerminalApplication):
     def main(self, args):
         proc = CompoundPiCmd()
         proc.network = args.network
-        proc.server_port = args.server_port
+        proc.port = args.port
         proc.bind = args.bind
-        proc.client_port = args.client_port
         proc.timeout = args.timeout
         proc.capture_delay = args.capture_delay
         proc.capture_count = args.capture_count
@@ -161,34 +185,73 @@ class CompoundPiCmd(Cmd):
             'Type "help" for more information, '
             'or "find" to locate Pi servers')
         self.servers = set()
-        self.network = IPv4Network('192.168.0.0/16')
-        self.server_port = 5647
-        self.bind = IPv4Address('0.0.0.0')
-        self.client_port = 5647
+        self.network = '192.168.0.0/16'
+        self.port = 5647
         self.timeout = 5
         self.capture_delay = 0
         self.capture_count = 1
         self.video_port = False
         self.output = '/tmp'
-
-    def preloop(self):
-        Cmd.preloop(self)
-        # Set up a broadcast capable UDP socket
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        # Set up a threading download server
-        address = socket.getaddrinfo(
-            str(self.bind), self.client_port, 0, socket.SOCK_STREAM)[0][-1]
-        self.server = CompoundPiDownloadServer(address, CompoundPiDownloadHandler)
-        self.server.cmd = self
-        self.server_event = threading.Event()
-        self.server_thread = threading.Thread(target=self.server.serve_forever)
-        self.server_thread.daemon = True
-        self.server_thread.start()
+        self.server = None
+
+    def __getattr__(self, name):
+        # Py3: remove this method
+        # This method only exists because computed properties don't work with
+        # old-style classes in Python 2
+        if name == 'bind':
+            return self._get_bind()
+        elif name == 'network':
+            return self._get_network()
+        else:
+            return Cmd.__getattr__(self, name)
+
+    def __setattr__(self, name, value):
+        # Py3: remove this method
+        # This method only exists because computed properties don't work with
+        # old-style classes in Python 2
+        if name == 'bind':
+            self._set_bind(value)
+        elif name == 'network':
+            self._set_network(value)
+        else:
+            self.__dict__[name] = value
+
+    def _get_bind(self):
+        if self.server:
+            return IPv4Address(self.server.socket.getsockname()[0])
+    def _set_bind(self, value):
+        if self.server:
+            self.server.shutdown()
+            self.server.socket.close()
+            self.server_thread = None
+        if value is not None:
+            self.server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
+            self.server.cmd = self
+            self.server.event = threading.Event()
+            self.server.expected_size = None
+            self.server.expected_address = None
+            self.server.exception = None
+            self.server_thread = threading.Thread(target=self.server.serve_forever)
+            self.server_thread.daemon = True
+            self.server_thread.start()
+    bind = property(_get_bind, _set_bind)
+
+    def _get_network(self):
+        return self._network
+    def _set_network(self, value):
+        self._network = network(value)
+        self.servers = set()
+    network = property(_get_network, _set_network)
+
+    def preloop(self):
+        assert self.server
+        Cmd.preloop(self)
 
     def postloop(self):
         Cmd.postloop(self)
-        self.server.shutdown()
+        self.bind = None
 
     def parse_address(self, s):
         try:
@@ -232,10 +295,10 @@ class CompoundPiCmd(Cmd):
                 "You must define servers first (see help for 'find' and 'add')")
 
     def unicast(self, data, address):
-        self.socket.sendto(data, (str(address), self.server_port))
+        self.socket.sendto(data, (str(address), self.port))
 
     def broadcast(self, data):
-        self.socket.sendto(data, (str(self.network.broadcast), self.server_port))
+        self.socket.sendto(data, (str(self.network.broadcast), self.port))
 
     def responses(self, servers=None, count=0):
         if servers is None:
@@ -251,7 +314,7 @@ class CompoundPiCmd(Cmd):
                 data, address = self.socket.recvfrom(512)
                 address, port = address
                 address = IPv4Address(address)
-                if port != self.server_port:
+                if port != self.port:
                     self.pprint('Ignoring response from wrong port %s:%d' % (address, port))
                 elif address in result:
                     self.pprint('Ignoring double response from %s' % address)
@@ -265,7 +328,10 @@ class CompoundPiCmd(Cmd):
 
     def transact(self, data, addresses):
         if addresses:
-            addresses = self.parse_address_list(addresses)
+            if isinstance(addresses, str):
+                addresses = self.parse_address_list(addresses)
+            elif isinstance(addresses, IPv4Address):
+                addresses = {addresses}
             for address in addresses:
                 self.unicast(data, address)
         else:
@@ -288,7 +354,7 @@ class CompoundPiCmd(Cmd):
                         'Unexpected response from %s: %r' % (address, response))
         if failed:
             raise CmdError('Failed to execute successfully on all servers')
-        return result
+        return responses
 
     def do_config(self, arg=''):
         """
@@ -307,9 +373,8 @@ class CompoundPiCmd(Cmd):
             [('Setting', 'Value')] +
             [(name, getattr(self, name)) for name in (
                 'network',
-                'server_port',
+                'port',
                 'bind',
-                'client_port',
                 'timeout',
                 'capture_delay',
                 'capture_count',
@@ -317,6 +382,42 @@ class CompoundPiCmd(Cmd):
                 'output',
                 )]
             )
+
+    def do_set(self, arg):
+        """
+        Change a configuration variable.
+
+        Syntax: set <name> <value>
+
+        The set command is used to alter the value of a client configuration
+        variable. Use the related "config" command to view the current
+        configuration.
+
+        See also: config.
+
+        cpi> set timeout 10
+        cpi> set output /home/camera/
+        cpi> set capture_count 5
+        """
+        match = re.match(r' *(?P<name>[A-Za-z_]+) +(?P<value>.*)', arg)
+        if not match:
+            raise CmdSyntaxError('You must specify a variable name and value')
+        name = match.group('name').lower()
+        value = match.group('value').strip()
+        try:
+            value = {
+                'network':       network,
+                'port':          service,
+                'bind':          address,
+                'timeout':       one_or_more,
+                'capture_delay': zero_or_more,
+                'capture_count': one_or_more,
+                'video_port':    boolean,
+                'output':        path,
+                }[name](value)
+        except KeyError:
+            raise CmdSyntaxError('Invalid configuration variable: %s' % name)
+        setattr(self, name, value)
 
     def do_servers(self, arg=''):
         """
@@ -383,7 +484,7 @@ class CompoundPiCmd(Cmd):
         """
         Add addresses to the list of servers.
 
-        Syntax: add addresses
+        Syntax: add <addresses>
 
         The 'add' command is used to manually define the set of Pi's to
         communicate with. Addresses can be specified individually, as a
@@ -408,7 +509,7 @@ class CompoundPiCmd(Cmd):
         """
         Remove addresses from the list of servers.
 
-        Syntax: remove addresses
+        Syntax: remove <addresses>
 
         The 'remove' command is used to remove addresses from the set of Pi's
         to communicate with. Addresses can be specified individually, as a
@@ -476,7 +577,7 @@ class CompoundPiCmd(Cmd):
         """
         Sets the resolution on the defined servers.
 
-        Syntax: resolution res [addresses]
+        Syntax: resolution <width>x<height> [addresses]
 
         The 'resolution' command is used to set the capture resolution of the
         camera on all or some of the defined servers.
@@ -507,7 +608,7 @@ class CompoundPiCmd(Cmd):
         """
         Sets the framerate on the defined servers.
 
-        Syntax: framerate rate [addresses]
+        Syntax: framerate <rate> [addresses]
 
         The 'framerate' command is used to set the capture framerate of the
         camera on all or some of the defined servers. The rate can be specified
@@ -562,7 +663,7 @@ class CompoundPiCmd(Cmd):
         if self.capture_delay:
             cmd += ' %f'
             params.append(time.time() + self.capture_delay)
-        self.transact(cmd % params, arg)
+        self.transact(cmd % tuple(params), arg)
 
     def complete_capture(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -585,12 +686,24 @@ class CompoundPiCmd(Cmd):
             if not addresses:
                 self.no_servers()
         for address in addresses:
+            self.server.expected_address = address
             response = self.transact('LIST', address)[address]
             response = response.strip().splitlines()[:-1]
-            for index, image_details in enumerate(response):
-                self.server_event.clear()
-                self.transact('SEND %d %d' % (index, self.client_port), address)
-                if not self.server_event.wait(self.timeout):
+            for index, details in enumerate(response):
+                try:
+                    timestamp, size = details.split(' ', 1)
+                    timestamp = float(timestamp)
+                    size = int(size)
+                except (ValueError, TypeError):
+                    raise CmdError(
+                        'Received invalid image details from %s' % address)
+                self.server.expected_size = size
+                self.server.event.clear()
+                self.transact('SEND %d %d' % (index, self.port), address)
+                if self.server.event.wait(self.timeout):
+                    if self.server.exception:
+                        raise CmdError(str(self.server.exception))
+                else:
                     raise CmdError(
                         'Timed out waiting for image transfer from %s' % address)
                 self.pprint('Downloaded image %d from %s' % (index, address))
@@ -627,10 +740,18 @@ class CompoundPiCmd(Cmd):
 class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
     def handle(self):
         try:
+            if self.client_address[0] != str(self.server.expected_address):
+                raise ValueError(
+                    'Connection from unexpected address: %s instead of %s' %
+                    (self.client_address[0], self.server.expected_address))
             timestamp, size = struct.unpack(_str('<dL'), self.request.recv(12))
+            if size != self.server.expected_size:
+                raise ValueError(
+                    'Image size differs from LIST result: '
+                    '%d != %d' % (size, self.server.expected_size))
             # Guard against something sending a ridiculously large file
             if size > 10*1024*1024:
-                raise ValueError('Image is unreasonably large: %d' % size)
+                raise ValueError('Image size is unreasonably large: %d' % size)
             timestamp = datetime.datetime.fromtimestamp(timestamp)
             filename = os.path.join(
                 self.server.cmd.output, '%s-%s.jpg' % (
@@ -642,8 +763,14 @@ class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
                     data = self.request.recv(1024)
                     output.write(data)
                     size -= len(data)
+            if size > 0:
+                raise ValueError('Server did not transmit entire image')
+        except Exception as e:
+            self.server.exception = e
+        else:
+            self.server.exception = None
         finally:
-            self.server.cmd.server_event.set()
+            self.server.event.set()
 
 
 class CompoundPiDownloadServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
