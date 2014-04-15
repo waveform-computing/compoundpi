@@ -40,49 +40,12 @@ import socket
 import SocketServer as socketserver
 import shutil
 import signal
-import resource
 
 import daemon
 import RPi.GPIO as GPIO
 
 from . import __version__
 from .terminal import TerminalApplication
-
-
-def max_fd():
-    "Determine the maximum number of file descriptors for this platform"
-    soft_lim, hard_lim = resource.getrlimit(resource.RLIMIT_NOFILE)
-    if hard_lim == resource.RLIM_INFINITY:
-        return 2048
-    return hard_lim
-
-def find_fd(major, minor):
-    "Dirty hack to find file descriptor representing a specific device"
-    for fd in range(max_fd()):
-        try:
-            stat = os.fstat(fd)
-        except OSError:
-            continue
-        if (os.major(stat.st_rdev), os.minor(stat.st_rdev)) == (major, minor):
-            return fd
-    raise ValueError(
-        'Unable to locate device identified by (%d, %d)' % (major, minor))
-
-def dev_mem_fd():
-    "Returns the file descriptor associated with /dev/mem"
-    return find_fd(1, 1)
-
-def dev_vchiq_fd():
-    "Returns the file descriptor associated with /dev/vchiq"
-    major = None
-    with io.open('/proc/devices', 'r') as devices:
-        for line in devices:
-            if line.strip().endswith('vchiq'):
-                major = int(line.strip().split(' ')[0])
-                break
-    if major is None:
-        raise ValueError('Failed to find device number for vchiq')
-    return find_fd(major, 0)
 
 
 class CompoundPiServer(TerminalApplication):
