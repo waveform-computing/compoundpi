@@ -163,15 +163,15 @@ class TerminalApplication(object):
                 self.config_bools = ['pdb'] + self.config_bools
             if not self.config_section:
                 self.config_section = self.config.sections()[0]
-            if not self.config_section in self.config:
+            if not self.config_section in self.config.sections():
                 self.parser.error(
                     'unable to locate [%s] section in configuration' % self.config_section)
             self.parser.set_defaults(**{
                 key:
-                self.config.getboolean(section, key)
+                self.config.getboolean(self.config_section, key)
                 if key in self.config_bools else
-                self.config.get(section, key)
-                for key in self.config[self.config_section]
+                self.config.get(self.config_section, key)
+                for key in self.config.options(self.config_section)
                 })
         return args
 

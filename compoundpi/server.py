@@ -49,6 +49,16 @@ from . import __version__
 from .terminal import TerminalApplication
 
 
+def service(s):
+    try:
+        return int(s)
+    except ValueError:
+        return socket.servbyname(s)
+
+def address(s):
+    return socket.getaddrinfo(s, 0, 0, socket.SOCK_DGRAM)[0][-1][0]
+
+
 class CompoundPiServer(TerminalApplication):
     """
     This is the server daemon for the CompoundPi application. Starting the
@@ -73,16 +83,17 @@ class CompoundPiServer(TerminalApplication):
             bind='0.0.0.0',
             port=5647,
             daemon=False,
-            pid_file='/var/run/cpid.pid',
+            pidfile='/var/run/cpid.pid',
             )
         self.parser.add_argument(
-            '-b', '--bind', dest='bind', action='store', metavar='ADDRESS',
+            '-b', '--bind', dest='bind', action='store', type=address,
+            metavar='ADDRESS',
             help='specifies the address to listen on for packets '
             '(default: %(default)s)')
         self.parser.add_argument(
-            '-p', '--port', dest='port', action='store',
+            '-p', '--port', dest='port', action='store', type=service,
             help='specifies the UDP port for the server to listen on '
-            '(default: %(default)d)')
+            '(default: %(default)s)')
         self.parser.add_argument(
             '-d', '--daemon', dest='daemon', action='store_true',
             help='if specified, start as a background daemon')
@@ -107,14 +118,13 @@ class CompoundPiServer(TerminalApplication):
         for handler in logging.getLogger().handlers:
             if isinstance(handler, logging.FileHandler):
                 files_preserve.append(handler.stream)
-        if not args.daemon:
-            files_preserve.append(sys.stderr)
         logging.info('Entering daemon context')
         with daemon.DaemonContext(
-                files_preserve=files_preserve,
                 # The following odd construct is to ensure detachment only
                 # where sensible (see default setting of detach_process)
                 detach_process=None if args.daemon else False,
+                stderr=None if args.daemon else sys.stderr,
+                files_preserve=files_preserve,
                 pidfile=pidfile,
                 signal_map={
                     signal.SIGTERM: self.terminate,
