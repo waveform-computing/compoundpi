@@ -34,7 +34,7 @@ __keywords__     = ['raspberrypi', 'camera', 'multi']
 __author__       = 'Dave Hughes'
 __author_email__ = 'dave@waveform.org.uk'
 __url__          = 'http://compoundpi.readthedocs.org/'
-__platforms__    = 'ALL',
+__platforms__    = 'ALL'
 
 __requires__ = ['ipaddr']
 
