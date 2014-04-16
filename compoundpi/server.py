@@ -42,6 +42,7 @@ import shutil
 import signal
 
 import daemon
+import daemon.runner
 import RPi.GPIO as GPIO
 
 from . import __version__
@@ -72,6 +73,7 @@ class CompoundPiServer(TerminalApplication):
             bind='0.0.0.0',
             port=5647,
             daemon=False,
+            pidfile='/var/run/cpid.pid',
             )
         self.parser.add_argument(
             '-b', '--bind', dest='bind', action='store', metavar='ADDRESS',
@@ -84,8 +86,14 @@ class CompoundPiServer(TerminalApplication):
         self.parser.add_argument(
             '-d', '--daemon', dest='daemon', action='store_true',
             help='if specified, start as a background daemon')
+        self.parser.add_argument(
+            '--pidfile', dest='pidfile', action='store', metavar='FILE',
+            help='specifies the location of the pid lock file')
 
     def main(self, args):
+        pidfile = daemon.runner.make_pidlockfile(args.pidfile, 5)
+        if daemon.runner.is_pidfile_stale(pidfile):
+            pidfile.break_lock()
         address = socket.getaddrinfo(
             args.bind, args.port, 0, socket.SOCK_DGRAM)[0][-1]
         self.server = socketserver.UDPServer(address, CameraRequestHandler)
@@ -107,6 +115,7 @@ class CompoundPiServer(TerminalApplication):
                 # The following odd construct is to ensure detachment only
                 # where sensible (see default setting of detach_process)
                 detach_process=None if args.daemon else False,
+                pidfile=pidfile,
                 signal_map={
                     signal.SIGTERM: self.terminate,
                     signal.SIGINT:  self.interrupt,

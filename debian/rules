@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+# -*- makefile -*-
+
+#export DH_VERBOSE=1
+export DH_OPTIONS
+
+%:
+	dh $@ --with python2,sphinxdoc --buildsystem=python_distutils
+
+override_dh_auto_install:
+	python setup.py install --root debian/compoundpi-common --install-layout=deb
+
+override_dh_auto_test:
+	# Don't run the tests!
+
+override_dh_installdocs:
+	python setup.py build_sphinx -b html
+	dh_installdocs
+

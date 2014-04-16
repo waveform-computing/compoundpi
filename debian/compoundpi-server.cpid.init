@@ -1,0 +1,65 @@
+#!/bin/sh
+
+### BEGIN INIT INFO
+# Provides:          cpid
+# Required-Start:    $remote_fs $syslog $time $network
+# Required-Stop:     $remote_fs $syslog $time $network
+# Default-Start:     2 3 4 5
+# Default-Stop:      0 1 6
+# Short-Description: Compound Pi camera daemon
+### END INIT INFO
+
+PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
+DAEMON=/usr/sbin/cpid
+NAME=cpid
+DESC="Compound Pi camera daemon"
+
+test -x $DAEMON || exit 0
+set -e
+
+if [ -f /etc/default/cpid ]; then
+    . /etc/default/cpid
+fi
+
+. /lib/lsb/init-functions
+
+case "$1" in
+    start)
+        log_daemon_msg "Starting CompoundPi server" "cpid" || true
+        if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/cpid.pid --exec /usr/bin/cpid -- $CPID_OPTS; then
+            log_end_msg 0 || true
+        else
+            log_end_msg 1 || true
+        fi
+        ;;
+
+    stop)
+        log_daemon_msg "Stopping CompoundPi server" "cpid" || true
+        if start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/cpid.pid; then
+            log_end_msg 0 || true
+        else
+            log_end_msg 1 || true
+        fi
+        ;;
+
+    restart|reload|force-reload)
+        log_daemon_msg "Restarting CompoundPi server" "cpid" || true
+        start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/cpid.pid
+        if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/cpid.pid --exec /usr/bin/cpid -- $CPID_OPTS; then
+            log_end_msg 0 || true
+        else
+            log_end_msg 1 || true
+        fi
+        ;;
+
+    status)
+        status_of_proc -p /var/run/cpid.pid /usr/bin/cpid cpid && exit 0 || exit $?
+        ;;
+
+    *)
+        log_action_msg "Usage: /etc/init.d/cpid {start|stop|reload|force-reload|restart|status}" || true
+        exit 1
+        ;;
+esac
+
+exit 0

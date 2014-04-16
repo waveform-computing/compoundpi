@@ -1,0 +1,10 @@
+Document: compoundpi-common
+Title: Compound Pi
+Author: Dave Hughes <dave@waveform.org.uk>
+Abstract: Documentation for the Compound Pi camera system.
+Section: Graphics
+
+Format: HTML
+Index: /usr/share/doc/compoundpi-docs/html/index.html
+Files: /usr/share/doc/compoundpi-docs/html/*
+

@@ -65,6 +65,10 @@ Description
 
     if specified, start as a background daemon
 
+.. option:: --pidfile FILE
+
+    specifies the location of the pid lock file
+
 
 Usage
 =====

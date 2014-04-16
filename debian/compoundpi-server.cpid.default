@@ -1,0 +1,5 @@
+# Default settings for compoundpi-server. This file is sourced by /bin/sh from
+# /etc/init.d/cpid.
+
+# Options to pass to cpid
+CPID_OPTS=

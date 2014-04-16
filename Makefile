@@ -37,8 +37,15 @@ DOC_SOURCES:=$(wildcard docs/*.rst)
 DIST_EGG=dist/$(NAME)-$(VER)-$(PYVER).egg
 DIST_TAR=dist/$(NAME)-$(VER).tar.gz
 DIST_ZIP=dist/$(NAME)-$(VER).zip
-DIST_DEB=dist/$(NAME)_$(VER)-1~ppa1_all.deb
-DIST_DSC=dist/$(NAME)_$(VER)-1.tar.gz dist/$(NAME)_$(VER)-1.dsc dist/$(NAME)_$(VER)-1_source.changes
+DIST_DEB=dist/$(NAME)-server_$(VER)-1~ppa1_armhf.deb \
+	dist/$(NAME)-client_$(VER)-1~ppa1_all.deb \
+	dist/$(NAME)-common_$(VER)-1~ppa1_all.deb \
+	dist/$(NAME)-docs_$(VER)-1~ppa1_all.deb
+DIST_DSC=dist/$(NAME)_$(VER)-1.tar.gz \
+	dist/$(NAME)_$(VER)-1.dsc \
+	dist/$(NAME)_$(VER)-1_source.changes
+MAN_DIR=build/sphinx/man
+MAN_PAGES=$(MAN_DIR)/cpi.1 $(MAN_DIR)/cpid.1
 
 
 # Default target
@@ -106,7 +113,10 @@ $(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES)
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
 	debuild -b -i -I -Idist -Ibuild -Ihtmlcov -I__pycache__ -I.coverage -Itags -I*.pyc -rfakeroot
 	mkdir -p dist/
-	cp ../$(NAME)_$(VER)-1~ppa1_all.deb dist/
+	cp ../$(NAME)-server_$(VER)-1~ppa1_armhf.deb dist/
+	cp ../$(NAME)-client_$(VER)-1~ppa1_all.deb dist/
+	cp ../$(NAME)-common_$(VER)-1~ppa1_all.deb dist/
+	cp ../$(NAME)-docs_$(VER)-1~ppa1_all.deb dist/
 
 $(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES)
 	# build the source package in the parent directory then rename it to
