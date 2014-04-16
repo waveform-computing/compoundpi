@@ -48,8 +48,7 @@ DIST_DEB=dist/$(NAME)-server_$(VER)-1_all.deb \
 DIST_DSC=dist/$(NAME)_$(VER)-1.tar.gz \
 	dist/$(NAME)_$(VER)-1.dsc \
 	dist/$(NAME)_$(VER)-1_source.changes
-MAN_DIR=build/sphinx/man
-MAN_PAGES=$(MAN_DIR)/cpi.1 $(MAN_DIR)/cpid.1
+MAN_PAGES=man/cpi.1 man/cpid.1
 
 
 # Default target
@@ -103,6 +102,8 @@ tags: $(PY_SOURCES)
 
 $(MAN_PAGES): $(DOC_SOURCES)
 	$(PYTHON) $(PYFLAGS) setup.py build_sphinx -b man
+	mkdir -p man/
+	cp build/sphinx/man/*.1 man/
 
 $(DIST_TAR): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats gztar
