@@ -26,10 +26,14 @@ PY_SOURCES:=$(shell \
 DEB_SOURCES:=debian/changelog \
 	debian/control \
 	debian/copyright \
-	debian/install \
 	debian/rules \
-	debian/source/include-binaries \
-	debian/$(NAME).manpages \
+	debian/docs \
+	debian/$(NAME)-docs.docs \
+	debian/$(NAME)-docs.doc-base \
+	debian/$(NAME)-client.manpages \
+	debian/$(NAME)-server.manpages \
+	debian/$(NAME)-server.cpid.init \
+	debian/$(NAME)-server.cpid.default \
 	$(wildcard debian/*.desktop)
 DOC_SOURCES:=$(wildcard docs/*.rst)
 
@@ -37,10 +41,10 @@ DOC_SOURCES:=$(wildcard docs/*.rst)
 DIST_EGG=dist/$(NAME)-$(VER)-$(PYVER).egg
 DIST_TAR=dist/$(NAME)-$(VER).tar.gz
 DIST_ZIP=dist/$(NAME)-$(VER).zip
-DIST_DEB=dist/$(NAME)-server_$(VER)-1~ppa1_armhf.deb \
-	dist/$(NAME)-client_$(VER)-1~ppa1_all.deb \
-	dist/$(NAME)-common_$(VER)-1~ppa1_all.deb \
-	dist/$(NAME)-docs_$(VER)-1~ppa1_all.deb
+DIST_DEB=dist/$(NAME)-server_$(VER)-1_all.deb \
+	dist/$(NAME)-client_$(VER)-1_all.deb \
+	dist/$(NAME)-common_$(VER)-1_all.deb \
+	dist/$(NAME)-docs_$(VER)-1_all.deb
 DIST_DSC=dist/$(NAME)_$(VER)-1.tar.gz \
 	dist/$(NAME)_$(VER)-1.dsc \
 	dist/$(NAME)_$(VER)-1_source.changes
@@ -97,6 +101,9 @@ clean:
 tags: $(PY_SOURCES)
 	ctags -R --exclude="build/*" --exclude="debian/*" --exclude="docs/*" --languages="Python"
 
+$(MAN_PAGES): $(DOC_SOURCES)
+	$(PYTHON) $(PYFLAGS) setup.py build_sphinx -b man
+
 $(DIST_TAR): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats gztar
 
@@ -106,19 +113,19 @@ $(DIST_ZIP): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
 $(DIST_EGG): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
 	$(PYTHON) $(PYFLAGS) setup.py bdist_egg
 
-$(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES)
+$(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	# build the source package in the parent directory then rename it to
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
 	debuild -b -i -I -Idist -Ibuild -Ihtmlcov -I__pycache__ -I.coverage -Itags -I*.pyc -rfakeroot
 	mkdir -p dist/
-	cp ../$(NAME)-server_$(VER)-1~ppa1_armhf.deb dist/
-	cp ../$(NAME)-client_$(VER)-1~ppa1_all.deb dist/
-	cp ../$(NAME)-common_$(VER)-1~ppa1_all.deb dist/
-	cp ../$(NAME)-docs_$(VER)-1~ppa1_all.deb dist/
+	cp ../$(NAME)-server_$(VER)-1_all.deb dist/
+	cp ../$(NAME)-client_$(VER)-1_all.deb dist/
+	cp ../$(NAME)-common_$(VER)-1_all.deb dist/
+	cp ../$(NAME)-docs_$(VER)-1_all.deb dist/
 
-$(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES)
+$(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	# build the source package in the parent directory then rename it to
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
@@ -133,7 +140,7 @@ release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# ensure there are no current uncommitted changes
 	test -z "$(shell git status --porcelain)"
 	# update the changelog with new release information
-	dch --newversion $(VER)-1~ppa1 --controlmaint
+	dch --newversion $(VER)-1 --controlmaint
 	# commit the changes and add a new tag
 	git commit debian/changelog -m "Updated changelog for release $(VER)"
 	git tag -s release-$(VER) -m "Release $(VER)"
@@ -142,7 +149,7 @@ upload: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	# build a source archive and upload to PyPI
 	$(PYTHON) $(PYFLAGS) setup.py sdist upload
 	# build the deb source archive and upload to the PPA
-	dput waveform-ppa ../$(NAME)_$(VER)-1~ppa1_source.changes
+	dput waveform-ppa ../$(NAME)_$(VER)-1_source.changes
 
 .PHONY: all install develop test doc source egg deb tar zip dist clean tags release upload
 

@@ -20,8 +20,8 @@ Description: multi-camera capture system - common files.
  This package provides files common to both the server and client components of
  the project.
 
-Package: componentpi-server
-Architecture: any
+Package: compoundpi-server
+Architecture: all
 Depends: ${misc:Depends}, ${python:Depends}, compoundpi-common (>= ${binary:Version}), python-picamera, python-rpi.gpio, python-daemon
 Description: multi-camera capture system - server component.
  Compound Pi is a system for controlling camera modules attached to multiple
@@ -31,7 +31,7 @@ Description: multi-camera capture system - server component.
  .
  This package provides the server component of the project.
 
-Package: componentpi-client
+Package: compoundpi-client
 Architecture: all
 Depends: ${misc:Depends}, ${python:Depends}, compoundpi-common (>= ${binary:Version})
 Description: multi-camera capture system - server component.

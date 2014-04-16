@@ -73,7 +73,7 @@ class CompoundPiServer(TerminalApplication):
             bind='0.0.0.0',
             port=5647,
             daemon=False,
-            pidfile='/var/run/cpid.pid',
+            pid_file='/var/run/cpid.pid',
             )
         self.parser.add_argument(
             '-b', '--bind', dest='bind', action='store', metavar='ADDRESS',

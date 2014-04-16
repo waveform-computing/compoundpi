@@ -2,4 +2,4 @@
 # /etc/init.d/cpid.
 
 # Options to pass to cpid
-CPID_OPTS=
+CPID_OPTS=""

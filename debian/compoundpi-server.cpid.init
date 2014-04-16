@@ -10,23 +10,24 @@
 ### END INIT INFO
 
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
-DAEMON=/usr/sbin/cpid
 NAME=cpid
+DAEMON=/usr/sbin/$NAME
+PIDFILE=/var/run/$NAME.pid
+DEFAULT=/etc/default/$NAME
 DESC="Compound Pi camera daemon"
 
-test -x $DAEMON || exit 0
 set -e
-
-if [ -f /etc/default/cpid ]; then
-    . /etc/default/cpid
-fi
+[ -x $DAEMON ] || exit 0
+[ -f $DEFAULT ] && . $DEFAULT
 
 . /lib/lsb/init-functions
 
+DAEMON_ARGS="-d $CPID_OPTS"
+
 case "$1" in
     start)
-        log_daemon_msg "Starting CompoundPi server" "cpid" || true
-        if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/cpid.pid --exec /usr/bin/cpid -- $CPID_OPTS; then
+        log_daemon_msg "Starting CompoundPi server" $NAME || true
+        if start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_ARGS; then
             log_end_msg 0 || true
         else
             log_end_msg 1 || true
@@ -34,8 +35,8 @@ case "$1" in
         ;;
 
     stop)
-        log_daemon_msg "Stopping CompoundPi server" "cpid" || true
-        if start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/cpid.pid; then
+        log_daemon_msg "Stopping CompoundPi server" $NAME || true
+        if start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE; then
             log_end_msg 0 || true
         else
             log_end_msg 1 || true
@@ -43,9 +44,9 @@ case "$1" in
         ;;
 
     restart|reload|force-reload)
-        log_daemon_msg "Restarting CompoundPi server" "cpid" || true
-        start-stop-daemon --stop --quiet --oknodo --pidfile /var/run/cpid.pid
-        if start-stop-daemon --start --quiet --oknodo --pidfile /var/run/cpid.pid --exec /usr/bin/cpid -- $CPID_OPTS; then
+        log_daemon_msg "Restarting CompoundPi server" $NAME || true
+        start-stop-daemon --stop --quiet --oknodo --pidfile $PIDFILE
+        if start-stop-daemon --start --quiet --oknodo --pidfile $PIDFILE --exec $DAEMON -- $DAEMON_ARGS; then
             log_end_msg 0 || true
         else
             log_end_msg 1 || true
@@ -53,7 +54,8 @@ case "$1" in
         ;;
 
     status)
-        status_of_proc -p /var/run/cpid.pid /usr/bin/cpid cpid && exit 0 || exit $?
+        status_of_proc -p $PIDFILE $DAEMON $NAME
+        exit $?
         ;;
 
     *)
