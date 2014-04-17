@@ -220,7 +220,7 @@ class CompoundPiCmd(Cmd):
 
     def _get_bind(self):
         if self.server:
-            return IPv4Address(self.server.socket.getsockname()[0])
+            return self.server.socket.getsockname()
     def _set_bind(self, value):
         if self.server:
             self.server.shutdown()
@@ -371,16 +371,22 @@ class CompoundPiCmd(Cmd):
         """
         self.pprint_table(
             [('Setting', 'Value')] +
-            [(name, getattr(self, name)) for name in (
-                'network',
-                'port',
-                'bind',
-                'timeout',
-                'capture_delay',
-                'capture_count',
-                'video_port',
-                'output',
-                )]
+            [
+                (name,
+                    '%s:%d' % getattr(self, name)
+                    if name == 'bind'
+                    else str(getattr(self, name))
+                    )
+                for name in (
+                    'network',
+                    'port',
+                    'bind',
+                    'timeout',
+                    'capture_delay',
+                    'capture_count',
+                    'video_port',
+                    'output',
+                    )]
             )
 
     def do_set(self, arg):
