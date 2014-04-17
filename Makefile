@@ -19,6 +19,11 @@ endif
 # documentation, packaging, icon, and executable script files
 NAME:=$(shell $(PYTHON) $(PYFLAGS) setup.py --name)
 VER:=$(shell $(PYTHON) $(PYFLAGS) setup.py --version)
+ifeq ($(shell lsb_release -si),Ubuntu)
+DEB_SUFFIX:=ubuntu2
+else
+DEB_SUFFIX:=
+endif
 PYVER:=$(shell $(PYTHON) $(PYFLAGS) -c "import sys; print('py%d.%d' % sys.version_info[:2])")
 PY_SOURCES:=$(shell \
 	$(PYTHON) $(PYFLAGS) setup.py egg_info >/dev/null 2>&1 && \
@@ -41,13 +46,13 @@ DOC_SOURCES:=$(wildcard docs/*.rst)
 DIST_EGG=dist/$(NAME)-$(VER)-$(PYVER).egg
 DIST_TAR=dist/$(NAME)-$(VER).tar.gz
 DIST_ZIP=dist/$(NAME)-$(VER).zip
-DIST_DEB=dist/$(NAME)-server_$(VER)-1_all.deb \
-	dist/$(NAME)-client_$(VER)-1_all.deb \
-	dist/$(NAME)-common_$(VER)-1_all.deb \
-	dist/$(NAME)-docs_$(VER)-1_all.deb
-DIST_DSC=dist/$(NAME)_$(VER)-1.tar.gz \
-	dist/$(NAME)_$(VER)-1.dsc \
-	dist/$(NAME)_$(VER)-1_source.changes
+DIST_DEB=dist/$(NAME)-server_$(VER)-1$(DEB_SUFFIX)_all.deb \
+	dist/$(NAME)-client_$(VER)-1$(DEB_SUFFIX)_all.deb \
+	dist/$(NAME)-common_$(VER)-1$(DEB_SUFFIX)_all.deb \
+	dist/$(NAME)-docs_$(VER)-1$(DEB_SUFFIX)_all.deb
+DIST_DSC=dist/$(NAME)_$(VER)-1$(DEB_SUFFIX).tar.gz \
+	dist/$(NAME)_$(VER)-1$(DEB_SUFFIX).dsc \
+	dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
 MAN_PAGES=man/cpi.1 man/cpid.1
 
 
@@ -121,10 +126,7 @@ $(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
 	debuild -b -i -I -Idist -Ibuild -Ihtmlcov -I__pycache__ -I.coverage -Itags -I*.pyc -rfakeroot
 	mkdir -p dist/
-	cp ../$(NAME)-server_$(VER)-1_all.deb dist/
-	cp ../$(NAME)-client_$(VER)-1_all.deb dist/
-	cp ../$(NAME)-common_$(VER)-1_all.deb dist/
-	cp ../$(NAME)-docs_$(VER)-1_all.deb dist/
+	for f in $(DIST_DEB); do cp ../$${f##*/} dist/; done
 
 $(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	# build the source package in the parent directory then rename it to
@@ -133,9 +135,7 @@ $(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
 	debuild -S -i -I -Idist -Ibuild -Ihtmlcov -I__pycache__ -I.coverage -Itags -I*.pyc -rfakeroot
 	mkdir -p dist/
-	cp ../$(NAME)_$(VER)-1_source.changes dist/
-	cp ../$(NAME)_$(VER)-1.dsc dist/
-	cp ../$(NAME)_$(VER)-1.tar.gz dist/
+	for f in $(DIST_DSC); do cp ../$${f##*/} dist/; done
 
 release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# ensure there are no current uncommitted changes
@@ -150,7 +150,7 @@ upload: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	# build a source archive and upload to PyPI
 	$(PYTHON) $(PYFLAGS) setup.py sdist upload
 	# build the deb source archive and upload to the PPA
-	dput waveform-ppa ../$(NAME)_$(VER)-1_source.changes
+	dput waveform-ppa ../$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
 
 .PHONY: all install develop test doc source egg deb tar zip dist clean tags release upload
 
