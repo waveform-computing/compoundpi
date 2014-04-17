@@ -49,16 +49,18 @@ import cmd
 import readline
 from textwrap import TextWrapper
 
-COLOR_BOLD    = '\033[1m'
-COLOR_BLACK   = '\033[30m'
-COLOR_RED     = '\033[31m'
-COLOR_GREEN   = '\033[32m'
-COLOR_YELLOW  = '\033[33m'
-COLOR_BLUE    = '\033[34m'
-COLOR_MAGENTA = '\033[35m'
-COLOR_CYAN    = '\033[36m'
-COLOR_WHITE   = '\033[37m'
-COLOR_RESET   = '\033[0m'
+# Hex 1 and 2 are used to ensure readline ignores color sequences in the prompt
+COLOR_IGNORE  = lambda s: '\001%s\002' % s
+COLOR_BOLD    = COLOR_IGNORE('\033[1m')
+COLOR_BLACK   = COLOR_IGNORE('\033[30m')
+COLOR_RED     = COLOR_IGNORE('\033[31m')
+COLOR_GREEN   = COLOR_IGNORE('\033[32m')
+COLOR_YELLOW  = COLOR_IGNORE('\033[33m')
+COLOR_BLUE    = COLOR_IGNORE('\033[34m')
+COLOR_MAGENTA = COLOR_IGNORE('\033[35m')
+COLOR_CYAN    = COLOR_IGNORE('\033[36m')
+COLOR_WHITE   = COLOR_IGNORE('\033[37m')
+COLOR_RESET   = COLOR_IGNORE('\033[0m')
 
 __all__ = [
     'CmdError',
@@ -184,18 +186,6 @@ class Cmd(cmd.Cmd):
             self.prompt = COLOR_BOLD + COLOR_GREEN + self.prompt + COLOR_RESET
         if self.history_file and os.path.exists(self.history_file):
             readline.read_history_file(self.history_file)
-
-    def precmd(self, line):
-        # Reset the prompt to its uncolored variant for the benefit of any
-        # command handlers that don't expect ANSI color sequences in it
-        self.prompt = self.base_prompt
-        return line
-
-    def postcmd(self, stop, line):
-        # Set the prompt back to its colored variant, if required
-        if self.color_prompt:
-            self.prompt = COLOR_BOLD + COLOR_GREEN + self.prompt + COLOR_RESET
-        return stop
 
     def postloop(self):
         readline.set_history_length(self.history_size)
