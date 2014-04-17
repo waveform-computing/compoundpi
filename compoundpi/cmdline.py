@@ -253,7 +253,7 @@ class Cmd(cmd.Cmd):
         lengths = [
             max(len(str(item)) for item in row)
             for row in zip(*data)
-        ]
+            ]
         # Take a copy of data that we can insert header and footer lines into
         data = list(data)
         if header_rows > 0:
@@ -267,7 +267,7 @@ class Cmd(cmd.Cmd):
         for row in data:
             self.stdout.write(' '.join(
                 '%-*s' % (length, s) for (length, s) in zip(lengths, row)
-            ) + '\n')
+                ) + '\n')
 
     def do_help(self, arg):
         """
@@ -295,17 +295,17 @@ class Cmd(cmd.Cmd):
                 (
                     method[3:],
                     self.parse_docstring(getattr(self, method).__doc__)[0]
-                )
+                    )
                 for method in self.get_names()
                 if method.startswith('do_')
                 and method != 'do_EOF'
-            ]
+                ]
             # Size the column containing the method names, ensuring it is no
             # wider than one third of the terminal width
             maxlen = min(
                 max(len(command) for (command, help) in commands) + 2,
                 self.width / 3
-            )
+                )
             indent = ' ' * maxlen
             for (command, help_text) in commands:
                 if len(command) <= maxlen:
