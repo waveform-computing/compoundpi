@@ -20,7 +20,7 @@ endif
 NAME:=$(shell $(PYTHON) $(PYFLAGS) setup.py --name)
 VER:=$(shell $(PYTHON) $(PYFLAGS) setup.py --version)
 ifeq ($(shell lsb_release -si),Ubuntu)
-DEB_SUFFIX:=ubuntu2
+DEB_SUFFIX:=ubuntu1
 else
 DEB_SUFFIX:=
 endif
@@ -33,14 +33,16 @@ DEB_SOURCES:=debian/changelog \
 	debian/copyright \
 	debian/rules \
 	debian/docs \
-	debian/$(NAME)-docs.docs \
-	debian/$(NAME)-docs.doc-base \
-	debian/$(NAME)-client.manpages \
-	debian/$(NAME)-server.manpages \
-	debian/$(NAME)-server.cpid.init \
-	debian/$(NAME)-server.cpid.default \
+	$(wildcard debian/*.init) \
+	$(wildcard debian/*.default) \
+	$(wildcard debian/*.manpages) \
+	$(wildcard debian/*.docs) \
+	$(wildcard debian/*.doc-base) \
 	$(wildcard debian/*.desktop)
-DOC_SOURCES:=$(wildcard docs/*.rst)
+DOC_SOURCES:=docs/conf.py \
+	$(wildcard docs/*.png) \
+	$(wildcard docs/*.svg) \
+	$(wildcard docs/*.rst)
 
 # Calculate the name of all outputs
 DIST_EGG=dist/$(NAME)-$(VER)-$(PYVER).egg
