@@ -8,6 +8,7 @@ tags
 *.egg-info
 dist
 build
+man
 eggs
 parts
 bin
