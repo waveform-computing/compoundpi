@@ -706,13 +706,36 @@ class CompoundPiCmd(Cmd):
     def complete_download(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
 
+    def do_clear(self, arg):
+        """
+        Clear the image store on the specified servers.
+
+        Syntax: clear [addresses]
+
+        The 'clear' command can be used to clear the in-memory image store
+        on the specified Pi servers (or all Pi servers if no address is
+        given. The 'download' command automatically clears the image store
+        after successful transfers so this command is only useful in the case
+        that the operator wants to discard images without first downloading
+        them.
+
+        See also: download.
+
+        cpi> clear
+        cpi> clear 192.168.0.1-192.168.0.10
+        """
+        responses = self.transact('CLEAR', arg)
+
+    def complete_clear(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
+
     def do_identify(self, arg):
         """
         Blink the LED on the specified servers.
 
         Syntax: identify [addresses]
 
-        The 'identify' command can be used to locatea specific Pi server (or
+        The 'identify' command can be used to locate a specific Pi server (or
         servers) by their address. It sends a command causing the camera's LED
         to blink on and off for 5 seconds. If no addresses are specified, the
         command will be sent to all defined servers (this can be useful after
