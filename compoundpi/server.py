@@ -79,27 +79,21 @@ class CompoundPiServer(TerminalApplication):
                 'daemon'
                 ],
             )
-        self.parser.set_defaults(
-            bind='0.0.0.0',
-            port=5647,
-            daemon=False,
-            pidfile='/var/run/cpid.pid',
-            )
         self.parser.add_argument(
-            '-b', '--bind', dest='bind', action='store', type=address,
-            metavar='ADDRESS',
+            '-b', '--bind', type=address, default='0.0.0.0', metavar='ADDRESS',
             help='specifies the address to listen on for packets '
             '(default: %(default)s)')
         self.parser.add_argument(
-            '-p', '--port', dest='port', action='store', type=service,
+            '-p', '--port', type=service, default='5647',
             help='specifies the UDP port for the server to listen on '
             '(default: %(default)s)')
         self.parser.add_argument(
-            '-d', '--daemon', dest='daemon', action='store_true',
+            '-d', '--daemon', action='store_true', default=False,
             help='if specified, start as a background daemon')
         self.parser.add_argument(
-            '--pidfile', dest='pidfile', action='store', metavar='FILE',
-            help='specifies the location of the pid lock file')
+            '--pidfile', metavar='FILE', default='/var/run/cpid.pid',
+            help='specifies the location of the pid lock file '
+            '(default: %(default)s)')
 
     def main(self, args):
         pidfile = daemon.runner.make_pidlockfile(args.pidfile, 5)

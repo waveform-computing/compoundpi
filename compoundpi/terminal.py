@@ -85,25 +85,20 @@ class TerminalApplication(object):
             description = self.__doc__
         self.parser = argparse.ArgumentParser(
             description=description,
-            fromfile_prefix_chars='@',
-            argument_default=argparse.SUPPRESS)
-        self.parser.set_defaults(
-            debug=False,
-            log_file='',
-            log_level=logging.WARNING
-            )
-        self.parser.add_argument('--version', action='version',
-            version=version)
+            fromfile_prefix_chars='@')
+        self.parser.add_argument(
+            '--version', action='version', version=version)
         if config_files:
             self.config = configparser.ConfigParser(interpolation=None)
             self.config_files = config_files
             self.config_section = config_section
             self.config_bools = config_bools
             self.parser.add_argument(
-                '-c', '--config', dest='config', action='store',
+                '-c', '--config', metavar='FILE',
                 help='specify the configuration file to load')
         else:
             self.config = None
+        self.parser.set_defaults(log_level=logging.WARNING)
         self.parser.add_argument(
             '-q', '--quiet', dest='log_level', action='store_const',
             const=logging.ERROR, help='produce less console output')
@@ -111,7 +106,7 @@ class TerminalApplication(object):
             '-v', '--verbose', dest='log_level', action='store_const',
             const=logging.INFO, help='produce more console output')
         opt = self.parser.add_argument(
-            '-l', '--log-file', dest='log_file', metavar='FILE', default=None,
+            '-l', '--log-file', metavar='FILE',
             help='log messages to the specified file')
         if argcomplete:
             # XXX Complete with *.log, *.txt

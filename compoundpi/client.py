@@ -116,49 +116,37 @@ class CompoundPiClient(TerminalApplication):
                 'video_port',
                 ],
             )
-        self.parser.set_defaults(
-            network='192.168.0.0/16',
-            port=5647,
-            bind='0.0.0.0:5647',
-            timeout=5,
-            capture_delay=0,
-            capture_count=1,
-            video_port=False,
-            output='/tmp',
-            )
         self.parser.add_argument(
-            '-o', '--output', dest='output', action='store', metavar='PATH',
+            '-o', '--output', metavar='PATH', default='/tmp',
             help='specifies the directory that downloaded images will be '
             'written to (default: %(default)s)')
         self.parser.add_argument(
-            '-n', '--network', dest='network', action='store',
-            type=network, help='specifies the network that the servers '
+            '-n', '--network', type=network, default='192.168.0.0/16',
+            help='specifies the network that the servers '
             'belong to (default: %(default)s)')
         self.parser.add_argument(
-            '-p', '--port', dest='port', action='store', type=service,
-            metavar='PORT',
+            '-p', '--port', type=service, default='5647', metavar='PORT',
             help='specifies the port that the servers are listening on '
             '(default: %(default)d)')
         self.parser.add_argument(
-            '-b', '--bind', dest='bind', action='store',
-            type=address, metavar='ADDRESS:PORT',
+                '-b', '--bind', type=address, default='0.0.0.0:5647', metavar='ADDRESS:PORT',
             help='specifies the address and port that the client listens on '
             'for downloads (default: %(default)s)')
         self.parser.add_argument(
-            '-t', '--timeout', dest='timeout', action='store', type=int,
-            metavar='SECS', help='specifies the timeout (in seconds) for '
-            'network transactions (default: %(default)d)')
+            '-t', '--timeout', type=int, default='5', metavar='SECS',
+            help='specifies the timeout (in seconds) for network '
+            'transactions (default: %(default)s)')
         self.parser.add_argument(
-            '--capture-delay', dest='capture_delay', action='store', type=int,
-            metavar='SECS', help='specifies the delay (in seconds) used to '
-            'synchronize captures. This must be less than the network delay '
-            '(default: %(default)d)')
+            '--capture-delay', type=int, default='0', metavar='SECS',
+            help='specifies the delay (in seconds) used to synchronize '
+            'captures. This must be less than the network delay '
+            '(default: %(default)s)')
         self.parser.add_argument(
-            '--capture-count', dest='capture_count', action='store', type=int,
-            metavar='NUM', help='specifies the number of consecutive pictures '
-            'to capture when requested (default: %(default)d)')
+            '--capture-count', type=int, default='1', metavar='NUM',
+            help='specifies the number of consecutive pictures to capture '
+            'when requested (default: %(default)s)')
         self.parser.add_argument(
-            '--video-port', dest='video_port', action='store_true',
+            '--video-port', action='store_true', default=False,
             help="if specified, use the camera's video port for rapid capture")
 
     def main(self, args):
