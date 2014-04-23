@@ -23,6 +23,7 @@ from __future__ import (
     division,
     )
 str = type('')
+input = raw_input
 
 """
 Enhanced version of the standard Python Cmd command line interpreter.
@@ -47,6 +48,7 @@ import os
 import re
 import cmd
 import readline
+import locale
 from textwrap import TextWrapper
 
 # Hex 1 and 2 are used to ensure readline ignores color sequences in the prompt
@@ -61,6 +63,7 @@ COLOR_MAGENTA = COLOR_IGNORE('\033[35m')
 COLOR_CYAN    = COLOR_IGNORE('\033[36m')
 COLOR_WHITE   = COLOR_IGNORE('\033[37m')
 COLOR_RESET   = COLOR_IGNORE('\033[0m')
+ENCODING = locale.getdefaultlocale()[1]
 
 __all__ = [
     'CmdError',
@@ -181,6 +184,10 @@ class Cmd(cmd.Cmd):
         # Do not repeat commands when given an empty line
         pass
 
+    def precmd(self, line):
+        # Ensure input is given as unicode
+        return line.decode(ENCODING)
+
     def preloop(self):
         if self.color_prompt:
             self.prompt = COLOR_BOLD + COLOR_GREEN + self.prompt + COLOR_RESET
@@ -236,13 +243,17 @@ class Cmd(cmd.Cmd):
         lines = self.wrap(prompt, newline=False).split('\n')
         prompt = lines[-1]
         s = ''.join(line + '\n' for line in lines[:-1])
+        if isinstance(s, str):
+            s = s.encode(ENCODING)
         self.stdout.write(s)
-        return input(prompt).strip()
+        return input(prompt).decode(ENCODING).strip()
 
     def pprint(self, s, newline=True, wrap=True,
             initial_indent='', subsequent_indent=''):
         "Pretty-prints text to the terminal"
         s = self.wrap(s, newline, wrap, initial_indent, subsequent_indent)
+        if isinstance(s, str):
+            s = s.encode(ENCODING)
         self.stdout.write(s)
 
     def pprint_table(self, data, header_rows=1, footer_rows=0):
