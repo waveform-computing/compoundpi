@@ -31,6 +31,8 @@ from __future__ import (
     )
 str = type('')
 
+# Py3: remove this module entirely
+
 import collections
 import ConfigParser as _ConfigParser
 
