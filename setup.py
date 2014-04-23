@@ -19,10 +19,11 @@
 
 from __future__ import (
     unicode_literals,
-    print_function,
     absolute_import,
+    print_function,
     division,
     )
+str = type('')
 
 import os
 import sys
@@ -35,7 +36,7 @@ elif sys.version_info[0] == 3:
     if not sys.version_info >= (3, 2):
         raise ValueError('This application requires Python 3.2 or above')
 else:
-    raise ValueError('What version of Python is this?!')
+    raise ValueError('Unrecognized major version of Python')
 
 HERE = os.path.abspath(os.path.dirname(__file__))
 
@@ -56,30 +57,30 @@ except ImportError:
 
 def main():
     import io
-    import compoundpi
+    import compoundpi as app
     with io.open(os.path.join(HERE, 'README.rst'), 'r') as readme:
         setup(
-            name                 = compoundpi.__project__,
-            version              = compoundpi.__version__,
-            description          = compoundpi.__doc__,
+            name                 = app.__project__,
+            version              = app.__version__,
+            description          = app.__doc__,
             long_description     = readme.read(),
-            classifiers          = compoundpi.__classifiers__,
-            author               = compoundpi.__author__,
-            author_email         = compoundpi.__author_email__,
-            url                  = compoundpi.__url__,
+            classifiers          = app.__classifiers__,
+            author               = app.__author__,
+            author_email         = app.__author_email__,
+            url                  = app.__url__,
             license              = [
                 c.rsplit('::', 1)[1].strip()
-                for c in compoundpi.__classifiers__
+                for c in app.__classifiers__
                 if c.startswith('License ::')
                 ][0],
-            keywords             = compoundpi.__keywords__,
+            keywords             = app.__keywords__,
             packages             = find_packages(),
             package_data         = {},
             include_package_data = True,
-            platforms            = compoundpi.__platforms__,
-            install_requires     = compoundpi.__requires__,
-            extras_require       = compoundpi.__extra_requires__,
-            entry_points         = compoundpi.__entry_points__,
+            platforms            = app.__platforms__,
+            install_requires     = app.__requires__,
+            extras_require       = app.__extra_requires__,
+            entry_points         = app.__entry_points__,
             )
 
 
