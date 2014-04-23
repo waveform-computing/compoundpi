@@ -17,6 +17,14 @@
 # You should have received a copy of the GNU General Public License along with
 # compoundpi.  If not, see <http://www.gnu.org/licenses/>.
 
+from __future__ import (
+    unicode_literals,
+    absolute_import,
+    print_function,
+    division,
+    )
+str = type('')
+
 import sys
 import os
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
@@ -83,7 +91,7 @@ latex_elements = {
     'papersize': 'a4paper',
     'pointsize': '10pt',
     #'preamble': '',
-}
+    }
 
 latex_documents = [
     (
@@ -93,7 +101,7 @@ latex_documents = [
         _setup.__author__,             # author
         'manual',                      # documentclass
         ),
-]
+    ]
 
 #latex_logo = None
 #latex_use_parts = False
