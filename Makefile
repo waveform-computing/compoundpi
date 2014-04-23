@@ -1,9 +1,10 @@
-# vim: set noet sw=4 ts=4:
+# vim: set noet sw=4 ts=4 fileencoding=utf-8:
 
 # External utilities
 PYTHON=python
 PIP=pip
 PYTEST=py.test
+COVERAGE=coverage
 PYFLAGS=
 DEST_DIR=/
 
@@ -27,7 +28,7 @@ endif
 PYVER:=$(shell $(PYTHON) $(PYFLAGS) -c "import sys; print('py%d.%d' % sys.version_info[:2])")
 PY_SOURCES:=$(shell \
 	$(PYTHON) $(PYFLAGS) setup.py egg_info >/dev/null 2>&1 && \
-	cat $(NAME).egg-info/SOURCES.txt)
+	grep -v "\.egg-info" $(NAME).egg-info/SOURCES.txt)
 DEB_SOURCES:=debian/changelog \
 	debian/control \
 	debian/copyright \
@@ -62,19 +63,19 @@ MAN_PAGES=man/cpi.1 man/cpid.1
 all:
 	@echo "make install - Install on local system"
 	@echo "make develop - Install symlinks for development"
-	@echo "make test - Run tests through nose environment"
+	@echo "make test - Run tests"
 	@echo "make doc - Generate HTML and PDF documentation"
 	@echo "make source - Create source package"
 	@echo "make egg - Generate a PyPI egg package"
 	@echo "make zip - Generate a source zip package"
 	@echo "make tar - Generate a source tar package"
-	@echo "make deb - Generate a Debian package"
+	@echo "make deb - Generate Debian packages"
 	@echo "make dist - Generate all packages"
 	@echo "make clean - Get rid of all generated files"
 	@echo "make release - Create and tag a new release"
 	@echo "make upload - Upload the new release to repositories"
 
-install: $(SUBDIRS)
+install:
 	$(PYTHON) $(PYFLAGS) setup.py install --root $(DEST_DIR)
 
 doc: $(DOC_SOURCES)
@@ -96,7 +97,8 @@ develop: tags
 	$(PIP) install -e .
 
 test:
-	$(PYTEST) -v tests/
+	$(COVERAGE) run -m $(PYTEST) tests -v
+	$(COVERAGE) report --rcfile coverage.cfg
 
 clean:
 	$(PYTHON) $(PYFLAGS) setup.py clean
@@ -112,21 +114,21 @@ $(MAN_PAGES): $(DOC_SOURCES)
 	mkdir -p man/
 	cp build/sphinx/man/*.1 man/
 
-$(DIST_TAR): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
+$(DIST_TAR): $(PY_SOURCES)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats gztar
 
-$(DIST_ZIP): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
+$(DIST_ZIP): $(PY_SOURCES)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats zip
 
-$(DIST_EGG): $(PY_SOURCES) $(SUBDIRS) $(LICENSES)
+$(DIST_EGG): $(PY_SOURCES)
 	$(PYTHON) $(PYFLAGS) setup.py bdist_egg
 
 $(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
-	# build the source package in the parent directory then rename it to
+	# build the binary package in the parent directory then rename it to
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
-	debuild -b -i -I -Idist -Ibuild -Ihtmlcov -I__pycache__ -I.coverage -Itags -I*.pyc -rfakeroot
+	debuild -b -i -I -Idist -Ibuild -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
 	mkdir -p dist/
 	for f in $(DIST_DEB); do cp ../$${f##*/} dist/; done
 
@@ -135,7 +137,7 @@ $(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
-	debuild -S -i -I -Idist -Ibuild -Ihtmlcov -I__pycache__ -I.coverage -Itags -I*.pyc -rfakeroot
+	debuild -S -i -I -Idist -Ibuild -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
 	mkdir -p dist/
 	for f in $(DIST_DSC); do cp ../$${f##*/} dist/; done
 
@@ -143,16 +145,19 @@ release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# ensure there are no current uncommitted changes
 	test -z "$(shell git status --porcelain)"
 	# update the changelog with new release information
-	dch --newversion $(VER)-1 --controlmaint
+	dch --newversion $(VER)-1$(DEB_SUFFIX) --controlmaint
 	# commit the changes and add a new tag
 	git commit debian/changelog -m "Updated changelog for release $(VER)"
 	git tag -s release-$(VER) -m "Release $(VER)"
+	# update the package's registration on PyPI (in case any metadata's changed)
+	$(PYTHON) $(PYFLAGS) setup.py register
 
 upload: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	# build a source archive and upload to PyPI
 	$(PYTHON) $(PYFLAGS) setup.py sdist upload
 	# build the deb source archive and upload to the PPA
-	dput waveform-ppa ../$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
+	dput waveform-ppa dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
+	git push --tags
 
-.PHONY: all install develop test doc source egg deb tar zip dist clean tags release upload
+.PHONY: all install develop test doc source egg zip tar deb dist clean tags release upload
 
