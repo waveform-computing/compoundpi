@@ -32,6 +32,8 @@ import sys
 import os
 import io
 import re
+import pwd
+import grp
 import fractions
 import struct
 import time
@@ -59,6 +61,18 @@ def service(s):
 
 def address(s):
     return socket.getaddrinfo(s, 0, 0, socket.SOCK_DGRAM)[0][-1][0]
+
+def user(s):
+    try:
+        return int(s)
+    except ValueError:
+        return pwd.getpwnam(s).pw_uid
+
+def group(s):
+    try:
+        return int(s)
+    except ValueError:
+        return grp.getgrnam(s).gr_gid
 
 
 class CompoundPiServer(TerminalApplication):
@@ -93,6 +107,14 @@ class CompoundPiServer(TerminalApplication):
             '-d', '--daemon', action='store_true', default=False,
             help='if specified, start as a background daemon')
         self.parser.add_argument(
+            '-u', '--user', type=user, default=os.getuid(), metavar='UID',
+            help='specifies the user that the daemon should run as. Defaults '
+            'to the effective user (%(default)s)')
+        self.parser.add_argument(
+            '-g', '--group', type=group, default=os.getgid(), metavar='GID',
+            help='specifies the group that the daemon should run as. Defaults '
+            'to the effective group (%(default)s)')
+        self.parser.add_argument(
             '--pidfile', metavar='FILE', default='/var/run/cpid.pid',
             help='specifies the location of the pid lock file '
             '(default: %(default)s)')
@@ -121,6 +143,7 @@ class CompoundPiServer(TerminalApplication):
                 # where sensible (see default setting of detach_process)
                 detach_process=None if args.daemon else False,
                 stderr=None if args.daemon else sys.stderr,
+                uid=args.user, gid=args.group,
                 files_preserve=files_preserve,
                 pidfile=pidfile,
                 signal_map={
