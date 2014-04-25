@@ -275,16 +275,16 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_status(self):
         return (
-            'RESOLUTION {width:d} {height:d}\n'
-            'FRAMERATE {framerate:.2f}\n'
-            'TIMESTAMP {timestamp:f}\n'
-            'IMAGES {images:d\n'.format(
+            'RESOLUTION {width} {height}\n'
+            'FRAMERATE {framerate}\n'
+            'TIMESTAMP {timestamp}\n'
+            'IMAGES {images}\n'.format(
                 width=self.server.camera.resolution[0],
                 height=self.server.camera.resolution[1],
                 framerate=self.server.camera.framerate,
                 timestamp=time.time(),
-                images=len(self.server.images)
-                )
+                images=len(self.server.images),
+                ))
 
     def do_resolution(self, width, height):
         width, height = int(width), int(height)
