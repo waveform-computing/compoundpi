@@ -310,7 +310,7 @@ class CompoundPiCmd(Cmd):
         while time.time() - start < self.timeout:
             if select.select([self.socket], [], [], 1)[0]:
                 data, address = self.socket.recvfrom(512)
-                match = self.response_re.match(data)
+                match = self.response_re.match(data.decode('utf-8'))
                 address, port = address
                 address = IPv4Address(address)
                 if port != self.port:
@@ -321,8 +321,7 @@ class CompoundPiCmd(Cmd):
                 elif address not in servers:
                     logging.debug('%s: unexpected response', address)
                 elif not match:
-                    logging.error(repr(data))
-                    logging.error('%s: badly formed response', address)
+                    logging.debug('%s: badly formed response', address)
                 else:
                     seqno = int(match.group('seqno'))
                     self.unicast('%d ACK' % seqno, address)
