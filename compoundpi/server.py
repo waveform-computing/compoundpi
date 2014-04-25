@@ -31,9 +31,11 @@ range = xrange
 import sys
 import os
 import io
+import re
 import fractions
 import struct
 import time
+import random
 import logging
 import threading
 import socket
@@ -125,11 +127,14 @@ class CompoundPiServer(TerminalApplication):
                     signal.SIGINT:  self.interrupt,
                     }
                 ):
+            # seed the random number generator from the system clock
+            random.seed()
             # picamera has to be imported here (currently) partly because the
             # camera doesn't like forks after initialization, and partly
             # because the author stupidly runs bcm_host_init on module import
             import picamera
             logging.info('Initializing camera')
+            self.server.seqno = 0
             self.server.images = []
             self.server.camera = picamera.PiCamera()
             try:
@@ -153,47 +158,94 @@ class CompoundPiServer(TerminalApplication):
         self.server.shutdown()
 
 
+class ResponderThread(threading.Thread):
+    def __init__(self, socket, client_address, data):
+        super(ResponderThread, self).__init__()
+        self.socket = socket
+        self.client_address = client_address
+        self.data = data
+        self.terminate = False
+        self.daemon = True
+        self.start()
+
+    def run(self):
+        start = time.time()
+        while not self.terminate and time.time() < start + 1:
+            time.sleep(random.uniform(0.0, 0.1))
+            self.socket.sendto(self.data, self.client_address)
+
+
 class CameraRequestHandler(socketserver.DatagramRequestHandler):
+    request_re = re.compile(
+            r'(?P<seqno>\d+) '
+            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
+    response_re = re.compile(
+            r'(?P<seqno>\d+) '
+            r'(?P<result>OK|ERROR [^\n]+)(\n(?P<data>.*))?')
+
     def handle(self):
-        data = self.request[0].strip()
-        logging.debug(
-            'Received %r from %s:%d',
-            data, self.client_address[0], self.client_address[1])
-        command = data.split(' ')
+        data = self.rfile.read().strip()
+        logging.info(
+            '%s:%d > %r',
+            self.client_address[0], self.client_address[1], data)
+        seqno = 0
         try:
-            handler = {
-                'PING':        self.do_ping,
-                'STATUS':      self.do_status,
-                'RESOLUTION':  self.do_resolution,
-                'FRAMERATE':   self.do_framerate,
-                'CAPTURE':     self.do_capture,
-                'SEND':        self.do_send,
-                'LIST':        self.do_list,
-                'CLEAR':       self.do_clear,
-                'QUIT':        self.do_quit,
-                'BLINK':       self.do_blink,
-                }[command[0]]
-        except KeyError:
-            logging.error(
-                'Unknown command "%s" from %s',
-                data, self.client_address[0])
-            self.wfile.write('ERROR Unknown command "%s"' % command[0])
-        else:
+            match = self.request_re.match(data)
+            if not match:
+                raise ValueError('Unable to parse request')
+            seqno = int(match.group('seqno'))
+            command = match.group('command')
+            params = match.group('params').split()
             try:
-                handler(*command[1:])
-                self.wfile.write('OK')
-            except Exception as exc:
-                logging.error(
-                    'While executing "%s" from %s: %s',
-                    data, self.client_address[0], str(exc))
-                self.wfile.write('ERROR %s' % str(exc))
-        logging.debug(
-            'Sent %r to %s:%d',
-            self.wfile.getvalue().strip(),
-            self.client_address[0], self.client_address[1])
+                handler = {
+                    'ACK':         self.do_ack,
+                    'PING':        self.do_ping,
+                    'STATUS':      self.do_status,
+                    'RESOLUTION':  self.do_resolution,
+                    'FRAMERATE':   self.do_framerate,
+                    'CAPTURE':     self.do_capture,
+                    'SEND':        self.do_send,
+                    'LIST':        self.do_list,
+                    'CLEAR':       self.do_clear,
+                    'QUIT':        self.do_quit,
+                    'BLINK':       self.do_blink,
+                    }[command]
+            except KeyError:
+                raise ValueError('Unknown command %s' % command)
+            if handler == self.do_ack:
+                self.do_ack(seqno)
+                return
+            elif handler == self.do_ping:
+                self.server.seqno = seqno
+            elif seqno <= self.server.seqno:
+                raise ValueError('Invalid sequence number')
+            response = handler(*params)
+            if not response:
+                response = ''
+            logging.info(
+                '%s:%d < OK %r',
+                self.client_address[0], self.client_address[1], response)
+            self.send_response(seqno, '%d OK\n%s' % (seqno, response))
+        except Exception as exc:
+            logging.error(
+                '%s:%d < ERROR %r',
+                self.client_address[0], self.client_address[1], str(exc))
+            self.send_response(seqno, '%d ERROR %s\n' % (seqno, exc))
+
+    def send_response(self, seqno, data):
+        assert self.response_re.match(data)
+        self.server.responders[seqno] = ResponderThread(
+                self.socket, self.client_address, data)
+
+    def do_ack(self, seqno):
+        seqno = int(seqno)
+        responder = self.server.responders.pop(seqno, None)
+        if responder:
+            responder.terminate = True
+            responder.join()
 
     def do_ping(self):
-        pass
+        return __version__
 
     def blink_led(self, timeout):
         try:

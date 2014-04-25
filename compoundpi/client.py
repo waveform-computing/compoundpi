@@ -34,6 +34,7 @@ import sys
 import io
 import os
 import re
+import logging
 import datetime
 import fractions
 import time
@@ -165,6 +166,12 @@ class CompoundPiClient(TerminalApplication):
 class CompoundPiCmd(Cmd):
 
     prompt = 'cpi> '
+    request_re = re.compile(
+            r'(?P<seqno>\d+) '
+            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
+    response_re = re.compile(
+            r'(?P<seqno>\d+) '
+            r'(?P<result>OK|ERROR [^\n]+)(\n(?P<data>.*))?')
 
     def __init__(self):
         Cmd.__init__(self)
@@ -180,6 +187,7 @@ class CompoundPiCmd(Cmd):
         self.capture_count = 1
         self.video_port = False
         self.output = '/tmp'
+        self.seqno = 0
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self.server = None
@@ -283,9 +291,11 @@ class CompoundPiCmd(Cmd):
                 "You must define servers first (see help for 'find' and 'add')")
 
     def unicast(self, data, address):
+        assert self.request_re.match(data)
         self.socket.sendto(data, (str(address), self.port))
 
     def broadcast(self, data):
+        assert self.request_re.match(data)
         self.socket.sendto(data, (str(self.network.broadcast), self.port))
 
     def responses(self, servers=None, count=0):
@@ -300,21 +310,38 @@ class CompoundPiCmd(Cmd):
         while time.time() - start < self.timeout:
             if select.select([self.socket], [], [], 1)[0]:
                 data, address = self.socket.recvfrom(512)
+                match = self.response_re.match(data)
                 address, port = address
                 address = IPv4Address(address)
                 if port != self.port:
-                    self.pprint('Ignoring response from wrong port %s:%d' % (address, port))
+                    logging.debug(
+                        '%s: response from wrong port %d', address, port)
                 elif address in result:
-                    self.pprint('Ignoring double response from %s' % address)
+                    logging.debug('%s: ignoring double response', address)
                 elif address not in servers:
-                    self.pprint('Ignoring unexpected response from %s' % address)
+                    logging.debug('%s: unexpected response', address)
+                elif not match:
+                    logging.error('%s: badly formed response', address)
                 else:
-                    result[address] = data.strip()
-                    if len(result) == count:
-                        break
+                    seqno = int(match.group('seqno'))
+                    self.unicast('%d ACK' % seqno, address)
+                    if seqno < self.seqno:
+                        logging.debug('%s: stale response', address)
+                    elif seqno > self.seqno:
+                        logging.warning('%s: future response', address)
+                    else:
+                        logging.info('%s: received response', address)
+                        result[address] = (
+                                match.group('result'),
+                                match.group('data'),
+                                )
+                        if len(result) == count:
+                            break
         return result
 
     def transact(self, data, addresses):
+        self.seqno += 1
+        data = '%d %s' % (self.seqno, data)
         if addresses:
             if isinstance(addresses, str):
                 addresses = self.parse_address_list(addresses)
@@ -331,15 +358,15 @@ class CompoundPiCmd(Cmd):
         failed = False
         for address in addresses:
             try:
-                response = responses[address]
+                result, response = responses[address]
             except KeyError:
                 failed = True
-                self.pprint('Missing response from %s' % address)
+                logging.error('%s: no response' % address)
             else:
-                if response.splitlines()[-1].strip() != 'OK':
+                responses[address] = response
+                if result != 'OK':
                     failed = True
-                    self.pprint(
-                        'Unexpected response from %s: %r' % (address, response))
+                    logging.error('%s: %s', address, result)
         if failed:
             raise CmdError('Failed to execute successfully on all servers')
         return responses
@@ -465,12 +492,13 @@ class CompoundPiCmd(Cmd):
         self.broadcast('PING')
         responses = self.responses(count=count)
         for address, response in responses.items():
-            if response.strip() != 'OK':
-                self.pprint('Ignoring bogus response from %s' % address)
+            response = response.strip()
+            if response != __version__:
+                logging.warning('%s: unexpected version %s', address, response)
                 del responses[address]
         if responses:
             self.servers = set(responses.keys())
-            self.pprint('Found %d servers' % len(self.servers))
+            logging.info('Found %d servers' % len(self.servers))
         else:
             raise CmdError('Failed to find any servers')
 
@@ -527,8 +555,7 @@ class CompoundPiCmd(Cmd):
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(\.\d+)?)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
-            r'IMAGES (?P<images>\d{,3})\n'
-            r'OK')
+            r'IMAGES (?P<images>\d{,3})')
     def do_status(self, arg=''):
         """
         Retrieves status from the defined servers.
@@ -682,7 +709,7 @@ class CompoundPiCmd(Cmd):
         for address in addresses:
             self.server.expected_address = address
             response = self.transact('LIST', address)[address]
-            response = response.strip().splitlines()[:-1]
+            response = int(response.strip())
             for index, details in enumerate(response):
                 try:
                     timestamp, size = details.split(' ', 1)
