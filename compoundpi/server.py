@@ -172,8 +172,8 @@ class ResponderThread(threading.Thread):
     def run(self):
         start = time.time()
         while not self.terminate and time.time() < start + 1:
-            time.sleep(random.uniform(0.0, 0.1))
             self.socket.sendto(self.data, self.client_address)
+            time.sleep(random.uniform(0.0, 0.2))
 
 
 class CameraRequestHandler(socketserver.DatagramRequestHandler):
@@ -187,8 +187,8 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
     def handle(self):
         data = self.rfile.read().strip()
         logging.info(
-            '%s:%d > %r',
-            self.client_address[0], self.client_address[1], data)
+                '%s:%d > %r',
+                self.client_address[0], self.client_address[1], data)
         seqno = 0
         try:
             match = self.request_re.match(data)
@@ -226,18 +226,18 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             response = handler(*params)
             if not response:
                 response = ''
-            logging.info(
-                '%s:%d < OK %r',
-                self.client_address[0], self.client_address[1], response)
             self.send_response(seqno, '%d OK\n%s' % (seqno, response))
         except Exception as exc:
-            logging.error(
-                '%s:%d < ERROR %r',
-                self.client_address[0], self.client_address[1], str(exc))
+            logging.error(str(exc))
             self.send_response(seqno, '%d ERROR %s\n' % (seqno, exc))
 
     def send_response(self, seqno, data):
         assert self.response_re.match(data)
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        logging.info(
+                '%s:%d < %r',
+                self.client_address[0], self.client_address[1], data)
         self.server.responders[seqno] = ResponderThread(
                 self.socket, self.client_address, data)
 
