@@ -274,12 +274,17 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         thread.start()
 
     def do_status(self):
-        self.wfile.write('RESOLUTION %d %d\n' % (
-            self.server.camera.resolution[0],
-            self.server.camera.resolution[1]))
-        self.wfile.write('FRAMERATE %.2f\n' % self.server.camera.framerate)
-        self.wfile.write('TIMESTAMP %f\n' % time.time())
-        self.wfile.write('IMAGES %d\n' % len(self.server.images))
+        return (
+            'RESOLUTION {width:d} {height:d}\n'
+            'FRAMERATE {framerate:.2f}\n'
+            'TIMESTAMP {timestamp:f}\n'
+            'IMAGES {images:d\n'.format(
+                width=self.server.camera.resolution[0],
+                height=self.server.camera.resolution[1],
+                framerate=self.server.camera.framerate,
+                timestamp=time.time(),
+                images=len(self.server.images)
+                )
 
     def do_resolution(self, width, height):
         width, height = int(width), int(height)
@@ -299,7 +304,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_capture(self, count=1, use_video_port=False, sync=None):
         count = int(count)
-        use_video_port = bool(use_video_port)
+        use_video_port = bool(int(use_video_port))
         sync = float(sync) if sync else None
         self.server.camera.led = False
         try:
