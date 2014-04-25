@@ -171,7 +171,7 @@ class CompoundPiCmd(Cmd):
             r'(?P<command>[A-Z]+)( (?P<params>.*))?')
     response_re = re.compile(
             r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR [^\n]+)(\n(?P<data>.*))?')
+            r'(?P<result>OK|ERROR [^\n]+)(\n(?P<data>.*))?', flags=re.DOTALL)
 
     def __init__(self):
         Cmd.__init__(self)
@@ -558,9 +558,9 @@ class CompoundPiCmd(Cmd):
 
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
-            r'FRAMERATE (?P<rate>\d+(\.\d+)?)\n'
+            r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
-            r'IMAGES (?P<images>\d{,3})')
+            r'IMAGES (?P<images>\d{,3})\n')
     def do_status(self, arg=''):
         """
         Retrieves status from the defined servers.
@@ -585,7 +585,7 @@ class CompoundPiCmd(Cmd):
                 (
                     address,
                     '%sx%s' % (match.group('width'), match.group('height')),
-                    '%sfps' % match.group('rate'),
+                    fractions.Fraction(match.group('rate')),
                     datetime.datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )
