@@ -78,6 +78,12 @@ def one_or_more(s):
         raise ValueError('Value must be 1 or more')
     return result
 
+def positive_float(s):
+    result = float(s)
+    if result > 0.0:
+        return result
+    raise ValueError('Value must be greater than 0')
+
 def path(s):
     if not os.path.exists(s):
         raise ValueError('%s does not exist' % s)
@@ -149,6 +155,10 @@ class CompoundPiClient(TerminalApplication):
         self.parser.add_argument(
             '--video-port', action='store_true', default=False,
             help="if specified, use the camera's video port for rapid capture")
+        self.parser.add_argument(
+            '--time-delta', type=float, default='0.25', metavar='SECS',
+            help='specifies the maximum delta between server timestamps that '
+            'the client will tolerate (default: %(default)ss)')
 
     def main(self, args):
         proc = CompoundPiCmd()
@@ -159,6 +169,7 @@ class CompoundPiClient(TerminalApplication):
         proc.capture_delay = args.capture_delay
         proc.capture_count = args.capture_count
         proc.video_port = args.video_port
+        proc.time_delta = args.time_delta
         proc.output = args.output
         proc.cmdloop()
 
@@ -186,6 +197,7 @@ class CompoundPiCmd(Cmd):
         self.capture_delay = 0
         self.capture_count = 1
         self.video_port = False
+        self.time_delta = 0.25
         self.output = '/tmp'
         self.seqno = 0
         self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -400,6 +412,7 @@ class CompoundPiCmd(Cmd):
                     'capture_delay',
                     'capture_count',
                     'video_port',
+                    'time_delta',
                     'output',
                     )]
             )
@@ -434,10 +447,13 @@ class CompoundPiCmd(Cmd):
                 'capture_delay': zero_or_more,
                 'capture_count': one_or_more,
                 'video_port':    boolean,
+                'time_delta':    positive_float,
                 'output':        path,
                 }[name](value)
         except KeyError:
             raise CmdSyntaxError('Invalid configuration variable: %s' % name)
+        except ValueError as e:
+            raise CmdSyntaxError(e)
         setattr(self, name, value)
 
     def do_servers(self, arg=''):
@@ -592,6 +608,27 @@ class CompoundPiCmd(Cmd):
                 for (address, data, match) in responses
                 if match
                 ])
+        if len(set(
+                (match.group('width'), match.group('height'))
+                for (_, _, match) in responses
+                if match
+                )) > 1:
+            logging.warning('Warning: multiple resolutions configured')
+        if len(set(
+                match.group('rate')
+                for (_, _, match) in responses
+                if match
+                )) > 1:
+            logging.warning('Warning: multiple framerates configured')
+        for (address1, _, match1) in responses:
+            for (address2, _, match2) in responses:
+                if match1 and match2 and address1 < address2:
+                    if abs(
+                            float(match1.group('time')) -
+                            float(match2.group('time'))) > self.time_delta:
+                        logging.warning(
+                            'Warning: timestamps of %s and %s are >%.2fs apart',
+                            address1, address2, self.time_delta)
         for (address, data, match) in responses:
             if not match:
                 self.pprint('Invalid response from %s:\n%s' % (address, data))
