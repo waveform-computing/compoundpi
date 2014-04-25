@@ -367,7 +367,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
     def do_list(self):
         for timestamp, stream in self.server.images:
             stream.seek(0, io.SEEK_END)
-            self.wfile.write('%f %d\n' % (timestamp, stream.tell()))
+        return '\n'.join(
+            '%f %d' % (timestamp, stream.tell())
+            for (timestamp, stream) in self.server.images
+            )
 
     def do_clear(self):
         logging.info('Clearing images')

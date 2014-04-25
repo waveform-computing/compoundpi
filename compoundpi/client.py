@@ -753,8 +753,7 @@ class CompoundPiCmd(Cmd):
         for address in addresses:
             self.server.expected_address = address
             response = self.transact('LIST', address)[address]
-            response = int(response.strip())
-            for index, details in enumerate(response):
+            for index, details in enumerate(response.strip().splitlines()):
                 try:
                     timestamp, size = details.split(' ', 1)
                     timestamp = float(timestamp)
