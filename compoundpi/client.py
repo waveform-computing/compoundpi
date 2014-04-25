@@ -159,6 +159,7 @@ class CompoundPiClient(TerminalApplication):
             '--time-delta', type=float, default='0.25', metavar='SECS',
             help='specifies the maximum delta between server timestamps that '
             'the client will tolerate (default: %(default)ss)')
+        self.parser.set_defaults(log_level=logging.INFO)
 
     def main(self, args):
         proc = CompoundPiCmd()
@@ -342,7 +343,7 @@ class CompoundPiCmd(Cmd):
                     elif seqno > self.seqno:
                         logging.warning('%s: future response', address)
                     else:
-                        logging.info('%s: received response', address)
+                        logging.debug('%s: received response', address)
                         result[address] = (
                                 match.group('result'),
                                 match.group('data'),
@@ -506,6 +507,7 @@ class CompoundPiCmd(Cmd):
         else:
             count = 0
         self.seqno += 1
+        self.servers = set()
         self.broadcast('%d PING' % self.seqno)
         responses = self.responses(count=count)
         for address, (result, response) in responses.items():
