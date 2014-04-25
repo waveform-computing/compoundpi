@@ -321,6 +321,7 @@ class CompoundPiCmd(Cmd):
                 elif address not in servers:
                     logging.debug('%s: unexpected response', address)
                 elif not match:
+                    logging.error(repr(data))
                     logging.error('%s: badly formed response', address)
                 else:
                     seqno = int(match.group('seqno'))
@@ -489,12 +490,17 @@ class CompoundPiCmd(Cmd):
                 raise CmdSyntaxError('Invalid find count "%d"' % arg)
         else:
             count = 0
-        self.broadcast('PING')
+        self.seqno += 1
+        self.broadcast('%d PING' % self.seqno)
         responses = self.responses(count=count)
-        for address, response in responses.items():
-            response = response.strip()
-            if response != __version__:
-                logging.warning('%s: unexpected version %s', address, response)
+        for address, (result, response) in responses.items():
+            if result == 'OK':
+                response = response.strip()
+                if response != __version__:
+                    logging.warning('%s: wrong version %s', address, response)
+                    del responses[address]
+            else:
+                logging.error('%s: %s', address, result)
                 del responses[address]
         if responses:
             self.servers = set(responses.keys())

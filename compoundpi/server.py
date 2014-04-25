@@ -135,6 +135,7 @@ class CompoundPiServer(TerminalApplication):
             import picamera
             logging.info('Initializing camera')
             self.server.seqno = 0
+            self.server.responders = {}
             self.server.images = []
             self.server.camera = picamera.PiCamera()
             try:
@@ -195,7 +196,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 raise ValueError('Unable to parse request')
             seqno = int(match.group('seqno'))
             command = match.group('command')
-            params = match.group('params').split()
+            if match.group('params'):
+                params = match.group('params').split()
+            else:
+                params = ()
             try:
                 handler = {
                     'ACK':         self.do_ack,
