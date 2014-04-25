@@ -103,6 +103,7 @@ class CompoundPiServer(TerminalApplication):
             pidfile.break_lock()
         address = socket.getaddrinfo(
             args.bind, args.port, 0, socket.SOCK_DGRAM)[0][-1]
+        logging.info('Listening on %s:%d', address[0], address[1])
         self.server = socketserver.UDPServer(address, CameraRequestHandler)
         # Test GPIO before entering the daemon context (GPIO access usually
         # requires root privileges for access to /dev/mem - better to bomb out
