@@ -85,6 +85,7 @@ def positive_float(s):
     raise ValueError('Value must be greater than 0')
 
 def path(s):
+    s = os.path.expanduser(s)
     if not os.path.exists(s):
         raise ValueError('%s does not exist' % s)
     if not os.path.isdir(s):
