@@ -147,3 +147,22 @@ command::
 
 You can use the ``config`` and ``set`` commands to configure capture options,
 the download target directory, and so on.
+
+Troubleshooting
+===============
+
+Compound Pi provides some crude but effective tools for debugging problems. The
+first is simply that the daemon activates the camera by default. If you see
+a Pi server without the camera LED lit after boot-up, you know the daemon has
+failed to start for some reason.
+
+The ``identify`` command is the main debugging tool provided by Compound Pi.
+If specified without any further parameters it will cause all discovered Pi
+servers to blink their camera LED for 5 seconds. Thus, if you run this command
+immediately after ``find`` you can quickly locate any Pi servers that were
+no discovered (typically this is due to misconfiguration of the network).
+
+If ``identify`` is specified with one or more addresses, it will blink the LED
+on the specified Pi servers. This can be used to quickly figure out which
+address corresponds to which Pi (useful when dynamic addressing is used).
+
