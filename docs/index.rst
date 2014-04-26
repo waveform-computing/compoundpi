@@ -26,6 +26,8 @@ Table of Contents
    quickstart
    cpi
    cpid
+   commands
+   protocol
    changelog
    license
 

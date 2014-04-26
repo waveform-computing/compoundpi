@@ -12,12 +12,32 @@ other Pis.
 This quick start tutorial assumes you are using the Raspbian operating system
 on your Pis, and Ubuntu as your client.
 
+Client Installation
+===================
+
+Ensure your Ubuntu client machine is connected to the same network as your Pis
+(whether by Ethernet or Wifi doesn't matter). Then, execute the following to
+install the client and an NTP daemon::
+
+    $ sudo add-apt-repository ppa:waveform/ppa
+    $ sudo apt-get update
+    $ sudo apt-get install compoundpi-client ntp
+
+The NTP daemon will most likely be installed to synchronize with an NTP pool
+on the Internet (e.g. ``pool.ntp.org``). This is fine, but check that it's
+working with the following command line::
+
+    $ ntpq -p
+         remote           refid      st t when poll reach   delay   offset  jitter
+    ==============================================================================
+    *aaaaaaa.aaaaaaa nn.nnn.nnn.nnn   3 u  109 1024  377    4.639   -2.101  21.233
+
 Server Network Configuration
 ============================
 
-On Raspbian, to configure the Pi to use DHCP to automatically obtain an IP
-address, edit the ``/etc/network/interfaces`` file and ensure that it looks
-similar to the following::
+On the Pi you intend to clone, configure networking to use DHCP to
+automatically obtain an IP address. Edit the ``/etc/network/interfaces`` file
+and ensure that it looks similar to the following::
 
     auto lo
 
@@ -30,9 +50,10 @@ similar to the following::
     iface default inet dhcp
 
 This configuration should ensure that the first Ethernet and/or WiFi interfaces
-will pick up an address automatically from the local DHCP server. To complete
-the WiFi configuration, edit the ``/etc/wpa_supplicant/wpa_supplicant.conf``
-file to look something like the following::
+will pick up an address automatically from the local DHCP server. If you are
+using WiFi, complete the WiFi configuration by editing the
+``/etc/wpa_supplicant/wpa_supplicant.conf`` file to look something like the
+following::
 
     ctrl_interface=DIR=/var/run/wpa_supplicant GROUP=netdev
     update_config=1
@@ -46,8 +67,8 @@ file to look something like the following::
             auth_alg=OPEN
     }
 
-Server Daemon Installation
-==========================
+Server Installation
+===================
 
 Execute the following command to install the Compound Pi server package and the
 NTP daemon (the latter is required for time-synchronized image capture)::
@@ -60,7 +81,29 @@ rebooting the Pi with a camera module attached. You should see the camera
 module's LED light up when the daemon starts. If it doesn't, the most likely
 culprit is the camera: try running ``raspistill``, ensure you've activated the
 camera with ``sudo raspi-config``, and ensure the CSI cable is inserted
-correctly.
+correctly. You can control the Compound Pi daemon as you would any other system
+daemon::
+
+    $ sudo service cpid stop
+    $ sudo service cpid start
+    $ sudo service cpid restart
+
+Ideally, you want all your Pi servers to sync with the NTP time server you set
+up on your client. Edit the ``/etc/ntp.conf`` file and repalce the ``server``
+lines with the IP address of your client (ideally you should configure your
+router to give your client a fixed address)::
+
+    ...
+    #server 0.debian.pool.ntp.org iburst
+    #server 1.debian.pool.ntp.org iburst
+    #server 2.debian.pool.ntp.org iburst
+    #server 3.debian.pool.ntp.org iburst
+    server 192.168.1.2
+    ...
+
+Restart the NTP daemon to use the new configuration::
+
+    $ sudo service ntp restart
 
 Clone the SD Card
 =================
@@ -94,31 +137,66 @@ modules activate.
     source after cloning because you the cloning also duplicates the partition
     table of the smaller device.
 
-Client Installation
+Testing the Servers
 ===================
 
-Ensure your Ubuntu client machine is connected to the same network as your Pis
-(whether by Ethernet or Wifi doesn't matter). Then, execute the following to
-install the client::
-
-    $ sudo add-apt-repository ppa:waveform/ppa
-    $ sudo apt-get update
-    $ sudo apt-get install compoundpi-client
-
-Once installed, simply execute ``cpi`` to run the client. You will be presented
-with a command line like the following::
+Back on the Ubuntu client machine, execute ``cpi`` to run the client. You will
+be presented with a command line like the following::
 
     CompoundPi Client
     Type "help" for more information, or "find" to locate Pi servers
     cpi>
 
-You can use the ``help`` command to discover the available commands, but as
-suggested the first step in using your Compound Pi servers is to locate them on
-the network. If you run ``find`` on its own it will send out a broadcast ping
-and wait for a fixed number of seconds for servers to respond. If you know
-exactly how many servers you have, specify a number with the ``find`` command
-and it will warn you if it doesn't find that many servers (it will also finish
-faster if it does find the expected number of Pis)::
+Firstly, ensure that the network configuration is correct. The ``config``
+command can be used to print the current configuration::
+
+    cpi> config
+    Setting       Value
+    ------------- --------------
+    network       192.168.0.0/16
+    port          5647
+    bind          0.0.0.0:5647
+    timeout       5
+    capture_delay 0
+    capture_count 1
+    video_port    False
+    time_delta    0.25
+    output        /tmp
+
+Assuming we're using a typical home router which gives out addresses in the
+192.168.1.x network, this is incorrect. In order for broadcasts to work, the
+network *must* have the correct definition - it's no good having a superset
+configured (192.168.0.0/16 is a superset of 192.168.1.0/24). To correct the
+network definition, use the ``set`` command::
+
+    cpi> set network 192.168.1.0/24
+    cpi> config
+    Setting       Value
+    ------------- --------------
+    network       192.168.1.0/24
+    port          5647
+    bind          0.0.0.0:5647
+    timeout       5
+    capture_delay 0
+    capture_count 1
+    video_port    False
+    time_delta    0.25
+    output        /tmp
+
+To make permanent configuration changes, simply place them in a file named
+``~/.cpi.ini`` like so::
+
+    [cpi]
+    network=192.168.1.0/24
+    timeout=10
+    output=~/Pictures
+
+With the network configured correctly, you can now use ``find`` to locate your
+servers.  If you run ``find`` on its own it will send out a broadcast ping and
+wait for a fixed number of seconds for servers to respond. If you know exactly
+how many servers you have, specify a number with the ``find`` command and it
+will warn you if it doesn't find that many servers (it will also finish faster
+if it does find the expected number of Pis)::
 
     cpi> find 2
     Found 2 servers
@@ -129,10 +207,14 @@ server, and the number of images currently stored in memory on the server. If
 you only want to query a specific set of servers you can give their addresses
 as a parameter::
 
-    cpi> status 192.168.80.154
-    Address        Resolution Framerate Timestamp                  Images
-    -------------- ---------- --------- -------------------------- ------
-    192.168.80.154 1280x720   30.00fps  2014-04-15 20:53:06.826477 0
+    cpi> status 192.168.1.154
+    Address        Resolution  Time                       #
+    -------------- ----------- -------------------------- -
+    192.168.80.154 1280x720@30 2014-04-26 13:44:53.400000 0
+
+If any major discrepancies are detected (resolution, framerate, or timestamp),
+the status command should notify you of them. The maximum discrepancy permitted
+in the timestamp is configured with the ``time_delta`` configuration setting.
 
 To shoot an image, use the ``capture`` command::
 
@@ -142,8 +224,8 @@ Finally, to download the captured images from all Pis, simply use the ``download
 command::
 
     cpi> download
-    Downloaded image 0 from 192.168.80.154
-    Downloaded image 0 from 192.168.80.168
+    Downloaded image 0 from 192.168.1.154
+    Downloaded image 0 from 192.168.1.168
 
 You can use the ``config`` and ``set`` commands to configure capture options,
 the download target directory, and so on.

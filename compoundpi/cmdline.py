@@ -49,7 +49,10 @@ import re
 import cmd
 import readline
 import locale
+import logging
 from textwrap import TextWrapper
+
+from .terminal import _CONSOLE
 
 # Hex 1 and 2 are used to ensure readline ignores color sequences in the prompt
 COLOR_IGNORE  = lambda s: '\001%s\002' % s
@@ -78,6 +81,16 @@ class CmdError(Exception):
 class CmdSyntaxError(CmdError):
     "Exception raised when the user makes a syntax error"
 
+
+class CmdHandler(logging.Handler):
+    def __init__(self, cmd, level=logging.NOTSET):
+        super(CmdHandler, self).__init__(level)
+        self.cmd = cmd
+
+    def emit(self, record):
+        self.cmd.pprint(record.msg % record.args)
+
+
 class Cmd(cmd.Cmd):
     "An enhanced version of the standard Cmd command line processor"
     use_rawinput = True
@@ -90,6 +103,7 @@ class Cmd(cmd.Cmd):
         self._wrapper = TextWrapper()
         self.color_prompt = color_prompt
         self.base_prompt = self.prompt
+        self.logging_handler = CmdHandler(self, logging.DEBUG)
 
     def parse_bool(self, value, default=None):
         """
@@ -193,10 +207,16 @@ class Cmd(cmd.Cmd):
             self.prompt = COLOR_BOLD + COLOR_GREEN + self.prompt + COLOR_RESET
         if self.history_file and os.path.exists(self.history_file):
             readline.read_history_file(self.history_file)
+        # Replace the _CONSOLE logging handler with something that calls pprint
+        logging.getLogger().addHandler(self.logging_handler)
+        logging.getLogger().removeHandler(_CONSOLE)
 
     def postloop(self):
         readline.set_history_length(self.history_size)
         readline.write_history_file(self.history_file)
+        # Restore the _CONSOLE handler
+        logging.getLogger().addHandler(_CONSOLE)
+        logging.getLogger().removeHandler(self.logging_handler)
 
     def onecmd(self, line):
         # Just catch and report CmdError's; don't terminate execution because
@@ -283,6 +303,8 @@ class Cmd(cmd.Cmd):
     def do_help(self, arg):
         """
         Displays the available commands or help on a specified command.
+
+        Syntax: help [command]
 
         The 'help' command is used to display the help text for a command or,
         if no command is specified, it presents a list of all available

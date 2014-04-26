@@ -425,14 +425,14 @@ class CompoundPiCmd(Cmd):
 
         Syntax: set <name> <value>
 
-        The set command is used to alter the value of a client configuration
-        variable. Use the related "config" command to view the current
+        The 'set' command is used to alter the value of a client configuration
+        variable. Use the related 'config' command to view the current
         configuration.
 
         See also: config.
 
         cpi> set timeout 10
-        cpi> set output /home/camera/
+        cpi> set output ~/Pictures/
         cpi> set capture_count 5
         """
         match = re.match(r' *(?P<name>[A-Za-z_]+) +(?P<value>.*)', arg)
@@ -599,12 +599,15 @@ class CompoundPiCmd(Cmd):
             for (address, data) in self.transact('STATUS', arg).items()
             ]
         self.pprint_table(
-            [('Address', 'Resolution', 'Framerate', 'Timestamp', 'Images')] +
+            [('Address', 'Resolution', 'Time', '#')] +
             [
                 (
                     address,
-                    '%sx%s' % (match.group('width'), match.group('height')),
-                    fractions.Fraction(match.group('rate')),
+                    '%sx%s@%s' % (
+                        match.group('width'),
+                        match.group('height'),
+                        fractions.Fraction(match.group('rate')),
+                        ),
                     datetime.datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )
@@ -634,7 +637,7 @@ class CompoundPiCmd(Cmd):
                             address1, address2, self.time_delta)
         for (address, data, match) in responses:
             if not match:
-                self.pprint('Invalid response from %s:\n%s' % (address, data))
+                logging.error('%s: invalid response "%s"', address, data)
 
     def complete_status(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -646,11 +649,16 @@ class CompoundPiCmd(Cmd):
         Syntax: resolution <width>x<height> [addresses]
 
         The 'resolution' command is used to set the capture resolution of the
-        camera on all or some of the defined servers.
+        camera on all or some of the defined servers. The resolution of the
+        camera influences the capture mode that the camera uses. See the
+        camera hardware[1] chapter of the picamera documentation for more
+        information.
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
         ranges, comma-separated lists, or any combination of the two.
+
+        [1] http://picamera.readthedocs.org/en/latest/fov.html
 
         See also: status, framerate.
 
@@ -678,11 +686,16 @@ class CompoundPiCmd(Cmd):
 
         The 'framerate' command is used to set the capture framerate of the
         camera on all or some of the defined servers. The rate can be specified
-        as an integer or floating-point number, or as a fractional value.
+        as an integer or floating-point number, or as a fractional value. The
+        framerate of the camera influences the capture mode that the camera
+        uses. See the camera hardware[1] chapter of the picamera documentation
+        for more information.
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
         ranges, comma-separated lists, or any combination of the two.
+
+        [1] http://picamera.readthedocs.org/en/latest/fov.html
 
         See also: status, resolution.
 
@@ -718,7 +731,7 @@ class CompoundPiCmd(Cmd):
         still reasonably quick there will be a measurable difference between
         the timestamps of the last and first captures.
 
-        See also: download, list, clear.
+        See also: download, clear.
 
         cpi> capture
         cpi> capture 192.168.0.1
@@ -744,6 +757,11 @@ class CompoundPiCmd(Cmd):
         to the client. Servers are contacted consecutively to avoid saturating
         the network bandwidth. Once images are successfully downloaded from a
         server, they are wiped from the server.
+
+        See also: capture, clear.
+
+        cpi> download
+        cpi> download 192.168.0.1
         """
         if arg:
             addresses = self.parse_address_list(arg)
@@ -790,7 +808,7 @@ class CompoundPiCmd(Cmd):
         that the operator wants to discard images without first downloading
         them.
 
-        See also: download.
+        See also: download, capture.
 
         cpi> clear
         cpi> clear 192.168.0.1-192.168.0.10
