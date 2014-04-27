@@ -79,7 +79,7 @@ install:
 	$(PYTHON) $(PYFLAGS) setup.py install --root $(DEST_DIR)
 
 doc: $(DOC_SOURCES)
-	$(MAKE) -C docs html
+	$(MAKE) -C docs html latexpdf
 
 source: $(DIST_TAR) $(DIST_ZIP)
 
@@ -103,6 +103,7 @@ test:
 clean:
 	$(PYTHON) $(PYFLAGS) setup.py clean
 	$(MAKE) -f $(CURDIR)/debian/rules clean
+	$(MAKE) -C docs clean
 	rm -fr build/ dist/ $(NAME).egg-info/ tags
 	find $(CURDIR) -name "*.pyc" -delete
 

@@ -10,7 +10,7 @@ initiated by the :ref:`command_download` command in the client) are TCP-based.
 The diagram below shows a typical conversation between a Compound Pi client and
 three servers involving a broadcast PING packet and the resulting responses:
 
-.. image:: protocol_example.svg
+.. image:: protocol_example.*
     :align: center
 
 All messages are encoded as ASCII text.  Command messages consist of a non-zero
@@ -107,7 +107,7 @@ ACK for server3, but the ACK for server2 is lost. After another random delay,
 server2 once again retries its OK response, causing the client to send another
 ACK which succeeds this time:
 
-.. image:: protocol_retry.svg
+.. image:: protocol_retry.*
     :align: center
 
 The following sections document the various commands that the server

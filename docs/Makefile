@@ -9,6 +9,7 @@ BUILDDIR      = _build
 DOT_DIAGRAMS  = $(wildcard *.dot)
 MSC_DIAGRAMS  = $(wildcard *.msc)
 SVG_IMAGES    = $(DOT_DIAGRAMS:.dot=.svg) $(MSC_DIAGRAMS:.msc=.svg)
+PDF_IMAGES    = $(DOT_DIAGRAMS:.dot=.pdf) $(MSC_DIAGRAMS:.msc=.pdf)
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -106,20 +107,20 @@ epub:
 	@echo
 	@echo "Build finished. The epub file is in $(BUILDDIR)/epub."
 
-latex:
+latex: $(PDF_IMAGES)
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
 	@echo
 	@echo "Build finished; the LaTeX files are in $(BUILDDIR)/latex."
 	@echo "Run \`make' in that directory to run these through (pdf)latex" \
 	      "(use \`make latexpdf' here to do that automatically)."
 
-latexpdf:
+latexpdf: $(PDF_IMAGES)
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
 	@echo "Running LaTeX files through pdflatex..."
 	$(MAKE) -C $(BUILDDIR)/latex all-pdf
 	@echo "pdflatex finished; the PDF files are in $(BUILDDIR)/latex."
 
-latexpdfja:
+latexpdfja: $(PDF_IMAGES)
 	$(SPHINXBUILD) -b latex $(ALLSPHINXOPTS) $(BUILDDIR)/latex
 	@echo "Running LaTeX files through platex and dvipdfmx..."
 	$(MAKE) -C $(BUILDDIR)/latex all-pdf-ja
@@ -181,3 +182,7 @@ pseudoxml:
 
 %.svg: %.msc
 	mscgen -T svg -o $@ $<
+
+%.pdf: %.msc
+	mscgen -T eps -o - $< | ps2pdf -dEPSCrop - $@
+
