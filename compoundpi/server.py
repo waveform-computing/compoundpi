@@ -235,7 +235,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                     'SEND':        self.do_send,
                     'LIST':        self.do_list,
                     'CLEAR':       self.do_clear,
-                    'QUIT':        self.do_quit,
                     'BLINK':       self.do_blink,
                     }[command]
             except KeyError:
