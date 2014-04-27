@@ -142,7 +142,7 @@ $(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	mkdir -p dist/
 	for f in $(DIST_DSC); do cp ../$${f##*/} dist/; done
 
-release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
+release-pi: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# ensure there are no current uncommitted changes
 	test -z "$(shell git status --porcelain)"
 	# update the changelog with new release information
@@ -153,6 +153,14 @@ release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# update the package's registration on PyPI (in case any metadata's changed)
 	$(PYTHON) $(PYFLAGS) setup.py register
 
+release-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
+	# ensure there are no current uncommitted changes
+	test -z "$(shell git status --porcelain)"
+	# update the changelog with new release information
+	dch --newversion $(VER)-1$(DEB_SUFFIX) --controlmaint
+	# commit the changes and add a new tag
+	git commit debian/changelog -m "Updated changelog for Ubuntu release"
+
 upload: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	# build a source archive and upload to PyPI
 	$(PYTHON) $(PYFLAGS) setup.py sdist upload
@@ -160,5 +168,5 @@ upload: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	dput waveform-ppa dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
 	git push --tags
 
-.PHONY: all install develop test doc source egg zip tar deb dist clean tags release upload
+.PHONY: all install develop test doc source egg zip tar deb dist clean tags release-pi release-ubuntu upload
 
