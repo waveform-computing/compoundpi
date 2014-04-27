@@ -6,12 +6,13 @@ cpi
 
 This is the Compound Pi client application which provides a command line
 interface through which you can query and interact with any Pi's running the
-:ref:`Compound Pi daemon <cpid>` on your configured subnet. Use the ``help``
-command within the application for information on the available commands.
+:ref:`Compound Pi daemon <cpid>` on your configured subnet. Use the
+:ref:`command_help` command within the application for information on the
+available commands.
 
 The application can be configured via command line switches, a configuration
-file (defaults to ``/etc/cpi.ini``, ``/usr/local/etc/cpi.ini``, or
-``~/.cpid.ini``), or through the interactive command line itself.
+file (defaults to :file:`/etc/cpi.ini`, :file:`/usr/local/etc/cpi.ini`, or
+:file:`~/.cpid.ini`), or through the interactive command line itself.
 
 
 Synopsis
@@ -97,18 +98,18 @@ Description
 Usage
 =====
 
-The first command in a Compound Pi session is usually ``find`` to locate the
-servers on the specified subnet. If you know the number of servers available,
-specify it as an argument to the ``find`` command which will cause the command
-to return quicker in the case that all servers are found, or to warn you if
-less than the expected number are located.
+The first command in a Compound Pi session is usually :ref:`command_find` to
+locate the servers on the specified subnet. If you know the number of servers
+available, specify it as an argument to the :ref:`command_find` command which
+will cause the command to return quicker in the case that all servers are
+found, or to warn you if less than the expected number are located.
 
-The ``status`` command can be used to check that all servers have an equivalent
-camera configuration, and that time sync is reasonable.
+The :ref:`command_status` command can be used to check that all servers have an
+equivalent camera configuration, and that time sync is reasonable.
 
-The ``capture`` command is used to cause all located servers to capture an
-image. After capturing, use the ``download`` command to transfer all captured
-images to the client.
+The :ref:`command_capture` command is used to cause all located servers to
+capture an image. After capturing, use the :ref:`command_download` command to
+transfer all captured images to the client.
 
-Finally, the ``help`` command can be used to query the available commands, and
-to obtain help on an individual command.
+Finally, the :ref:`command_help` command can be used to query the available
+commands, and to obtain help on an individual command.

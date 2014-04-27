@@ -7,8 +7,8 @@ cpid
 This is the server daemon for the Compound Pi application. Starting the
 application with no arguments starts the server in the foreground. The server
 can be configured through command line arguments or a configuration file (which
-defaults to ``/etc/cpid.ini``, ``/usr/local/etc/cpid.ini``, or
-``~/.cpid.ini``).
+defaults to :file:`/etc/cpid.ini`, :file:`/usr/local/etc/cpid.ini`, or
+:file:`~/.cpid.ini`).
 
 
 Synopsis
@@ -23,7 +23,7 @@ Synopsis
 Description
 ===========
 
-.. program: cpid
+.. program:: cpid
 
 .. option:: -h, --help
 
@@ -95,8 +95,8 @@ lit (this is useful as Compound Pi servers are typically headless).
 .. note::
 
     If you explicitly set a user and/or group for the daemon (with the
-    :option:`-u` and :option:`-g` options), be aware that using the Pi's camera
-    typically requires membership of the ``video`` group. Furthermore, the
-    specified user and group must have the ability to create and remove the
-    pid lock file.
+    :option:`cpid -u` and :option:`cpid -g` options), be aware that using the
+    Pi's camera typically requires membership of the ``video`` group.
+    Furthermore, the specified user and group must have the ability to create
+    and remove the pid lock file.
 
