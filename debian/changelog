@@ -1,3 +1,9 @@
+compoundpi (0.2-1ubuntu1) precise; urgency=low
+
+  * Ubuntu release of 0.2
+
+ -- Dave Hughes <dave@waveform.org.uk>  Sun, 27 Apr 2014 22:01:26 +0100
+
 compoundpi (0.2-1) stable; urgency=low
 
   * The network protocol has been changed to enhance its reliability when
