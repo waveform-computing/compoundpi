@@ -78,9 +78,10 @@ Or, if an error occurred::
     <error-description>
 
 Sequence numbers start at 1 (0 is reserved), and are incremented on each
-command, except for :samp:`ACK`. The sequence number for a response indicates which
-command the response is associated with and likewise the sequence number for
-:samp:`ACK` indicates the response that the :samp:`ACK` terminates.
+command, except for :ref:`protocol_ack`. The sequence number for a response
+indicates which command the response is associated with and likewise the
+sequence number for :ref:`protocol_ack` indicates the response that the
+:ref:`protocol_ack` terminates.
 
 As UDP is an unreliable protocol, some mechanism is required to compensate for
 lost, unordered, or duplicated packets. An assumption is made that a Compound
@@ -97,10 +98,10 @@ client that the response was successfully received. The crude incrementing
 sequence number included in all messages guards against duplicated or unordered
 packets.
 
-In the following example, the client sends a :ref:`protocol_ping` command to
-three servers. The servers all immediately respond with an OK response, but
-only the packet from server1 makes it back to the client. The client responds
-to server1 with an ACK. The other servers (after a random delay) now retry
+In the following example, the client broadcasts a :ref:`protocol_ping` command
+to three servers. The servers all respond with an OK response, but only the
+packet from server1 makes it back to the client. The client responds to server1
+with an :ref:`protocol_ack`. The other servers (after a random delay) now retry
 their OK responses and both get through this time. The client responds with an
 ACK for server3, but the ACK for server2 is lost. After another random delay,
 server2 once again retries its OK response, causing the client to send another
@@ -120,18 +121,20 @@ ACK
 
 **Syntax:** ACK
 
-The :samp:`ACK` command is sent by the client to acknowledge receipt of a
-response from a server. It is special in that its sequence number must match
+The :ref:`protocol_ack` command is sent by the client to acknowledge receipt of
+a response from a server. It is special in that its sequence number must match
 the sequence number of the response that it acknowledges (it is the only
 command that does not increment the sequence number on the client).
 
 It is also special in that its implementation is effectively optional: a client
 doesn't *have* to acknowledge receipt of a server's response; after 5 seconds,
-the server will stop retrying its responses anyway but an :samp:`ACK` command
-is nonetheless useful to reduce the congestion of the network with useless
-response retries.
+the server will stop retrying its responses anyway but an :ref:`protocol_ack`
+command is nonetheless useful to reduce the congestion of the network with
+useless response retries.
 
-No response is to be sent.
+When a server receives the :ref:`protocol_ack` command, it must stop retrying
+responses with the same sequence number as the ACK command. No other response
+should be sent.
 
 
 .. _protocol_blink:
@@ -141,11 +144,11 @@ BLINK
 
 **Syntax:** BLINK
 
-The :samp:`BLINK` command should cause the server to identify itself for the
-purpose of debugging. In this implementation, this is accomplished by blinking
-the camera's LED for 5 seconds.
+The :ref:`protocol_blink` command should cause the server to identify itself
+for the purpose of debugging. In this implementation, this is accomplished by
+blinking the camera's LED for 5 seconds.
 
-A standard response is expected with no data.
+An OK response is expected with no data.
 
 
 .. _protocol_capture:
@@ -155,8 +158,8 @@ CAPTURE
 
 **Syntax:** CAPTURE *[count [video-port [sync]]]*
 
-The :samp:`CAPTURE` command should cause the server to capture one or more
-images from the camera. The parameters are as follows:
+The :ref:`protocol_capture` command should cause the server to capture one or
+more images from the camera. The parameters are as follows:
 
 *count*
     Specifies the number of images to capture. If specified, this must be a
@@ -182,7 +185,7 @@ The timestamp at which the image was taken must also be stored.  Storage in
 this implementation is simply in RAM, but implementations are free to use any
 storage medium they see fit.
 
-A standard response is expected with no data.
+An OK response is expected with no data.
 
 
 .. _protocol_clear:
@@ -192,11 +195,12 @@ CLEAR
 
 **Syntax:** CLEAR
 
-The :samp:`CLEAR` command deletes all images from the server's local storage.
-As noted above in :ref:`protocol_capture`, implementations are free to use any
-storage medium, but the current implementation simply uses a list in RAM.
+The :ref:`protocol_clear` command deletes all images from the server's local
+storage.  As noted above in :ref:`protocol_capture`, implementations are free
+to use any storage medium, but the current implementation simply uses a list in
+RAM.
 
-A standard response is expected with no data.
+An OK response is expected with no data.
 
 
 .. _protocol_framerate:
@@ -206,12 +210,12 @@ FRAMERATE
 
 **Syntax:** FRAMERATE *num[/denom]*
 
-The :samp:`FRAMERATE` command changes the camera's configuration to use the
-specified framerate which is given either as an integer number between 1 and 90
-or as a fraction consisting of an integer numerator and denominator separated
-by a forward-slash.
+The :ref:`protocol_framerate` command changes the camera's configuration to use
+the specified framerate which is given either as an integer number between 1
+and 90 or as a fraction consisting of an integer numerator and denominator
+separated by a forward-slash.
 
-A standard response is expected with no data.
+An OK response is expected with no data.
 
 
 .. _protocol_list:
@@ -221,14 +225,14 @@ LIST
 
 **Syntax:** LIST
 
-The :samp:`LIST` command causes the server to respond with a new-line separated
-list detailing all locally stored images. Each line in the data portion of the
-response has the following format::
+The :ref:`protocol_list` command causes the server to respond with a new-line
+separated list detailing all locally stored images. Each line in the data
+portion of the response has the following format::
 
     IMAGE <number> <timestamp> <size>
 
 For example, if five images are stored on the server the data portion of the
-response may look like this::
+OK response may look like this::
 
     IMAGE 0 1398618927.307944 8083879
     IMAGE 1 1398619000.53127 7960423
@@ -251,10 +255,10 @@ PING
 
 **Syntax:** PING
 
-The :samp:`PING` command is sent by the client's :ref:`command_find` command in
-order to locate Compound Pi servers. The server must send the following string
-in the data portion of the response indicating the version of the protocol
-that the server understands::
+The :ref:`protocol_ping` command is sent by the client's :ref:`command_find`
+command in order to locate Compound Pi servers. The server must send the
+following string in the data portion of the OK response indicating the version
+of the protocol that the server understands::
 
     VERSION 0.2
 
@@ -275,11 +279,11 @@ RESOLUTION
 
 **Syntax:** RESOLUTION *width* *height*
 
-The :samp:`RESOLUTION` command changes the camera's configuration to use the
-specified capture resolution which is two integer numbers giving the width and
-height of the new resolution.
+The :ref:`protocol_resolution` command changes the camera's configuration to
+use the specified capture resolution which is two integer numbers giving the
+width and height of the new resolution.
 
-A standard response is expected with no data.
+An OK response is expected with no data.
 
 
 .. _protocol_send:
@@ -289,8 +293,8 @@ SEND
 
 **Syntax:** SEND *index* *port*
 
-The :samp:`SEND` command causes the specified image to be sent from the server
-to the client. The parameters are as follows:
+The :ref:`protocol_send` command causes the specified image to be sent from the
+server to the client. The parameters are as follows:
 
 *index*
     Specifies the zero-based index of the image that the client wants the
@@ -304,8 +308,7 @@ to the client. The parameters are as follows:
 
 Assuming *index* refers to a valid image index, the server must connect to the
 specified TCP port on the client, send the bytes of the image, and finally
-close the connection. The server must also send a standard response with no
-data.
+close the connection. The server must also send an OK response with no data.
 
 
 .. _protocol_status:
@@ -315,9 +318,9 @@ STATUS
 
 **Syntax:** STATUS
 
-The :samp:`STATUS` command causes the server to send the client information
-about its current configuration. Specifically, the response must contain the
-following lines in its data portion, in the order given below::
+The :ref:`protocol_status` command causes the server to send the client
+information about its current configuration. Specifically, the response must
+contain the following lines in its data portion, in the order given below::
 
     RESOLUTION <width> <height>
     FRAMERATE <num>[/denom]
@@ -334,13 +337,14 @@ Where:
     fractional value
 
 *<time>*
-    Gives the timestamp at which the :samp:`STATUS` command was received in
-    UNIX time format (a dotted-decimal number of seconds since the UNIX epoch).
+    Gives the timestamp at which the :ref:`protocol_status` command was
+    received in UNIX time format (a dotted-decimal number of seconds since the
+    UNIX epoch).
 
 *<images>*
     Gives the number of images currently stored locally by the server.
 
-For example, the data portion of the response may look like the following::
+For example, the data portion of the OK response may look like the following::
 
     RESOLUTION 1280 720
     FRAMERATE 30
