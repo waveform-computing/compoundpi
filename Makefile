@@ -79,7 +79,7 @@ install:
 	$(PYTHON) $(PYFLAGS) setup.py install --root $(DEST_DIR)
 
 doc: $(DOC_SOURCES)
-	$(PYTHON) $(PYFLAGS) setup.py build_sphinx -b html
+	$(MAKE) -C docs html
 
 source: $(DIST_TAR) $(DIST_ZIP)
 

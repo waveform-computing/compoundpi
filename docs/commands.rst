@@ -158,7 +158,7 @@ exit
 **Syntax:** exit|quit
 
 The :ref:`command_exit` command is used to terminate the application. You can
-also use the standard UNIX ``Ctrl+D`` end of file sequence to quit.
+also use the standard UNIX :kbd:`Ctrl+D` end of file sequence to quit.
 
 
 .. _command_find:
@@ -252,7 +252,7 @@ quit
 **Syntax:** exit|quit
 
 The :ref:`command_exit` command is used to terminate the application. You can
-also use the standard UNIX ``Ctrl+D`` end of file sequence to quit.
+also use the standard UNIX :kbd:`Ctrl+D` end of file sequence to quit.
 
 
 .. _command_remove:

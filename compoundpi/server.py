@@ -195,7 +195,7 @@ class ResponderThread(threading.Thread):
 
     def run(self):
         start = time.time()
-        while not self.terminate and time.time() < start + 1:
+        while not self.terminate and time.time() < start + 5:
             self.socket.sendto(self.data, self.client_address)
             time.sleep(random.uniform(0.0, 0.2))
 
@@ -206,7 +206,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             r'(?P<command>[A-Z]+)( (?P<params>.*))?')
     response_re = re.compile(
             r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR [^\n]+)(\n(?P<data>.*))?')
+            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?')
 
     def handle(self):
         data = self.rfile.read().strip()
@@ -253,7 +253,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             self.send_response(seqno, '%d OK\n%s' % (seqno, response))
         except Exception as exc:
             logging.error(str(exc))
-            self.send_response(seqno, '%d ERROR %s\n' % (seqno, exc))
+            self.send_response(seqno, '%d ERROR\n%s' % (seqno, exc))
 
     def send_response(self, seqno, data):
         assert self.response_re.match(data)
@@ -273,7 +273,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             responder.join()
 
     def do_ping(self):
-        return __version__
+        return 'VERSION %s' % __version__
 
     def blink_led(self, timeout):
         try:
@@ -355,9 +355,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         client_sock.connect((self.client_address[0], port))
         client_file = client_sock.makefile('wb')
         try:
-            stream.seek(0, io.SEEK_END)
-            client_file.write(struct.pack(_str('<dL'), timestamp, stream.tell()))
-            client_file.flush()
             stream.seek(0)
             shutil.copyfileobj(stream, client_file)
         finally:
@@ -368,17 +365,13 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         for timestamp, stream in self.server.images:
             stream.seek(0, io.SEEK_END)
         return '\n'.join(
-            '%f %d' % (timestamp, stream.tell())
-            for (timestamp, stream) in self.server.images
+            'IMAGE %d %f %d' % (index, timestamp, stream.tell())
+            for (index, (timestamp, stream)) in enumerate(self.server.images)
             )
 
     def do_clear(self):
         logging.info('Clearing images')
         del self.server.images[:]
-
-    def do_quit(self):
-        logging.info('Received QUIT command')
-        self.server.shutdown()
 
 
 main = CompoundPiServer()

@@ -184,7 +184,7 @@ class CompoundPiCmd(Cmd):
             r'(?P<command>[A-Z]+)( (?P<params>.*))?')
     response_re = re.compile(
             r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR [^\n]+)(\n(?P<data>.*))?', flags=re.DOTALL)
+            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
 
     def __init__(self):
         Cmd.__init__(self)
@@ -241,6 +241,7 @@ class CompoundPiCmd(Cmd):
             self.server.cmd = self
             self.server.event = threading.Event()
             self.server.expected_size = None
+            self.server.expected_timestamp = None
             self.server.expected_address = None
             self.server.exception = None
             self.server_thread = threading.Thread(target=self.server.serve_forever)
@@ -375,12 +376,15 @@ class CompoundPiCmd(Cmd):
                 result, response = responses[address]
             except KeyError:
                 failed = True
-                logging.error('%s: no response' % address)
+                logging.error('%s: no response', address)
             else:
                 responses[address] = response
-                if result != 'OK':
+                if result == 'ERROR':
                     failed = True
-                    logging.error('%s: %s', address, result)
+                    logging.error('%s: %s', address, response)
+                elif result != 'OK':
+                    failed = True
+                    logging.error('%s: invalid response', address)
         if failed:
             raise CmdError('Failed to execute successfully on all servers')
         return responses
@@ -512,13 +516,13 @@ class CompoundPiCmd(Cmd):
         self.broadcast('%d PING' % self.seqno)
         responses = self.responses(count=count)
         for address, (result, response) in responses.items():
+            response = response.strip()
             if result == 'OK':
-                response = response.strip()
-                if response != __version__:
-                    logging.warning('%s: wrong version %s', address, response)
+                if response != 'VERSION %s' % __version__:
+                    logging.warning('%s: wrong version "%s"', address, response)
                     del responses[address]
             else:
-                logging.error('%s: %s', address, result)
+                logging.error('%s: %s', address, response)
                 del responses[address]
         if responses:
             self.servers = set(responses.keys())
@@ -772,15 +776,19 @@ class CompoundPiCmd(Cmd):
         for address in addresses:
             self.server.expected_address = address
             response = self.transact('LIST', address)[address]
-            for index, details in enumerate(response.strip().splitlines()):
+            for details in response.strip().splitlines():
                 try:
-                    timestamp, size = details.split(' ', 1)
-                    timestamp = float(timestamp)
+                    start, index, timestamp, size = details.split(' ', 3)
+                    if start != 'IMAGE':
+                        raise ValueError('Expected IMAGE')
+                    index = int(index)
+                    timestamp = datetime.datetime.fromtimestamp(float(timestamp))
                     size = int(size)
                 except (ValueError, TypeError):
                     raise CmdError(
                         'Received invalid image details from %s' % address)
                 self.server.expected_size = size
+                self.server.expected_timestamp = timestamp
                 self.server.event.clear()
                 self.transact('SEND %d %d' % (index, self.port), address)
                 if self.server.event.wait(self.timeout):
@@ -850,15 +858,11 @@ class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
                 raise ValueError(
                     'Connection from unexpected address: %s instead of %s' %
                     (self.client_address[0], self.server.expected_address))
-            timestamp, size = struct.unpack(_str('<dL'), self.request.recv(12))
-            if size != self.server.expected_size:
-                raise ValueError(
-                    'Image size differs from LIST result: '
-                    '%d != %d' % (size, self.server.expected_size))
+            size = self.server.expected_size
+            timestamp = self.server.expected_timestamp
             # Guard against something sending a ridiculously large file
             if size > 10*1024*1024:
                 raise ValueError('Image size is unreasonably large: %d' % size)
-            timestamp = datetime.datetime.fromtimestamp(timestamp)
             filename = os.path.join(
                 self.server.cmd.output, '%s-%s.jpg' % (
                     timestamp.strftime('%Y%m%d%H%M%S%f'),

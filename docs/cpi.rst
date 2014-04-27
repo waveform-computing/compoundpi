@@ -27,7 +27,7 @@ Synopsis
 Description
 ===========
 
-.. program: cpi
+.. program:: cpi
 
 .. option:: -h, --help
 

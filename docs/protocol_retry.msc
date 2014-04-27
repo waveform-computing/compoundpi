@@ -1,0 +1,17 @@
+msc {
+    client,server1,server2,server3;
+
+    client->* [label="2 PING"];
+    server1->client [label="2 OK"];
+    server2-xclient [label="2 OK"];
+    server3-xclient [label="2 OK"];
+    client->server1 [label="2 ACK"];
+    ...;
+    server2->client [label="2 OK"];
+    server3->client [label="2 OK"];
+    client-xserver2 [label="2 ACK"];
+    client->server3 [label="2 ACK"];
+    ...;
+    server2->client [label="2 OK"];
+    client->server2 [label="2 ACK"];
+}
