@@ -1,3 +1,13 @@
+compoundpi (0.2-1) stable; urgency=low
+
+  * The network protocol has been changed to enhance its reliability when
+    dealing with lots of Pis on unreliable networks (like Wifi).
+  * The status command has been enhanced to warn of configuration
+    discrepancies.
+  * Lots more work on the docs.
+
+ -- Dave Hughes <dave@waveform.org.uk>  Sun, 27 Apr 2014 21:54:57 +0100
+
 compoundpi (0.1-1ubuntu2) precise; urgency=low
 
   * Ubuntu release of 0.1
