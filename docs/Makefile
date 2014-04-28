@@ -7,9 +7,9 @@ SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      = _build
 DOT_DIAGRAMS  = $(wildcard *.dot)
-MSC_DIAGRAMS  = $(wildcard *.msc)
-SVG_IMAGES    = $(DOT_DIAGRAMS:.dot=.svg) $(MSC_DIAGRAMS:.msc=.svg)
-PDF_IMAGES    = $(DOT_DIAGRAMS:.dot=.pdf) $(MSC_DIAGRAMS:.msc=.pdf)
+MSC_DIAGRAMS  = $(wildcard *.mscgen)
+SVG_IMAGES    = $(DOT_DIAGRAMS:.dot=.svg) $(MSC_DIAGRAMS:.mscgen=.svg)
+PDF_IMAGES    = $(DOT_DIAGRAMS:.dot=.pdf) $(MSC_DIAGRAMS:.mscgen=.pdf)
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
