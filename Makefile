@@ -153,12 +153,16 @@ release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# update the package's registration on PyPI (in case any metadata's changed)
 	$(PYTHON) $(PYFLAGS) setup.py register
 
-upload: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
+upload-pi: $(DIST_DEB) $(DIST_DSC)
+	# send the debs and dscs to Raspbian maintainer
+	./maildebs.py $(DIST_DEB) $(DIST_DSC)
+
+upload-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	# build a source archive and upload to PyPI
 	$(PYTHON) $(PYFLAGS) setup.py sdist upload
 	# build the deb source archive and upload to the PPA
 	dput waveform-ppa dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
 	git push --tags
 
-.PHONY: all install develop test doc source egg zip tar deb dist clean tags release upload
+.PHONY: all install develop test doc source egg zip tar deb dist clean tags release upload-pi upload-ubuntu
 
