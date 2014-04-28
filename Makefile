@@ -129,7 +129,7 @@ $(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
-	debuild -b -i -I -Idist -Ibuild -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
+	debuild -b -i -I -Idist -Ibuild -Idocs/_build -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
 	mkdir -p dist/
 	for f in $(DIST_DEB); do cp ../$${f##*/} dist/; done
 
@@ -138,11 +138,11 @@ $(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
-	debuild -S -i -I -Idist -Ibuild -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
+	debuild -S -i -I -Idist -Ibuild -Idocs/_build -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
 	mkdir -p dist/
 	for f in $(DIST_DSC); do cp ../$${f##*/} dist/; done
 
-release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
+release-pi: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# ensure there are no current uncommitted changes
 	test -z "$(shell git status --porcelain)"
 	# update the changelog with new release information
@@ -152,6 +152,14 @@ release: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	git tag -s release-$(VER) -m "Release $(VER)"
 	# update the package's registration on PyPI (in case any metadata's changed)
 	$(PYTHON) $(PYFLAGS) setup.py register
+
+release-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
+	# ensure there are no current uncommitted changes
+	test -z "$(shell git status --porcelain)"
+	# update the changelog with new release information
+	dch --newversion $(VER)-1$(DEB_SUFFIX) --controlmaint
+	# commit the changes and add a new tag
+	git commit debian/changelog -m "Updated changelog for Ubuntu release"
 
 upload-pi: $(DIST_DEB) $(DIST_DSC)
 	# send the debs and dscs to Raspbian maintainer
@@ -164,5 +172,5 @@ upload-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	dput waveform-ppa dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
 	git push --tags
 
-.PHONY: all install develop test doc source egg zip tar deb dist clean tags release upload-pi upload-ubuntu
+.PHONY: all install develop test doc source egg zip tar deb dist clean tags release-pi release-ubuntu upload-pi upload-ubuntu
 
