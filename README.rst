@@ -5,7 +5,7 @@ Compound Pi
 ===========
 
 This project provides a means for controlling multiple `cameras`_ attached to
-`Raspberry Pi`_'s all of which are attached to the same subnet. Broadcast UDP
+`Raspberry Pis`_ all of which are attached to the same subnet. Broadcast UDP
 packets are utilized to permit near-simultaneous triggering of all attached
 cameras.
 
@@ -14,7 +14,7 @@ The code is licensed under the `GPL v3`_ or above. Packages can be
 also hosts the `bug tracker`_. The `documentation`_ (which includes
 installation and quick start examples) can be read on ReadTheDocs.
 
-.. _Raspberry Pi: http://www.raspberrypi.org/
+.. _Raspberry Pis: http://www.raspberrypi.org/
 .. _cameras: http://www.raspberrypi.org/camera
 .. _downloaded: http://pypi.python.org/pypi/compoundpi
 .. _documentation: http://compoundpi.readthedocs.org/

@@ -39,7 +39,7 @@ The following table demonstrates various examples of this syntax:
 +-----------------------------------------+-------------+
 
 It is also worth noting that if readline is installed (which it is on almost
-any modern Unix platform), the command line supports Tab-completion for
+any modern Unix platform), the command line supports :kbd:`Tab`-completion for
 commands and most parameters, including defined server addresses.
 
 
@@ -50,9 +50,9 @@ add
 
 **Syntax:** add *addresses*
 
-The :ref:`command_add` command is used to manually define the set of Pi's to
-communicate with. Addresses can be specified individually, as a dash-separated
-range, or a comma-separated list of ranges and addresses.
+The :ref:`command_add` command is used to manually define the set of Pi servers
+to communicate with. Addresses can be specified individually, as a
+dash-separated range, or a comma-separated list of ranges and addresses.
 
 See also: :ref:`command_find`, :ref:`command_remove`, :ref:`command_servers`.
 
@@ -98,7 +98,7 @@ clear
 **Syntax:** clear *[addresses]*
 
 The :ref:`command_clear` command can be used to clear the in-memory image store
-on the specified Pi servers (or all Pi servers if no address is given. The
+on the specified Pi servers (or all Pi servers if no address is given). The
 :ref:`command_download` command automatically clears the image store after
 successful transfers so this command is only useful in the case that the
 operator wants to discard images without first downloading them.
@@ -120,7 +120,8 @@ config
 **Syntax:** config
 
 The :ref:`command_config` command is used to display the current client
-configuration. Use the related "set" command to alter the configuration.
+configuration. Use the related :ref:`command_set` command to alter the
+configuration.
 
 See also: :ref:`command_set`.
 
@@ -169,8 +170,8 @@ find
 **Syntax:** find *[count]*
 
 The :ref:`command_find` command is typically the first command used in a client
-session to locate all Pi's on the current subnet. If a count is specified, the
-command will display an error if the expected number of Pi's is not located.
+session to locate all Pis on the configured subnet. If a count is specified,
+the command will display an error if the expected number of Pis is not located.
 
 See also: :ref:`command_add`, :ref:`command_remove`, :ref:`command_servers`,
 :ref:`command_identify`.
@@ -190,7 +191,7 @@ framerate
 
 The :ref:`command_framerate` command is used to set the capture framerate of
 the camera on all or some of the defined servers. The rate can be specified as
-an integer or floating-point number, or as a fractional value. The framerate
+an integer, a floating-point number, or as a fractional value. The framerate
 of the camera influences the capture mode that the camera uses. See the
 `camera hardware`_ chapter of the picamera documentation for more information.
 
@@ -263,7 +264,7 @@ remove
 **Syntax:** remove *addresses*
 
 The :ref:`command_remove` command is used to remove addresses from the set of
-Pi's to communicate with. Addresses can be specified individually, as a
+Pi servers to communicate with. Addresses can be specified individually, as a
 dash-separated range, or a comma-separated list of ranges and addresses.
 
 See also: :ref:`command_add`, :ref:`command_find`, :ref:`command_servers`.

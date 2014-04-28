@@ -65,7 +65,8 @@ integer sequence number (copied from the corresponding command), followed by a
 single space, followed by :samp:`ERROR`, followed by a new-line character
 (ASCII character 10), followed by a description of the error that occurred::
 
-    7 ERROR Unknown command FOO
+    7 ERROR
+    Unknown command FOO
 
 In other words, the general form of a response message is::
 
@@ -128,7 +129,7 @@ command that does not increment the sequence number on the client).
 
 It is also special in that its implementation is effectively optional: a client
 doesn't *have* to acknowledge receipt of a server's response; after 5 seconds,
-the server will stop retrying its responses anyway but an :ref:`protocol_ack`
+the server will stop retrying its responses anyway, but an :ref:`protocol_ack`
 command is nonetheless useful to reduce the congestion of the network with
 useless response retries.
 

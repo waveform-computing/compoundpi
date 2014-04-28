@@ -396,7 +396,7 @@ class CompoundPiCmd(Cmd):
         Syntax: config
 
         The config command is used to display the current client configuration.
-        Use the related "set" command to alter the configuration.
+        Use the related 'set' command to alter the configuration.
 
         See also: set.
 
@@ -493,9 +493,9 @@ class CompoundPiCmd(Cmd):
         Syntax: find [count]
 
         The 'find' command is typically the first command used in a client
-        session to locate all Pi's on the current subnet. If a count is
+        session to locate all Pis on the configured subnet. If a count is
         specified, the command will display an error if the expected number of
-        Pi's is not located.
+        Pis is not located.
 
         See also: add, remove, servers, identify.
 
@@ -536,7 +536,7 @@ class CompoundPiCmd(Cmd):
 
         Syntax: add <addresses>
 
-        The 'add' command is used to manually define the set of Pi's to
+        The 'add' command is used to manually define the set of Pi servers to
         communicate with. Addresses can be specified individually, as a
         dash-separated range, or a comma-separated list of ranges and
         addresses.
@@ -561,9 +561,9 @@ class CompoundPiCmd(Cmd):
 
         Syntax: remove <addresses>
 
-        The 'remove' command is used to remove addresses from the set of Pi's
-        to communicate with. Addresses can be specified individually, as a
-        dash-separated range, or a comma-separated list of ranges and
+        The 'remove' command is used to remove addresses from the set of Pi
+        servers to communicate with. Addresses can be specified individually,
+        as a dash-separated range, or a comma-separated list of ranges and
         addresses.
 
         See also: add, find, servers.
@@ -690,7 +690,7 @@ class CompoundPiCmd(Cmd):
 
         The 'framerate' command is used to set the capture framerate of the
         camera on all or some of the defined servers. The rate can be specified
-        as an integer or floating-point number, or as a fractional value. The
+        as an integer, a floating-point number, or as a fractional value. The
         framerate of the camera influences the capture mode that the camera
         uses. See the camera hardware[1] chapter of the picamera documentation
         for more information.
@@ -811,7 +811,7 @@ class CompoundPiCmd(Cmd):
 
         The 'clear' command can be used to clear the in-memory image store
         on the specified Pi servers (or all Pi servers if no address is
-        given. The 'download' command automatically clears the image store
+        given). The 'download' command automatically clears the image store
         after successful transfers so this command is only useful in the case
         that the operator wants to discard images without first downloading
         them.
