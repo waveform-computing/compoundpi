@@ -24,7 +24,6 @@ from __future__ import (
     print_function,
     division,
     )
-_str = str
 str = type('')
 range = xrange
 # Py3: correct super-class calls
