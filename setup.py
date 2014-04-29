@@ -75,7 +75,6 @@ def main():
                 ][0],
             keywords             = app.__keywords__,
             packages             = find_packages(),
-            package_data         = {},
             include_package_data = True,
             platforms            = app.__platforms__,
             install_requires     = app.__requires__,

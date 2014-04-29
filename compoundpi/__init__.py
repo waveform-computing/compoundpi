@@ -42,6 +42,7 @@ __extra_requires__ = {
     'client': [],
     'server': ['picamera', 'rpi.gpio', 'python-daemon'],
     'doc':    ['sphinx'],
+    'GUI':    ['pyqt'],
     }
 
 if sys.version_info[:2] == (3, 2):
@@ -53,7 +54,7 @@ if sys.version_info[:2] == (3, 2):
         ])
 
 __classifiers__ = [
-    'Development Status :: 3 - Alpha',
+    'Development Status :: 4 - Beta',
     'Environment :: Console',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
@@ -68,6 +69,9 @@ __entry_points__ = {
     'console_scripts': [
         'cpid = compoundpi.server:main',
         'cpi = compoundpi.client:main',
+        ],
+    'gui_scripts': [
+        'cpigui = compoundpi.clientgui:main',
         ],
     }
 
