@@ -185,9 +185,10 @@ class Cmd(cmd.Cmd):
     def complete_path(self, text, line, start, finish):
         "Utility routine used by path completion methods"
         path, _ = os.path.split(line)
+        path = os.path.expanduser(path)
         return [
-            item
-            for item in os.listdir(os.path.expanduser(path))
+            item + ('/' if os.path.isdir(os.path.join(path, item)) else '')
+            for item in os.listdir(path)
             if item.startswith(text)
             ]
 

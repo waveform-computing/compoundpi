@@ -462,6 +462,34 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError(e)
         setattr(self, name, value)
 
+    def complete_set(self, text, line, start, finish):
+        cmd_re = re.compile(r'set(?P<name> +[^ ]+(?P<value> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('value') < finish <= match.end('value'):
+            name = match.group('name').strip()
+            value = match.group('value').strip()
+            if name.startswith('output'):
+                return self.complete_path(text, value, start, finish)
+            elif name.startswith('video_port'):
+                values = ['on', 'off', 'true', 'false', 'yes', 'no', '0', '1']
+                return [value for value in values if value.startswith(text)]
+            else:
+                return []
+        elif match.start('name') < finish <= match.end('name'):
+            names = [
+                'network',
+                'port',
+                'bind',
+                'timeout',
+                'capture_delay',
+                'capture_count',
+                'video_port',
+                'time_delta',
+                'output',
+                ]
+            return [name for name in names if name.startswith(text)]
+
     def do_servers(self, arg=''):
         """
         Display the list of servers.
@@ -552,8 +580,12 @@ class CompoundPiCmd(Cmd):
         self.servers |= self.transact('PING', arg).keys()
 
     def complete_add(self, text, line, start, finish):
-        # XXX This is wrong - should be addresses in network that *aren't* in self.servers
-        return self.complete_server(text, line, start, finish)
+        return [
+            str(server)
+            for server in self.network
+            if server not in self.servers
+            and str(server).startswith(text)
+            ]
 
     def do_remove(self, arg):
         """
@@ -682,6 +714,35 @@ class CompoundPiCmd(Cmd):
                 'RESOLUTION %d %d' % (width, height),
                 arg[1] if len(arg) > 1 else '')
 
+    def complete_resolution(self, text, line, start, finish):
+        cmd_re = re.compile(r'resolution(?P<res> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('res') < finish <= match.end('res'):
+            # Some common resolutions; this list isn't intended to be
+            # exhaustive, just useful for completion
+            resolutions = [
+                '320x240',   # QVGA
+                '640x480',   # VGA (NTSC)
+                '768x576',   # PAL (4:3)
+                '800x600',   # SVGA
+                '1024x576',  # PAL (16:9)
+                '1024x768',  # XGA
+                '1280x720',  # HD 720
+                '1680x1050', # WSXGA+
+                '1920x1080', # HD 1080
+                '2048x1536', # QXGA
+                '2560x1440', # WQHD
+                '2592x1944', # Full resolution
+                ]
+            return [
+                resolution
+                for resolution in resolutions
+                if resolution.startswith(text)
+                ]
+
     def do_framerate(self, arg):
         """
         Sets the framerate on the defined servers.
@@ -717,6 +778,33 @@ class CompoundPiCmd(Cmd):
         self.transact(
                 'FRAMERATE %s' % rate,
                 arg[1] if len(arg) > 1 else '')
+
+    def complete_framerate(self, text, line, start, finish):
+        cmd_re = re.compile(r'framerate(?P<rate> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('rate') < finish <= match.end('rate'):
+            # Some common framerates; this list isn't intended to be
+            # exhaustive, just useful for completion
+            framerates = [
+                '90',
+                '60',
+                '50',
+                '48',
+                '30',
+                '25',
+                '24',
+                '23.976',
+                '15',
+                '1',
+                ]
+            return [
+                framerate
+                for framerate in framerates
+                if framerate.startswith(text)
+                ]
 
     def do_capture(self, arg=''):
         """
