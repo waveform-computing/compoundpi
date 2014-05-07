@@ -14,18 +14,21 @@
    <string>Compound Pi</string>
   </property>
   <widget class="QWidget" name="centralwidget">
-   <layout class="QHBoxLayout" name="horizontalLayout">
+   <layout class="QVBoxLayout" name="verticalLayout">
     <property name="margin">
      <number>0</number>
     </property>
     <item>
-     <widget class="QListView" name="pi_list"/>
-    </item>
-    <item>
-     <widget class="QListView" name="image_list">
-      <property name="viewMode">
-       <enum>QListView::IconMode</enum>
+     <widget class="QSplitter" name="splitter">
+      <property name="orientation">
+       <enum>Qt::Horizontal</enum>
       </property>
+      <widget class="QListView" name="pi_list"/>
+      <widget class="QListView" name="image_list">
+       <property name="viewMode">
+        <enum>QListView::IconMode</enum>
+       </property>
+      </widget>
      </widget>
     </item>
    </layout>
@@ -47,9 +50,20 @@
     <addaction name="add_action"/>
     <addaction name="remove_action"/>
     <addaction name="separator"/>
+    <addaction name="capture_action"/>
     <addaction name="configure_action"/>
+    <addaction name="separator"/>
+    <addaction name="quit_action"/>
+   </widget>
+   <widget class="QMenu" name="help_menu">
+    <property name="title">
+     <string>&amp;Help</string>
+    </property>
+    <addaction name="about_action"/>
+    <addaction name="about_qt_action"/>
    </widget>
    <addaction name="servers_menu"/>
+   <addaction name="help_menu"/>
   </widget>
   <widget class="QStatusBar" name="status_bar"/>
   <widget class="QToolBar" name="tool_bar">
@@ -66,7 +80,10 @@
    <addaction name="add_action"/>
    <addaction name="remove_action"/>
    <addaction name="separator"/>
+   <addaction name="capture_action"/>
    <addaction name="configure_action"/>
+   <addaction name="separator"/>
+   <addaction name="quit_action"/>
   </widget>
   <action name="find_action">
    <property name="text">
@@ -88,10 +105,62 @@
   </action>
   <action name="configure_action">
    <property name="text">
-    <string>&amp;Configure</string>
+    <string>C&amp;onfigure...</string>
+   </property>
+  </action>
+  <action name="quit_action">
+   <property name="text">
+    <string>&amp;Quit</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+Q</string>
+   </property>
+   <property name="shortcutContext">
+    <enum>Qt::ApplicationShortcut</enum>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::QuitRole</enum>
+   </property>
+  </action>
+  <action name="about_action">
+   <property name="text">
+    <string>&amp;About Compound Pi...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::AboutRole</enum>
+   </property>
+  </action>
+  <action name="about_qt_action">
+   <property name="text">
+    <string>&amp;About QT...</string>
+   </property>
+   <property name="menuRole">
+    <enum>QAction::AboutQtRole</enum>
+   </property>
+  </action>
+  <action name="capture_action">
+   <property name="text">
+    <string>&amp;Capture</string>
    </property>
   </action>
  </widget>
  <resources/>
- <connections/>
+ <connections>
+  <connection>
+   <sender>quit_action</sender>
+   <signal>triggered()</signal>
+   <receiver>MainWindow</receiver>
+   <slot>close()</slot>
+   <hints>
+    <hint type="sourcelabel">
+     <x>-1</x>
+     <y>-1</y>
+    </hint>
+    <hint type="destinationlabel">
+     <x>399</x>
+     <y>299</y>
+    </hint>
+   </hints>
+  </connection>
+ </connections>
 </ui>

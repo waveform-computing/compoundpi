@@ -30,7 +30,7 @@ range = xrange
 
 from PyQt4 import QtCore, QtGui, uic
 
-from .windows import get_icon, get_ui_file
+from . import get_icon, get_ui_file
 
 
 class MainWindow(QtGui.QMainWindow):
@@ -54,15 +54,19 @@ class MainWindow(QtGui.QMainWindow):
         # Connect signals to methods
         self.ui.quit_action.setIcon(get_icon('application-exit'))
         self.ui.about_action.triggered.connect(self.about)
-        self.ui.acout_action.setIcon(get_icon('help-about'))
-        self.ui.acout_qt_action.triggered.connect(self.about_qt)
-        self.ui.acout_qt_action.setIcon(get_icon('help-about'))
+        self.ui.about_action.setIcon(get_icon('help-about'))
+        self.ui.about_qt_action.triggered.connect(self.about_qt)
+        self.ui.about_qt_action.setIcon(get_icon('help-about'))
         self.ui.find_action.setIcon(get_icon('system-search'))
         self.ui.find_action.triggered.connect(self.find_servers)
         self.ui.add_action.setIcon(get_icon('list-add'))
         self.ui.add_action.triggered.connect(self.add_servers)
         self.ui.remove_action.setIcon(get_icon('list-remove'))
         self.ui.remove_action.triggered.connect(self.remove_servers)
+        self.ui.capture_action.setIcon(get_icon('camera-photo'))
+        self.ui.capture_action.triggered.connect(self.capture)
+        self.ui.configure_action.setIcon(get_icon('preferences-system'))
+        self.ui.configure_action.triggered.connect(self.configure)
 
     def close(self):
         "Called when the main window is closed"
@@ -102,5 +106,11 @@ Project homepage is at
         pass
 
     def remove_servers(self):
+        pass
+
+    def capture(self):
+        pass
+
+    def configure(self):
         pass
 

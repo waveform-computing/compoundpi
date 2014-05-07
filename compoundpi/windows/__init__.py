@@ -28,6 +28,8 @@ str = type('')
 range = xrange
 
 import io
+import os
+import sys
 
 from PyQt4 import QtCore, QtGui, uic
 
