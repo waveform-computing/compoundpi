@@ -26,14 +26,12 @@ from __future__ import (
     )
 str = type('')
 range = xrange
-# Py3: correct super-class calls
-# Py3: remove getattr, setattr methods
 
 import sys
 import io
 import os
 import re
-import logging
+import warnings
 import datetime
 import fractions
 import time
@@ -42,142 +40,163 @@ import select
 import struct
 import socket
 import SocketServer as socketserver
+from collections import namedtuple
 try:
     from ipaddress import IPv4Address, IPv4Network
 except ImportError:
     from ipaddr import IPv4Address, IPv4Network
 
 from . import __version__
-from .terminal import TerminalApplication
-from .cmdline import Cmd, CmdSyntaxError, CmdError
 
 
-def service(s):
-    try:
-        return int(s)
-    except ValueError:
-        return socket.servbyname(s)
-
-def address(s):
-    host, port = s.rsplit(':', 1)
-    return socket.getaddrinfo(host, service(port), 0, socket.SOCK_STREAM)[0][-1]
-
-def network(s):
-    return IPv4Network(s)
-
-def zero_or_more(s):
-    result = int(s)
-    if result < 0:
-        raise ValueError('Value must be 0 or more')
-    return result
-
-def one_or_more(s):
-    result = int(s)
-    if result < 1:
-        raise ValueError('Value must be 1 or more')
-    return result
-
-def positive_float(s):
-    result = float(s)
-    if result > 0.0:
-        return result
-    raise ValueError('Value must be greater than 0')
-
-def path(s):
-    s = os.path.expanduser(s)
-    if not os.path.exists(s):
-        raise ValueError('%s does not exist' % s)
-    if not os.path.isdir(s):
-        raise ValueError('%s is not a directory' % s)
-    return s
-
-def boolean(s):
-    s = s.strip().lower()
-    if s in {'true', 't', 'yes', 'y', 'on', '1'}:
-        return True
-    elif s in {'false', 'f', 'no', 'n', 'off', '0'}:
-        return False
-    raise ValueError('%s is not a valid boolean' % s)
+class CompoundPiWarning(Warning):
+    "Base class for warnings raised by the Compound Pi client"
 
 
-class CompoundPiClient(TerminalApplication):
-    """
-    This is the CompoundPi client application which provides a command line
-    interface through which you can query and interact with any Pi's running
-    the CompoundPi server on your configured subnet. Use the "help" command
-    within the application for information on the available commands. The
-    application can be configured via command line switches, a configuration
-    file (defaults to ~/.cpid.ini), or through the interactive command line
-    itself.
-    """
+class CompoundPiServerWarning(CompoundPiWarning):
+    "Warning raised when a Compound Pi server does something unexpected"
+
+    def __init__(self, address, msg):
+        super(CompoundPiServerWarning, self).__init__(
+            '%s: %s' % (address, msg))
+        self.address = address
+
+
+class CompoundPiWrongPort(CompoundPiServerWarning):
+    "Warning raised when packets are received from the wrong port"
+
+    def __init__(self, address, port):
+        super(CompoundPiWrongPort, self).__init__(
+                address, 'response from wrong port %d' % port)
+
+
+class CompoundPiUnknownAddress(CompoundPiServerWarning):
+    "Warning raised when a packet is received from an unexpected address"
+
+    def __init__(self, address):
+        super(CompoundPiUnknownAddress, self).__init__(
+            address, 'unknown server')
+
+
+class CompoundPiMultiResponse(CompoundPiServerWarning):
+    "Warning raised when multiple responses are received"
+
+    def __init__(self, address):
+        super(CompoundPiDoubleResponse, self).__init__(
+            address, 'multiple responses received')
+
+
+class CompoundPiBadResponse(CompoundPiServerWarning):
+    "Warning raised when a response is badly formed"
+
+    def __init__(self, address):
+        super(CompoundPiBadResponse, self).__init__(
+            address, 'badly formed response')
+
+
+class CompoundPiStaleResponse(CompoundPiServerWarning):
+    "Warning raised when a stale response (old sequence number) is received"
+
+    def __init__(self, address):
+        super(CompoundPiStaleResponse, self).__init__(
+            address, 'stale response')
+
+
+class CompoundPiFutureResponse(CompoundPiServerWarning):
+    "Warning raised when a response with a future sequence number is received"
+
+    def __init__(self, address):
+        super(CompoundPiFutureResponse, self).__init__(
+            address, 'future response')
+
+
+class CompoundPiWrongVersion(CompoundPiServerWarning):
+    "Warning raised when a server reports an incompatible version"
+
+    def __init__(self, address, version):
+        super(CompoundPiWrongVersion, self).__init__(
+            address, 'wrong version "%s"' % version)
+        self.version = version
+
+
+class CompoundPiPingError(CompoundPiServerWarning):
+    "Warning raised when a server reports an error in response to PING"
+
+    def __init__(self, address, error):
+        super(CompoundPiPingError, self).__init__(address, error)
+        self.error = error
+
+
+class CompoundPiError(Exception):
+    "Base class for errors raised by the Compound Pi client"
+
+
+class CompoundPiNoServers(CompoundPiError):
+    "Exception raised when a command is execute with no servers defined"
 
     def __init__(self):
-        super(CompoundPiClient, self).__init__(
-            version=__version__,
-            config_files=[
-                '/etc/cpi.ini',
-                '/usr/local/etc/cpi.ini',
-                os.path.expanduser('~/.cpi.ini'),
-                ],
-            config_bools=[
-                'video_port',
-                ],
-            )
-        self.parser.add_argument(
-            '-o', '--output', metavar='PATH', default='/tmp',
-            help='specifies the directory that downloaded images will be '
-            'written to (default: %(default)s)')
-        self.parser.add_argument(
-            '-n', '--network', type=network, default='192.168.0.0/16',
-            help='specifies the network that the servers '
-            'belong to (default: %(default)s)')
-        self.parser.add_argument(
-            '-p', '--port', type=service, default='5647', metavar='PORT',
-            help='specifies the port that the servers are listening on '
-            '(default: %(default)d)')
-        self.parser.add_argument(
-                '-b', '--bind', type=address, default='0.0.0.0:5647', metavar='ADDRESS:PORT',
-            help='specifies the address and port that the client listens on '
-            'for downloads (default: %(default)s)')
-        self.parser.add_argument(
-            '-t', '--timeout', type=int, default='5', metavar='SECS',
-            help='specifies the timeout (in seconds) for network '
-            'transactions (default: %(default)s)')
-        self.parser.add_argument(
-            '--capture-delay', type=int, default='0', metavar='SECS',
-            help='specifies the delay (in seconds) used to synchronize '
-            'captures. This must be less than the network delay '
-            '(default: %(default)s)')
-        self.parser.add_argument(
-            '--capture-count', type=int, default='1', metavar='NUM',
-            help='specifies the number of consecutive pictures to capture '
-            'when requested (default: %(default)s)')
-        self.parser.add_argument(
-            '--video-port', action='store_true', default=False,
-            help="if specified, use the camera's video port for rapid capture")
-        self.parser.add_argument(
-            '--time-delta', type=float, default='0.25', metavar='SECS',
-            help='specifies the maximum delta between server timestamps that '
-            'the client will tolerate (default: %(default)ss)')
-        self.parser.set_defaults(log_level=logging.INFO)
-
-    def main(self, args):
-        proc = CompoundPiCmd()
-        proc.network = args.network
-        proc.port = args.port
-        proc.bind = args.bind
-        proc.timeout = args.timeout
-        proc.capture_delay = args.capture_delay
-        proc.capture_count = args.capture_count
-        proc.video_port = args.video_port
-        proc.time_delta = args.time_delta
-        proc.output = args.output
-        proc.cmdloop()
+        super(CompoundPiNoServers, self).__init__('no servers defined')
 
 
-class CompoundPiCmd(Cmd):
+class CompoundPiServerError(CompoundPiError):
+    "Exception raised when a Compound Pi server reports an error"
 
-    prompt = 'cpi> '
+    def __init__(self, address, msg):
+        super(CompoundPiErrorResponse, self).__init__('%s: %s' % (address, msg))
+        self.address = address
+
+
+class CompoundPiInvalidResponse(CompoundPiServerError):
+    "Exception raised when a server returns an unexpected response"
+
+    def __init__(self, address):
+        super(CompoundPiInvalidResponse, self).__init__(
+                address, 'invalid response')
+
+
+class CompoundPiMissingResponse(CompoundPiServerError):
+    "Exception raised when a server fails to return a response"
+
+    def __init__(self, address):
+        super(CompoundPiMissingResponse, self).__init__(
+                address, 'no response')
+
+
+class CompoundPiSendTimeout(CompoundPiServerError):
+    "Exception raised when a server fails to open a connection for SEND"
+
+    def __init__(self, address):
+        super(CompoundPiSendTimeout, self).__init__(
+                address, 'timed out waiting for SEND connection')
+
+
+class CompoundPiTransactionFailed(CompoundPiError):
+    "Compound exception which represents all errors encountered in a transaction"
+
+    def __init__(self, errors, msg=None):
+        if msg is None:
+            msg = '%d errors encountered while executing' % len(errors)
+        super(CompoundPiTransactionFailed, self).__init__(msg)
+        self.errors = errors
+
+
+CompoundPiStatus = namedtuple('CompoundPiStatus', (
+    'resolution',
+    'framerate',
+    'timestamp',
+    'images',
+    ))
+
+
+CompoundPiListItem = namedtuple('CompoundPiListItem', (
+    'index',
+    'timestamp',
+    'size',
+    ))
+
+
+class CompoundPiClient(object):
+
     request_re = re.compile(
             r'(?P<seqno>\d+) '
             r'(?P<command>[A-Z]+)( (?P<params>.*))?')
@@ -186,135 +205,54 @@ class CompoundPiCmd(Cmd):
             r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
 
     def __init__(self):
-        Cmd.__init__(self)
-        self.pprint('CompoundPi Client')
-        self.pprint(
-            'Type "help" for more information, '
-            'or "find" to locate Pi servers')
-        self.servers = set()
+        self._seqno = 0
+        self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self._server = None
+        self._server_thread = None
+        self._servers = set()
         self.network = '192.168.0.0/16'
         self.port = 5647
         self.timeout = 5
-        self.capture_delay = 0
-        self.capture_count = 1
-        self.video_port = False
-        self.time_delta = 0.25
-        self.output = '/tmp'
-        self.seqno = 0
-        self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        self.socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self.server = None
-
-    def __getattr__(self, name):
-        # Py3: remove this method
-        # This method only exists because computed properties don't work with
-        # old-style classes in Python 2
-        if name == 'bind':
-            return self._get_bind()
-        elif name == 'network':
-            return self._get_network()
-        else:
-            return Cmd.__getattr__(self, name)
-
-    def __setattr__(self, name, value):
-        # Py3: remove this method
-        # This method only exists because computed properties don't work with
-        # old-style classes in Python 2
-        if name == 'bind':
-            self._set_bind(value)
-        elif name == 'network':
-            self._set_network(value)
-        else:
-            self.__dict__[name] = value
 
     def _get_bind(self):
-        if self.server:
-            return self.server.socket.getsockname()
+        if self._server:
+            return self._server.socket.getsockname()
     def _set_bind(self, value):
-        if self.server:
-            self.server.shutdown()
-            self.server.socket.close()
-            self.server_thread = None
+        if self._server:
+            self._server.shutdown()
+            self._server.socket.close()
+            self._server_thread = None
         if value is not None:
-            self.server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
-            self.server.cmd = self
-            self.server.event = threading.Event()
-            self.server.expected_size = None
-            self.server.expected_timestamp = None
-            self.server.expected_address = None
-            self.server.exception = None
-            self.server_thread = threading.Thread(target=self.server.serve_forever)
-            self.server_thread.daemon = True
-            self.server_thread.start()
+            self._server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
+            self._server.cmd = self
+            self._server.event = threading.Event()
+            self._server.source = None
+            self._server.output = None
+            self._server.exception = None
+            self._server_thread = threading.Thread(target=self._server.serve_forever)
+            self._server_thread.daemon = True
+            self._server_thread.start()
     bind = property(_get_bind, _set_bind)
 
     def _get_network(self):
         return self._network
     def _set_network(self, value):
-        self._network = network(value)
-        self.servers = set()
+        self._network = IPv4Network(value)
+        self._servers = set()
     network = property(_get_network, _set_network)
 
-    def preloop(self):
-        assert self.server
-        Cmd.preloop(self)
-
-    def postloop(self):
-        Cmd.postloop(self)
-        self.bind = None
-
-    def parse_address(self, s):
-        try:
-            a = IPv4Address(s.strip())
-        except ValueError:
-            raise CmdSyntaxError('Invalid address "%s"' % s)
-        if not a in self.network:
-            raise CmdSyntaxError(
-                'Address "%s" does not belong to the configured network '
-                '"%s"' % (a, self.network))
-        return a
-
-    def parse_address_range(self, s):
-        if not '-' in s:
-            raise CmdSyntaxError('Expected two dash-separated addresses')
-        start, finish = (
-            self.parse_address(i)
-            for i in s.split('-', 1)
-            )
-        return start, finish
-
-    def parse_address_list(self, s):
-        result = set()
-        for i in s.split(','):
-            if '-' in i:
-                start, finish = self.parse_address_range(i)
-                result |= {IPv4Address(a) for a in range(start, finish + 1)}
-            else:
-                result.add(self.parse_address(i))
-        return result
-
-    def complete_server(self, text, line, start, finish):
-        return [
-            str(server)
-            for server in self.servers
-            if str(server).startswith(text)
-            ]
-
-    def no_servers(self):
-        raise CmdError(
-                "You must define servers first (see help for 'find' and 'add')")
-
-    def unicast(self, data, address):
+    def _unicast(self, data, address):
         assert self.request_re.match(data)
-        self.socket.sendto(data, (str(address), self.port))
+        self._socket.sendto(data, (str(address), self.port))
 
-    def broadcast(self, data):
+    def _broadcast(self, data):
         assert self.request_re.match(data)
-        self.socket.sendto(data, (str(self.network.broadcast), self.port))
+        self._socket.sendto(data, (str(self.network.broadcast), self.port))
 
-    def responses(self, servers=None, count=0):
+    def _responses(self, servers=None, count=0):
         if servers is None:
-            servers = self.servers
+            servers = self._servers
         if not count:
             count = len(servers)
         if not servers:
@@ -322,29 +260,27 @@ class CompoundPiCmd(Cmd):
         result = dict()
         start = time.time()
         while time.time() - start < self.timeout:
-            if select.select([self.socket], [], [], 1)[0]:
-                data, address = self.socket.recvfrom(512)
+            if select.select([self._socket], [], [], 1)[0]:
+                data, address = self._socket.recvfrom(512)
                 match = self.response_re.match(data.decode('utf-8'))
                 address, port = address
                 address = IPv4Address(address)
                 if port != self.port:
-                    logging.debug(
-                        '%s: response from wrong port %d', address, port)
+                    warnings.warn(CompoundPiWrongPort(address, port))
                 elif address in result:
-                    logging.debug('%s: ignoring double response', address)
+                    warnings.warn(CompoundPiMultiResponse(address))
                 elif address not in servers:
-                    logging.debug('%s: unexpected response', address)
+                    warnings.warn(CompoundPiUnknownAddress(address))
                 elif not match:
-                    logging.debug('%s: badly formed response', address)
+                    warnings.warn(CompoundPiBadResponse(address))
                 else:
                     seqno = int(match.group('seqno'))
-                    self.unicast('%d ACK' % seqno, address)
-                    if seqno < self.seqno:
-                        logging.debug('%s: stale response', address)
-                    elif seqno > self.seqno:
-                        logging.warning('%s: future response', address)
+                    self._unicast('%d ACK' % seqno, address)
+                    if seqno < self._seqno:
+                        warnings.warn(CompoundPiStaleResponse(address))
+                    elif seqno > self._seqno:
+                        warnings.warn(CompoundPiFutureResponse(address))
                     else:
-                        logging.debug('%s: received response', address)
                         result[address] = (
                                 match.group('result'),
                                 match.group('data'),
@@ -353,625 +289,180 @@ class CompoundPiCmd(Cmd):
                             break
         return result
 
-    def transact(self, data, addresses):
-        self.seqno += 1
-        data = '%d %s' % (self.seqno, data)
-        if addresses:
-            if isinstance(addresses, str):
-                addresses = self.parse_address_list(addresses)
-            elif isinstance(addresses, IPv4Address):
-                addresses = {addresses}
-            for address in addresses:
-                self.unicast(data, address)
-        else:
-            addresses = self.servers
+    def _transact(self, data, addresses=None):
+        errors = []
+        self._seqno += 1
+        data = '%d %s' % (self._seqno, data)
+        if addresses is None:
+            addresses = self._servers
             if not addresses:
-                self.no_servers()
-            self.broadcast(data)
-        responses = self.responses(addresses)
-        failed = False
+                raise CompoundPiNoServers()
+            self._broadcast(data)
+        else:
+            for address in addresses:
+                self._unicast(data, address)
+        responses = self._responses(addresses)
         for address in addresses:
             try:
                 result, response = responses[address]
             except KeyError:
-                failed = True
-                logging.error('%s: no response', address)
+                errors.append(CompoundPiMissingResponse(address))
             else:
                 responses[address] = response
                 if result == 'ERROR':
-                    failed = True
-                    logging.error('%s: %s', address, response)
+                    errors.append(CompoundPiServerError(address, response))
                 elif result != 'OK':
-                    failed = True
-                    logging.error('%s: invalid response', address)
-        if failed:
-            raise CmdError('Failed to execute successfully on all servers')
+                    errors.append(CompoundPiInvalidResponse(address))
+        if errors:
+            raise CompoundPiTransactionFailed(errors)
         return responses
 
-    def do_config(self, arg=''):
-        """
-        Prints the client configuration.
+    def __len__(self):
+        return len(self._servers)
 
-        Syntax: config
+    def __iter__(self):
+        return iter(self._servers)
 
-        The config command is used to display the current client configuration.
-        Use the related 'set' command to alter the configuration.
+    def __contains__(self, value):
+        return value in self._servers
 
-        See also: set.
-
-        cpi> config
-        """
-        self.pprint_table(
-            [('Setting', 'Value')] +
-            [
-                (name,
-                    '%s:%d' % getattr(self, name)
-                    if name == 'bind'
-                    else str(getattr(self, name))
-                    )
-                for name in (
-                    'network',
-                    'port',
-                    'bind',
-                    'timeout',
-                    'capture_delay',
-                    'capture_count',
-                    'video_port',
-                    'time_delta',
-                    'output',
-                    )]
-            )
-
-    def do_set(self, arg):
-        """
-        Change a configuration variable.
-
-        Syntax: set <name> <value>
-
-        The 'set' command is used to alter the value of a client configuration
-        variable. Use the related 'config' command to view the current
-        configuration.
-
-        See also: config.
-
-        cpi> set timeout 10
-        cpi> set output ~/Pictures/
-        cpi> set capture_count 5
-        """
-        match = re.match(r' *(?P<name>[A-Za-z_]+) +(?P<value>.*)', arg)
-        if not match:
-            raise CmdSyntaxError('You must specify a variable name and value')
-        name = match.group('name').lower()
-        value = match.group('value').strip()
-        try:
-            value = {
-                'network':       network,
-                'port':          service,
-                'bind':          address,
-                'timeout':       one_or_more,
-                'capture_delay': zero_or_more,
-                'capture_count': one_or_more,
-                'video_port':    boolean,
-                'time_delta':    positive_float,
-                'output':        path,
-                }[name](value)
-        except KeyError:
-            raise CmdSyntaxError('Invalid configuration variable: %s' % name)
-        except ValueError as e:
-            raise CmdSyntaxError(e)
-        setattr(self, name, value)
-
-    def complete_set(self, text, line, start, finish):
-        cmd_re = re.compile(r'set(?P<name> +[^ ]+(?P<value> +.*)?)?')
-        match = cmd_re.match(line)
-        assert match
-        if match.start('value') < finish <= match.end('value'):
-            name = match.group('name').strip()
-            value = match.group('value').strip()
-            if name.startswith('output'):
-                return self.complete_path(text, value, start, finish)
-            elif name.startswith('video_port'):
-                values = ['on', 'off', 'true', 'false', 'yes', 'no', '0', '1']
-                return [value for value in values if value.startswith(text)]
-            else:
-                return []
-        elif match.start('name') < finish <= match.end('name'):
-            names = [
-                'network',
-                'port',
-                'bind',
-                'timeout',
-                'capture_delay',
-                'capture_count',
-                'video_port',
-                'time_delta',
-                'output',
-                ]
-            return [name for name in names if name.startswith(text)]
-
-    def do_servers(self, arg=''):
-        """
-        Display the list of servers.
-
-        Syntax: servers
-
-        The 'servers' command is used to list the set of servers that the
-        client expects to communicate with. The content of the list can be
-        manipulated with the 'find', 'add', and 'remove' commands.
-
-        See also: find, add, remove.
-
-        cpi> servers
-        """
-        if arg:
-            raise CmdSyntaxError('Unexpected argument "%s"' % arg)
-        if not self.servers:
-            self.pprint('No servers are defined')
-        else:
-            self.pprint_table(
-                [('Address',)] +
-                [(key,) for key in self.servers]
-                )
-
-    def do_find(self, arg=''):
-        """
-        Find all servers on the current subnet.
-
-        Syntax: find [count]
-
-        The 'find' command is typically the first command used in a client
-        session to locate all Pis on the configured subnet. If a count is
-        specified, the command will display an error if the expected number of
-        Pis is not located.
-
-        See also: add, remove, servers, identify.
-
-        cpi> find
-        cpi> find 20
-        """
-        if arg:
-            try:
-                count = int(arg)
-            except ValueError:
-                raise CmdSyntaxError('Invalid find count "%s"' % arg)
-            if count < 1:
-                raise CmdSyntaxError('Invalid find count "%d"' % arg)
-        else:
-            count = 0
-        self.seqno += 1
-        self.servers = set()
-        self.broadcast('%d PING' % self.seqno)
-        responses = self.responses(count=count)
+    def _parse_ping(self, responses):
         for address, (result, response) in responses.items():
             response = response.strip()
             if result == 'OK':
                 if response != 'VERSION %s' % __version__:
-                    logging.warning('%s: wrong version "%s"', address, response)
+                    warnings.warn(CompoundPiWrongVersion(address, response))
                     del responses[address]
             else:
-                logging.error('%s: %s', address, response)
+                warnings.warn(CompoundPiPingError(address, response))
                 del responses[address]
-        if responses:
-            self.servers = set(responses.keys())
-            logging.info('Found %d servers' % len(self.servers))
-        else:
-            raise CmdError('Failed to find any servers')
+        return responses.keys()
 
-    def do_add(self, arg):
-        """
-        Add addresses to the list of servers.
+    def add(self, addresses):
+        self._seqno += 1
+        for address in addresses:
+            self._unicast('%d PING' % self._seqno, address)
+        self._servers |= self._parse_ping(self._responses(addresses))
 
-        Syntax: add <addresses>
+    def remove(self, addresses):
+        self._servers -= addresses
 
-        The 'add' command is used to manually define the set of Pi servers to
-        communicate with. Addresses can be specified individually, as a
-        dash-separated range, or a comma-separated list of ranges and
-        addresses.
-
-        See also: find, remove, servers.
-
-        cpi> add 192.168.0.1
-        cpi> add 192.168.0.1-192.168.0.10
-        cpi> add 192.168.0.1,192.168.0.5-192.168.0.10
-        """
-        if not arg:
-            raise CmdSyntaxError('You must specify address(es) to add')
-        self.servers |= self.transact('PING', arg).keys()
-
-    def complete_add(self, text, line, start, finish):
-        return [
-            str(server)
-            for server in self.network
-            if server not in self.servers
-            and str(server).startswith(text)
-            ]
-
-    def do_remove(self, arg):
-        """
-        Remove addresses from the list of servers.
-
-        Syntax: remove <addresses>
-
-        The 'remove' command is used to remove addresses from the set of Pi
-        servers to communicate with. Addresses can be specified individually,
-        as a dash-separated range, or a comma-separated list of ranges and
-        addresses.
-
-        See also: add, find, servers.
-
-        cpi> remove 192.168.0.1
-        cpi> remove 192.168.0.1-192.168.0.10
-        cpi> remove 192.168.0.1,192.168.0.5-192.168.0.10
-        """
-        if not arg:
-            raise CmdSyntaxError('You must specify address(es) to remove')
-        self.servers -= self.parse_address_list(arg)
-
-    def complete_remove(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
+    def find(self, count=0):
+        self._servers = set()
+        self._seqno += 1
+        self._broadcast('%d PING' % self._seqno)
+        self._servers = self._parse_ping(self._responses(count=count))
 
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
             r'IMAGES (?P<images>\d{,3})\n')
-    def do_status(self, arg=''):
-        """
-        Retrieves status from the defined servers.
-
-        Syntax: status [addresses]
-
-        The 'status' command is used to retrieve configuration information from
-        servers. If no addresses are specified, then all defined servers will
-        be queried.
-
-        See also: resolution, framerate.
-
-        cpi> status
-        """
+    def status(self, addresses=None):
         responses = [
-            (address, data, self.status_re.match(data))
-            for (address, data) in self.transact('STATUS', arg).items()
+            (address, self.status_re.match(data))
+            for (address, data) in self._transact('STATUS', addresses).items()
             ]
-        self.pprint_table(
-            [('Address', 'Resolution', 'Time', '#')] +
-            [
-                (
-                    address,
-                    '%sx%s@%s' % (
-                        match.group('width'),
-                        match.group('height'),
-                        fractions.Fraction(match.group('rate')),
-                        ),
+        errors = []
+        result = {}
+        for address, match in responses:
+            if match is None:
+                errors.append(CompoundPiInvalidResponse(address))
+            else:
+                result[address] = CompoundPiStatus(
+                    (int(match.group('width')), int(match.group('height'))),
+                    fractions.Fraction(match.group('rate')),
                     datetime.datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )
-                for (address, data, match) in responses
-                if match
-                ])
-        if len(set(
-                (match.group('width'), match.group('height'))
-                for (_, _, match) in responses
-                if match
-                )) > 1:
-            logging.warning('Warning: multiple resolutions configured')
-        if len(set(
-                match.group('rate')
-                for (_, _, match) in responses
-                if match
-                )) > 1:
-            logging.warning('Warning: multiple framerates configured')
-        for (address1, _, match1) in responses:
-            for (address2, _, match2) in responses:
-                if match1 and match2 and address1 < address2:
-                    if abs(
-                            float(match1.group('time')) -
-                            float(match2.group('time'))) > self.time_delta:
-                        logging.warning(
-                            'Warning: timestamps of %s and %s are >%.2fs apart',
-                            address1, address2, self.time_delta)
-        for (address, data, match) in responses:
-            if not match:
-                logging.error('%s: invalid response "%s"', address, data)
+        if errors:
+            raise CompoundPiTransactionFailed(
+                errors, '%d invalid status responses' % len(errors))
+        return result
 
-    def complete_status(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
+    def resolution(self, width, height, addresses=None):
+        self._transact('RESOLUTION %d %d' % (width, height), addresses)
 
-    def do_resolution(self, arg):
-        """
-        Sets the resolution on the defined servers.
+    def framerate(self, rate, addresses=None):
+        self._transact('FRAMERATE %s' % rate, addresses)
 
-        Syntax: resolution <width>x<height> [addresses]
-
-        The 'resolution' command is used to set the capture resolution of the
-        camera on all or some of the defined servers. The resolution of the
-        camera influences the capture mode that the camera uses. See the
-        camera hardware[1] chapter of the picamera documentation for more
-        information.
-
-        If no address is specified then all currently defined servers will be
-        targetted. Multiple addresses can be specified with dash-separated
-        ranges, comma-separated lists, or any combination of the two.
-
-        [1] http://picamera.readthedocs.org/en/latest/fov.html
-
-        See also: status, framerate.
-
-        cpi> resolution 640x480
-        cpi> resolution 1280x720 192.168.0.54
-        cpi> resolution 1280x720 192.168.0.1,192.168.0.3
-        """
-        if not arg:
-            raise CmdSyntaxError('You must specify a resolution')
-        arg = arg.split(' ', 1)
-        try:
-            width, height = arg[0].lower().split('x')
-            width, height = int(width), int(height)
-        except (TypeError, ValueError) as exc:
-            raise CmdSyntaxError('Invalid resolution "%s"' % arg[0])
-        self.transact(
-                'RESOLUTION %d %d' % (width, height),
-                arg[1] if len(arg) > 1 else '')
-
-    def complete_resolution(self, text, line, start, finish):
-        cmd_re = re.compile(r'resolution(?P<res> +[^ ]+(?P<addr> +.*)?)?')
-        match = cmd_re.match(line)
-        assert match
-        if match.start('addr') < finish <= match.end('addr'):
-            return self.complete_server(text, line, start, finish)
-        elif match.start('res') < finish <= match.end('res'):
-            # Some common resolutions; this list isn't intended to be
-            # exhaustive, just useful for completion
-            resolutions = [
-                '320x240',   # QVGA
-                '640x480',   # VGA (NTSC)
-                '768x576',   # PAL (4:3)
-                '800x600',   # SVGA
-                '1024x576',  # PAL (16:9)
-                '1024x768',  # XGA
-                '1280x720',  # HD 720
-                '1680x1050', # WSXGA+
-                '1920x1080', # HD 1080
-                '2048x1536', # QXGA
-                '2560x1440', # WQHD
-                '2592x1944', # Full resolution
-                ]
-            return [
-                resolution
-                for resolution in resolutions
-                if resolution.startswith(text)
-                ]
-
-    def do_framerate(self, arg):
-        """
-        Sets the framerate on the defined servers.
-
-        Syntax: framerate <rate> [addresses]
-
-        The 'framerate' command is used to set the capture framerate of the
-        camera on all or some of the defined servers. The rate can be specified
-        as an integer, a floating-point number, or as a fractional value. The
-        framerate of the camera influences the capture mode that the camera
-        uses. See the camera hardware[1] chapter of the picamera documentation
-        for more information.
-
-        If no address is specified then all currently defined servers will be
-        targetted. Multiple addresses can be specified with dash-separated
-        ranges, comma-separated lists, or any combination of the two.
-
-        [1] http://picamera.readthedocs.org/en/latest/fov.html
-
-        See also: status, resolution.
-
-        cpi> framerate 30
-        cpi> framerate 90 192.168.0.1
-        cpi> framerate 15 192.168.0.1-192.168.0.10
-        """
-        if not arg:
-            raise CmdSyntaxError('You must specify a framerate')
-        arg = arg.split(' ', 1)
-        try:
-            rate = fractions.Fraction(rate)
-        except (TypeError, ValueError) as exc:
-            raise CmdSyntaxError('Invalid framerate "%s"' % arg[0])
-        self.transact(
-                'FRAMERATE %s' % rate,
-                arg[1] if len(arg) > 1 else '')
-
-    def complete_framerate(self, text, line, start, finish):
-        cmd_re = re.compile(r'framerate(?P<rate> +[^ ]+(?P<addr> +.*)?)?')
-        match = cmd_re.match(line)
-        assert match
-        if match.start('addr') < finish <= match.end('addr'):
-            return self.complete_server(text, line, start, finish)
-        elif match.start('rate') < finish <= match.end('rate'):
-            # Some common framerates; this list isn't intended to be
-            # exhaustive, just useful for completion
-            framerates = [
-                '90',
-                '60',
-                '50',
-                '48',
-                '30',
-                '25',
-                '24',
-                '23.976',
-                '15',
-                '1',
-                ]
-            return [
-                framerate
-                for framerate in framerates
-                if framerate.startswith(text)
-                ]
-
-    def do_capture(self, arg=''):
-        """
-        Captures images from the defined servers.
-
-        Syntax: capture [addresses]
-
-        The 'capture' command causes the servers to capture an image. Note
-        that this does not cause the captured images to be sent to the client.
-        See the 'download' command for more information.
-
-        If no addresses are specified, a broadcast message to all defined
-        servers will be used in which case the timestamp of the captured images
-        are likely to be extremely close together. If addresses are specified,
-        unicast messages will be sent to each server in turn.  While this is
-        still reasonably quick there will be a measurable difference between
-        the timestamps of the last and first captures.
-
-        See also: download, clear.
-
-        cpi> capture
-        cpi> capture 192.168.0.1
-        cpi> capture 192.168.0.50-192.168.0.53
-        """
+    def capture(self, count=1, video_port=False, delay=None, addresses=None):
         cmd = 'CAPTURE %d %d'
-        params = [self.capture_count, self.video_port]
-        if self.capture_delay:
+        params = [count, video_port]
+        if delay:
             cmd += ' %f'
-            params.append(time.time() + self.capture_delay)
-        self.transact(cmd % tuple(params), arg)
+            params.append(time.time() + delay)
+        self._transact(cmd % tuple(params), addresses)
 
-    def complete_capture(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
-
-    def do_download(self, arg=''):
-        """
-        Downloads captured images from the defined servers.
-
-        Syntax: download [addresses]
-
-        The 'download' command causes each server to send its captured images
-        to the client. Servers are contacted consecutively to avoid saturating
-        the network bandwidth. Once images are successfully downloaded from a
-        server, they are wiped from the server.
-
-        See also: capture, clear.
-
-        cpi> download
-        cpi> download 192.168.0.1
-        """
-        if arg:
-            addresses = self.parse_address_list(arg)
-        else:
-            addresses = self.servers
-            if not addresses:
-                self.no_servers()
-        for address in addresses:
-            self.server.expected_address = address
-            response = self.transact('LIST', address)[address]
-            for details in response.strip().splitlines():
-                try:
-                    start, index, timestamp, size = details.split(' ', 3)
-                    if start != 'IMAGE':
-                        raise ValueError('Expected IMAGE')
-                    index = int(index)
-                    timestamp = datetime.datetime.fromtimestamp(float(timestamp))
-                    size = int(size)
-                except (ValueError, TypeError):
-                    raise CmdError(
-                        'Received invalid image details from %s' % address)
-                self.server.expected_size = size
-                self.server.expected_timestamp = timestamp
-                self.server.event.clear()
-                self.transact('SEND %d %d' % (index, self.port), address)
-                if self.server.event.wait(self.timeout):
-                    if self.server.exception:
-                        raise CmdError(str(self.server.exception))
+    list_line_re = re.compile(
+            r'IMAGE (?P<index>\d+) (?P<time>\d+(\.\d+)?) (?P<size>\d+)')
+    def list(self, addresses=None):
+        responses = {
+            address: [
+                self.list_line_re.match(line)
+                for line in data.splitlines()
+                ]
+            for (address, data) in self._transact('LIST', addresses).items()
+            }
+        errors = []
+        result = {}
+        for address, matches in responses.items():
+            result[address] = []
+            for match in matches:
+                if match is None:
+                    errors.append(CompoundPiInvalidResponse(address))
                 else:
-                    raise CmdError(
-                        'Timed out waiting for image transfer from %s' % address)
-                self.pprint('Downloaded image %d from %s' % (index, address))
-            self.transact('CLEAR', address)
+                    result[address].append(CompoundPiListItem(
+                        int(match.group('index')),
+                        datetime.datetime.fromtimestamp(float(match.group('time'))),
+                        int(match.group('size')),
+                        ))
+        if errors:
+            raise CompoundPiTransactionFailed(
+                errors, '%d invalid lines in responses' % len(errors))
+        return result
 
-    def complete_download(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
+    def clear(self, addresses=None):
+        self._transact('CLEAR', addresses)
 
-    def do_clear(self, arg):
-        """
-        Clear the image store on the specified servers.
+    def identify(self, addresses=None):
+        self._transact('BLINK', addresses)
 
-        Syntax: clear [addresses]
-
-        The 'clear' command can be used to clear the in-memory image store
-        on the specified Pi servers (or all Pi servers if no address is
-        given). The 'download' command automatically clears the image store
-        after successful transfers so this command is only useful in the case
-        that the operator wants to discard images without first downloading
-        them.
-
-        See also: download, capture.
-
-        cpi> clear
-        cpi> clear 192.168.0.1-192.168.0.10
-        """
-        responses = self.transact('CLEAR', arg)
-
-    def complete_clear(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
-
-    def do_identify(self, arg):
-        """
-        Blink the LED on the specified servers.
-
-        Syntax: identify [addresses]
-
-        The 'identify' command can be used to locate a specific Pi server (or
-        servers) by their address. It sends a command causing the camera's LED
-        to blink on and off for 5 seconds. If no addresses are specified, the
-        command will be sent to all defined servers (this can be useful after
-        the 'find' command to determine whether any Pi's failed to respond due
-        to network issues).
-
-        See also: find.
-
-        cpi> identify
-        cpi> identify 192.168.0.1
-        cpi> identify 192.168.0.3-192.168.0.5
-        """
-        responses = self.transact('BLINK', arg)
-
-    def complete_identify(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
+    def download(self, address, index, output):
+        self._server.source = address
+        self._server.output = output
+        self._server.event.clear()
+        try:
+            self._transact('SEND %d %d' % (index, self.port), address)
+            if self._server.event.wait(self.timeout):
+                if self._server.exception:
+                    raise self._server.exception
+            else:
+                raise CompoundPiSendTimeout(address)
+        finally:
+            self._server.source = None
+            self._server.output = None
 
 
 class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
     def handle(self):
-        try:
-            if self.client_address[0] != str(self.server.expected_address):
-                raise ValueError(
-                    'Connection from unexpected address: %s instead of %s' %
-                    (self.client_address[0], self.server.expected_address))
-            size = self.server.expected_size
-            timestamp = self.server.expected_timestamp
-            # Guard against something sending a ridiculously large file
-            if size > 10*1024*1024:
-                raise ValueError('Image size is unreasonably large: %d' % size)
-            filename = os.path.join(
-                self.server.cmd.output, '%s-%s.jpg' % (
-                    timestamp.strftime('%Y%m%d%H%M%S%f'),
-                    self.client_address[0],
-                ))
-            with io.open(filename, 'wb') as output:
-                while size > 0:
-                    data = self.request.recv(1024)
-                    output.write(data)
-                    size -= len(data)
-            if size > 0:
-                raise ValueError('Server did not transmit entire image')
-        except Exception as e:
-            self.server.exception = e
+        if self.client_address[0] != str(self.server.source):
+            warnings.warn(CompoundPiUnknownAddress(self.client_address[0]))
         else:
-            self.server.exception = None
-        finally:
-            self.server.event.set()
+            try:
+                with io.open(filename, 'wb') as output:
+                    while size > 0:
+                        data = self.request.recv(1024)
+                        self.server.output.write(data)
+                        size -= len(data)
+            except Exception as e:
+                self._server.exception = e
+            else:
+                self._server.exception = None
+            finally:
+                self._server.event.set()
 
 
 class CompoundPiDownloadServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
     pass
 
-
-main = CompoundPiClient()
