@@ -34,7 +34,9 @@ import io
 import os
 import re
 import logging
+import warnings
 import datetime
+import socket
 import fractions
 try:
     from ipaddress import IPv4Address, IPv4Network
@@ -192,6 +194,13 @@ class CompoundPiCmd(Cmd):
         self.video_port = False
         self.time_delta = 0.25
         self.output = '/tmp'
+        self.warnings = False
+        warnings.simplefilter('always')
+
+    def showwarning(self, message, category, filename, lineno, file=None,
+            line=None):
+        if self.warnings:
+            logging.warning(str(message))
 
     def preloop(self):
         assert self.client.bind
@@ -259,26 +268,20 @@ class CompoundPiCmd(Cmd):
 
         cpi> config
         """
-        # XXX Correct this
         self.pprint_table(
-            [('Setting', 'Value')] +
             [
-                (name,
-                    '%s:%d' % getattr(self, name)
-                    if name == 'bind'
-                    else str(getattr(self, name))
-                    )
-                for name in (
-                    'network',
-                    'port',
-                    'bind',
-                    'timeout',
-                    'capture_delay',
-                    'capture_count',
-                    'video_port',
-                    'time_delta',
-                    'output',
-                    )]
+                ('Setting',       'Value'),
+                ('network',       self.client.network),
+                ('port',          self.client.port),
+                ('bind',          '%s:%d' % self.client.bind),
+                ('timeout',       self.client.timeout),
+                ('capture_delay', self.capture_delay),
+                ('capture_count', self.capture_count),
+                ('video_port',    self.video_port),
+                ('time_delta',    self.time_delta),
+                ('output',        self.output),
+                ('warnings',      self.warnings),
+                ]
             )
 
     def do_set(self, arg):
@@ -314,12 +317,16 @@ class CompoundPiCmd(Cmd):
                 'video_port':    boolean,
                 'time_delta':    positive_float,
                 'output':        path,
+                'warnings':      boolean,
                 }[name](value)
         except KeyError:
             raise CmdSyntaxError('Invalid configuration variable: %s' % name)
         except ValueError as e:
             raise CmdSyntaxError(e)
-        setattr(self, name, value)
+        if name in ('network', 'port', 'bind', 'timeout'):
+            setattr(self.client, name, value)
+        else:
+            setattr(self, name, value)
 
     def complete_set(self, text, line, start, finish):
         cmd_re = re.compile(r'set(?P<name> +[^ ]+(?P<value> +.*)?)?')
@@ -330,7 +337,7 @@ class CompoundPiCmd(Cmd):
             value = match.group('value').strip()
             if name.startswith('output'):
                 return self.complete_path(text, value, start, finish)
-            elif name.startswith('video_port'):
+            elif name.startswith('video_port') or name.startswith('warnings'):
                 values = ['on', 'off', 'true', 'false', 'yes', 'no', '0', '1']
                 return [value for value in values if value.startswith(text)]
             else:
@@ -346,8 +353,9 @@ class CompoundPiCmd(Cmd):
                 'video_port',
                 'time_delta',
                 'output',
+                'warnings',
                 ]
-            return [name for name in names if name.startswith(text)]
+            return [name + ' ' for name in names if name.startswith(text)]
 
     def do_servers(self, arg=''):
         """
@@ -427,7 +435,7 @@ class CompoundPiCmd(Cmd):
     def complete_add(self, text, line, start, finish):
         return [
             str(server)
-            for server in self.network
+            for server in self.client.network
             if server not in self.client
             and str(server).startswith(text)
             ]
@@ -493,12 +501,12 @@ class CompoundPiCmd(Cmd):
                 ])
         if len(set(
                 status.resolution
-                for status in responses
+                for status in responses.values()
                 )) > 1:
             logging.warning('Warning: multiple resolutions configured')
         if len(set(
                 status.framerate
-                for status in responses
+                for status in responses.values()
                 )) > 1:
             logging.warning('Warning: multiple framerates configured')
         for (address1, status1) in responses.items():
@@ -685,33 +693,16 @@ class CompoundPiCmd(Cmd):
         cpi> download 192.168.0.1
         """
         responses = self.client.list(self.parse_arg(arg))
-
-        for address in addresses:
-            for image in self.client.list(address)[address]:
-            response = self.transact('LIST', address)[address]
-            for details in response.strip().splitlines():
-                try:
-                    start, index, timestamp, size = details.split(' ', 3)
-                    if start != 'IMAGE':
-                        raise ValueError('Expected IMAGE')
-                    index = int(index)
-                    timestamp = datetime.datetime.fromtimestamp(float(timestamp))
-                    size = int(size)
-                except (ValueError, TypeError):
-                    raise CmdError(
-                        'Received invalid image details from %s' % address)
-                self.server.expected_size = size
-                self.server.expected_timestamp = timestamp
-                self.server.event.clear()
-                self.transact('SEND %d %d' % (index, self.port), address)
-                if self.server.event.wait(self.timeout):
-                    if self.server.exception:
-                        raise CmdError(str(self.server.exception))
-                else:
-                    raise CmdError(
-                        'Timed out waiting for image transfer from %s' % address)
-                self.pprint('Downloaded image %d from %s' % (index, address))
-            self.transact('CLEAR', address)
+        for (address, images) in responses.items():
+            for image in images:
+                filename = '{ts:%Y%m%d-%H%M%S%f}-{addr}.jpg'.format(
+                        ts=image.timestamp, addr=address)
+                with io.open(os.path.join(self.output, filename), 'wb') as output:
+                    self.client.download(address, image.index, output)
+                    if output.tell() != image.size:
+                        raise CmdError('Wrong size for image %s' % filename)
+                logging.info('Downloaded %s' % filename)
+        self.client.clear(self.parse_arg(arg))
 
     def complete_download(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)

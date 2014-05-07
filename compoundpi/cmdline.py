@@ -50,6 +50,7 @@ import cmd
 import readline
 import locale
 import logging
+import warnings
 from textwrap import TextWrapper
 
 from .terminal import _CONSOLE
@@ -104,6 +105,10 @@ class Cmd(cmd.Cmd):
         self.color_prompt = color_prompt
         self.base_prompt = self.prompt
         self.logging_handler = CmdHandler(self, logging.DEBUG)
+
+    def showwarning(self, message, category, filename, lineno, file=None,
+            line=None):
+        logging.warning(str(message))
 
     def parse_bool(self, value, default=None):
         """
@@ -211,10 +216,15 @@ class Cmd(cmd.Cmd):
         # Replace the _CONSOLE logging handler with something that calls pprint
         logging.getLogger().addHandler(self.logging_handler)
         logging.getLogger().removeHandler(_CONSOLE)
+        # Replace warnings.showwarning with something that calls pprint
+        self._showwarning = warnings.showwarning
+        warnings.showwarning = self.showwarning
 
     def postloop(self):
         readline.set_history_length(self.history_size)
         readline.write_history_file(self.history_file)
+        # Restore the warnings.showwarning handler
+        warnings.showwarning = self._showwarning
         # Restore the _CONSOLE handler
         logging.getLogger().addHandler(_CONSOLE)
         logging.getLogger().removeHandler(self.logging_handler)

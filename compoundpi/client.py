@@ -28,8 +28,6 @@ str = type('')
 range = xrange
 
 import sys
-import io
-import os
 import re
 import warnings
 import datetime
@@ -82,7 +80,7 @@ class CompoundPiMultiResponse(CompoundPiServerWarning):
     "Warning raised when multiple responses are received"
 
     def __init__(self, address):
-        super(CompoundPiDoubleResponse, self).__init__(
+        super(CompoundPiMultiResponse, self).__init__(
             address, 'multiple responses received')
 
 
@@ -142,7 +140,7 @@ class CompoundPiServerError(CompoundPiError):
     "Exception raised when a Compound Pi server reports an error"
 
     def __init__(self, address, msg):
-        super(CompoundPiErrorResponse, self).__init__('%s: %s' % (address, msg))
+        super(CompoundPiServerError, self).__init__('%s: %s' % (address, msg))
         self.address = address
 
 
@@ -176,6 +174,7 @@ class CompoundPiTransactionFailed(CompoundPiError):
     def __init__(self, errors, msg=None):
         if msg is None:
             msg = '%d errors encountered while executing' % len(errors)
+        msg = '\n'.join([msg] + [str(e) for e in errors])
         super(CompoundPiTransactionFailed, self).__init__(msg)
         self.errors = errors
 
@@ -204,13 +203,20 @@ class CompoundPiClient(object):
             r'(?P<seqno>\d+) '
             r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
 
-    def __init__(self):
+    def __init__(self, progress=None):
         self._seqno = 0
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._server = None
         self._server_thread = None
         self._servers = set()
+        self._progress_start = self._progress_update = self._progress_finish = None
+        if progress is not None:
+            (
+                self._progress_start,
+                self._progress_update,
+                self._progress_finish,
+                ) = progress
         self.network = '192.168.0.0/16'
         self.port = 5647
         self.timeout = 5
@@ -251,43 +257,51 @@ class CompoundPiClient(object):
         self._socket.sendto(data, (str(self.network.broadcast), self.port))
 
     def _responses(self, servers=None, count=0):
-        if servers is None:
-            servers = self._servers
-        if not count:
-            count = len(servers)
-        if not servers:
-            servers = self.network
-        result = dict()
-        start = time.time()
-        while time.time() - start < self.timeout:
-            if select.select([self._socket], [], [], 1)[0]:
-                data, address = self._socket.recvfrom(512)
-                match = self.response_re.match(data.decode('utf-8'))
-                address, port = address
-                address = IPv4Address(address)
-                if port != self.port:
-                    warnings.warn(CompoundPiWrongPort(address, port))
-                elif address in result:
-                    warnings.warn(CompoundPiMultiResponse(address))
-                elif address not in servers:
-                    warnings.warn(CompoundPiUnknownAddress(address))
-                elif not match:
-                    warnings.warn(CompoundPiBadResponse(address))
-                else:
-                    seqno = int(match.group('seqno'))
-                    self._unicast('%d ACK' % seqno, address)
-                    if seqno < self._seqno:
-                        warnings.warn(CompoundPiStaleResponse(address))
-                    elif seqno > self._seqno:
-                        warnings.warn(CompoundPiFutureResponse(address))
+        if self._progress_start:
+            self._progress_start()
+        try:
+            if servers is None:
+                servers = self._servers
+            if not count:
+                count = len(servers)
+            if not servers:
+                servers = self.network
+            result = dict()
+            start = time.time()
+            while time.time() - start < self.timeout:
+                if self._progress_update:
+                    self._progress_update()
+                if select.select([self._socket], [], [], 1)[0]:
+                    data, address = self._socket.recvfrom(512)
+                    match = self.response_re.match(data.decode('utf-8'))
+                    address, port = address
+                    address = IPv4Address(address)
+                    if port != self.port:
+                        warnings.warn(CompoundPiWrongPort(address, port))
+                    elif address in result:
+                        warnings.warn(CompoundPiMultiResponse(address))
+                    elif address not in servers:
+                        warnings.warn(CompoundPiUnknownAddress(address))
+                    elif not match:
+                        warnings.warn(CompoundPiBadResponse(address))
                     else:
-                        result[address] = (
-                                match.group('result'),
-                                match.group('data'),
-                                )
-                        if len(result) == count:
-                            break
-        return result
+                        seqno = int(match.group('seqno'))
+                        self._unicast('%d ACK' % seqno, address)
+                        if seqno < self._seqno:
+                            warnings.warn(CompoundPiStaleResponse(address))
+                        elif seqno > self._seqno:
+                            warnings.warn(CompoundPiFutureResponse(address))
+                        else:
+                            result[address] = (
+                                    match.group('result'),
+                                    match.group('data'),
+                                    )
+                            if len(result) == count:
+                                break
+            return result
+        finally:
+            if self._progress_finish:
+                self._progress_finish()
 
     def _transact(self, data, addresses=None):
         errors = []
@@ -433,9 +447,10 @@ class CompoundPiClient(object):
         self._server.output = output
         self._server.event.clear()
         try:
-            self._transact('SEND %d %d' % (index, self.port), address)
+            self._transact('SEND %d %d' % (index, self.port), [address])
             if self._server.event.wait(self.timeout):
                 if self._server.exception:
+                    print('Exception in download thread: %s' % self._server.exception)
                     raise self._server.exception
             else:
                 raise CompoundPiSendTimeout(address)
@@ -450,17 +465,17 @@ class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
             warnings.warn(CompoundPiUnknownAddress(self.client_address[0]))
         else:
             try:
-                with io.open(filename, 'wb') as output:
-                    while size > 0:
-                        data = self.request.recv(1024)
-                        self.server.output.write(data)
-                        size -= len(data)
+                while True:
+                    data = self.request.recv(1024)
+                    if not data:
+                        break
+                    self.server.output.write(data)
             except Exception as e:
-                self._server.exception = e
+                self.server.exception = e
             else:
-                self._server.exception = None
+                self.server.exception = None
             finally:
-                self._server.event.set()
+                self.server.event.set()
 
 
 class CompoundPiDownloadServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
