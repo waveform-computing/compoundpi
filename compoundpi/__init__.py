@@ -68,10 +68,10 @@ __classifiers__ = [
 __entry_points__ = {
     'console_scripts': [
         'cpid = compoundpi.server:main',
-        'cpi = compoundpi.client:main',
+        'cpi = compoundpi.cli:main',
         ],
     'gui_scripts': [
-        'cpigui = compoundpi.clientgui:main',
+        'cpigui = compoundpi.gui:main',
         ],
     }
 

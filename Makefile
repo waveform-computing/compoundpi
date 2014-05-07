@@ -43,7 +43,8 @@ DEB_SOURCES:=debian/changelog \
 DOC_SOURCES:=docs/conf.py \
 	$(wildcard docs/*.png) \
 	$(wildcard docs/*.svg) \
-	$(wildcard docs/*.rst)
+	$(wildcard docs/*.rst) \
+	$(wildcard docs/*.pdf)
 
 # Calculate the name of all outputs
 DIST_EGG=dist/$(NAME)-$(VER)-$(PYVER).egg
