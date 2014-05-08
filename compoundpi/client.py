@@ -228,6 +228,7 @@ class CompoundPiClient(object):
                 ) = progress
         self.network = '192.168.0.0/16'
         self.port = 5647
+        self.bind = ('0.0.0.0', 5647)
         self.timeout = 5
 
     def _get_bind(self):
