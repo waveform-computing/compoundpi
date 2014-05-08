@@ -136,6 +136,15 @@ class CompoundPiNoServers(CompoundPiError):
         super(CompoundPiNoServers, self).__init__('no servers defined')
 
 
+class CompoundPiUndefinedServers(CompoundPiError):
+    "Exception raised when a transaction is attempted with undefined servers"
+
+    def __init__(self, addresses):
+        super(CompoundPiUndefinedServers, self).__init__(
+                'transaction with undefined servers: %s' %
+                ','.join(str(addr) for addr in addresses))
+
+
 class CompoundPiServerError(CompoundPiError):
     "Exception raised when a Compound Pi server reports an error"
 
@@ -304,6 +313,8 @@ class CompoundPiClient(object):
                 self._progress_finish()
 
     def _transact(self, data, addresses=None):
+        if addresses:
+            addresses = set(addresses)
         errors = []
         self._seqno += 1
         data = '%d %s' % (self._seqno, data)
@@ -312,6 +323,10 @@ class CompoundPiClient(object):
             if not addresses:
                 raise CompoundPiNoServers()
             self._broadcast(data)
+        elif addresses == self._servers:
+            self._broadcast(data)
+        elif addresses - self._servers:
+            raise CompoundPiUndefinedServers(addresses - self._servers)
         else:
             for address in addresses:
                 self._unicast(data, address)
@@ -350,7 +365,7 @@ class CompoundPiClient(object):
             else:
                 warnings.warn(CompoundPiPingError(address, response))
                 del responses[address]
-        return responses.keys()
+        return set(responses.keys())
 
     def add(self, addresses):
         self._seqno += 1
