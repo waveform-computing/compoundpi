@@ -28,9 +28,12 @@ str = type('')
 range = xrange
 
 
+import io
+
 from PyQt4 import QtCore, QtGui, uic
 
 from . import get_icon, get_ui_file
+from ..client import CompoundPiClient
 
 
 class MainWindow(QtGui.QMainWindow):
@@ -38,6 +41,12 @@ class MainWindow(QtGui.QMainWindow):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
+        self.client = CompoundPiClient(progress=(
+            self.progress_start,
+            self.progress_update,
+            self.progress_finish,
+            ))
+        self.images = {}
         self.ui = uic.loadUi(get_ui_file('main.ui'), self)
         # Read configuration
         self.settings = QtCore.QSettings()
@@ -51,6 +60,10 @@ class MainWindow(QtGui.QMainWindow):
                         'position', QtCore.QPoint(100, 100)))
         finally:
             self.settings.endGroup()
+        # Configure status bar elements
+        self.ui.progress_label = QtGui.QLabel('')
+        self.statusBar().addWidget(self.ui.progress_label)
+        self.progress_index = 0
         # Connect signals to methods
         self.ui.quit_action.setIcon(get_icon('application-exit'))
         self.ui.about_action.triggered.connect(self.about)
@@ -63,10 +76,36 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.add_action.triggered.connect(self.add_servers)
         self.ui.remove_action.setIcon(get_icon('list-remove'))
         self.ui.remove_action.triggered.connect(self.remove_servers)
+        self.ui.identify_action.setIcon(get_icon('dialog-information'))
+        self.ui.identify_action.triggered.connect(self.identify)
         self.ui.capture_action.setIcon(get_icon('camera-photo'))
         self.ui.capture_action.triggered.connect(self.capture)
+        self.ui.download_action.setIcon(get_icon('go-down'))
+        self.ui.download_action.triggered.connect(self.download)
         self.ui.configure_action.setIcon(get_icon('preferences-system'))
         self.ui.configure_action.triggered.connect(self.configure)
+        self.ui.select_all_action.setIcon(get_icon('edit-select-all'))
+        self.ui.select_all_action.triggered.connect(self.select_all)
+        self.ui.refresh_action.setIcon(get_icon('view-refresh'))
+        self.ui.refresh_action.triggered.connect(self.refresh)
+        self.ui.status_bar_action.triggered.connect(self.toggle_status)
+        self.ui.view_menu.aboutToShow.connect(self.update_status)
+        # Connect the address list to the model
+        self.ui.server_list.setModel(ServersModel(self.client))
+        # TODO What about pressing Enter instead of double clicking?
+        self.ui.server_list.model().modelReset.connect(
+            self.server_list_model_reset)
+        self.ui.server_list.model().dataChanged.connect(
+            self.server_list_data_changed)
+        self.ui.server_list.selectionModel().selectionChanged.connect(
+            self.server_list_selection_changed)
+        self.ui.server_list.doubleClicked.connect(
+            self.server_list_double_clicked)
+
+    @property
+    def selected_addresses(self):
+        return set(self.ui.server_list.model().addresses(
+            i.row() for i in self.ui.server_list.selectionModel().selectedRows()))
 
     def close(self):
         "Called when the main window is closed"
@@ -100,17 +139,177 @@ Project homepage is at
         QtGui.QMessageBox.aboutQt(self, self.tr('About QT'))
 
     def find_servers(self):
-        pass
+        self.ui.server_list.model().find()
+        for col in range(self.ui.server_list.model().columnCount()):
+            self.ui.server_list.resizeColumnToContents(col)
 
     def add_servers(self):
-        pass
+        raise NotImplementedError
+        self.ui.server_list.model().add()
 
     def remove_servers(self):
-        pass
+        self.ui.server_list.model().remove(self.selected_addresses)
+
+    def refresh(self):
+        self.ui.server_list.model().refresh()
+
+    def identify(self):
+        self.client.identify(self.selected_addresses)
 
     def capture(self):
-        pass
+        self.client.capture(addresses=self.selected_addresses)
+        self.ui.server_list.model().refresh()
+
+    def download(self):
+        responses = self.client.list(self.selected_addresses)
+        for (address, images) in responses.items():
+            if not address in self.images:
+                self.images[address] = []
+            for image in images:
+                output = io.BytesIO()
+                self.client.download(address, image.index, output)
+                if output.tell() != image.size:
+                    raise IOError('Incorrect download size')
+                self.images[address].append((image.timestamp, output))
+        # XXX Rollback in the case of a partial download...
+        self.client.clear(self.selected_addresses)
 
     def configure(self):
         pass
 
+    def select_all(self):
+        pass
+
+    def server_list_double_clicked(self, index):
+        pass
+
+    def server_list_model_reset(self):
+        self.ui.refresh_action.setEnabled(self.ui.server_list.model().rowCount())
+        self.ui.select_all_action.setEnabled(self.ui.server_list.model().rowCount())
+        self.ui.download_action.setEnabled(
+            any(self.ui.server_list.model().images(addr) > 0
+                for addr in self.selected_addresses))
+
+    def server_list_data_changed(self, top_left, bottom_right):
+        self.server_list_model_reset()
+
+    def server_list_selection_changed(self, selected, deselected):
+        selected = selected.indexes()
+        self.ui.remove_action.setEnabled(bool(selected))
+        self.ui.identify_action.setEnabled(bool(selected))
+        self.ui.capture_action.setEnabled(bool(selected))
+        self.ui.configure_action.setEnabled(bool(selected))
+        self.ui.download_action.setEnabled(
+            any(self.ui.server_list.model().images(addr) > 0
+                for addr in self.selected_addresses))
+
+    def update_status(self):
+        self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
+
+    def toggle_status(self):
+        if self.statusBar().isVisible():
+            self.statusBar().hide()
+        else:
+            self.statusBar().show()
+
+    def progress_start(self):
+        QtGui.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
+
+    def progress_update(self):
+        self.progress_index += 1
+        self.ui.progress_label.setText('Communicating' + '.' * (self.progress_index % 8))
+        QtGui.QApplication.instance().processEvents()
+
+    def progress_finish(self):
+        self.ui.progress_label.setText('')
+        QtGui.QApplication.instance().restoreOverrideCursor()
+
+
+class ServersModel(QtCore.QAbstractTableModel):
+    def __init__(self, client):
+        super(ServersModel, self).__init__()
+        self.client = client
+        self.status = []
+
+    def find(self, count=0):
+        self.client.find(count)
+        self.refresh()
+
+    def add(self, address):
+        raise NotImplementedError
+
+    def remove(self, addresses):
+        raise NotImplementedError
+
+    def refresh(self):
+        self.beginResetModel()
+        try:
+            self.status = sorted(self.client.status().items())
+        finally:
+            self.endResetModel()
+
+    def addresses(self, indexes):
+        return [self.status[index][0] for index in indexes]
+
+    def images(self, address):
+        # XXX Improve this
+        try:
+            return [s.images for (a, s) in self.status if a == address][0]
+        except IndexError:
+            raise KeyError(address)
+
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QtCore.QModelIndex()
+        if parent.isValid():
+            return 0
+        return len(self.status)
+
+    def columnCount(self, parent=None):
+        if parent is None:
+            parent = QtCore.QModelIndex()
+        if parent.isValid():
+            return 0
+        return 4
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        if role != QtCore.Qt.DisplayRole:
+            return None
+        (address, status) = self.status[index.row()]
+        return [
+            str(address),
+            '%dx%d@%s' % (status.resolution[0], status.resolution[1], status.framerate),
+            status.timestamp.strftime('%Y-%m-%d %H:%M:%S.%f'),
+            str(status.images),
+            ][index.column()]
+
+    def headerData(self, section, orientation, role):
+        if orientation == QtCore.Qt.Horizontal and role == QtCore.Qt.DisplayRole:
+            return [
+                'Address',
+                'Mode',
+                'Time',
+                'Images',
+                ][section]
+        elif orientation == QtCore.Qt.Vertical and role == QtCore.Qt.DisplayRole:
+            return section + 1
+
+
+class ImagesModel(QtCore.QAbstractListModel):
+    def __init__(self, parent):
+        super(ImagesModel, self).__init__()
+        self.parent = parent
+
+    def rowCount(self, parent=None):
+        if parent is None:
+            parent = QtCore.QModelIndex()
+        if parent.isValid():
+            return 0
+
+    def data(self, index, role):
+        if not index.isValid():
+            return None
+        if role != QtCore.Qt.DisplayRole:
+            return None

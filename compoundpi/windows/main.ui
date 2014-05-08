@@ -23,7 +23,26 @@
       <property name="orientation">
        <enum>Qt::Horizontal</enum>
       </property>
-      <widget class="QListView" name="pi_list"/>
+      <widget class="QTreeView" name="server_list">
+       <property name="editTriggers">
+        <set>QAbstractItemView::NoEditTriggers</set>
+       </property>
+       <property name="alternatingRowColors">
+        <bool>true</bool>
+       </property>
+       <property name="selectionMode">
+        <enum>QAbstractItemView::ExtendedSelection</enum>
+       </property>
+       <property name="uniformRowHeights">
+        <bool>true</bool>
+       </property>
+       <property name="allColumnsShowFocus">
+        <bool>true</bool>
+       </property>
+       <property name="expandsOnDoubleClick">
+        <bool>false</bool>
+       </property>
+      </widget>
       <widget class="QListView" name="image_list">
        <property name="viewMode">
         <enum>QListView::IconMode</enum>
@@ -50,8 +69,10 @@
     <addaction name="add_action"/>
     <addaction name="remove_action"/>
     <addaction name="separator"/>
-    <addaction name="capture_action"/>
+    <addaction name="identify_action"/>
     <addaction name="configure_action"/>
+    <addaction name="capture_action"/>
+    <addaction name="download_action"/>
     <addaction name="separator"/>
     <addaction name="quit_action"/>
    </widget>
@@ -62,7 +83,25 @@
     <addaction name="about_action"/>
     <addaction name="about_qt_action"/>
    </widget>
+   <widget class="QMenu" name="edit_menu">
+    <property name="title">
+     <string>&amp;Edit</string>
+    </property>
+    <addaction name="copy_action"/>
+    <addaction name="clear_action"/>
+    <addaction name="select_all_action"/>
+   </widget>
+   <widget class="QMenu" name="view_menu">
+    <property name="title">
+     <string>&amp;View</string>
+    </property>
+    <addaction name="refresh_action"/>
+    <addaction name="separator"/>
+    <addaction name="status_bar_action"/>
+   </widget>
    <addaction name="servers_menu"/>
+   <addaction name="edit_menu"/>
+   <addaction name="view_menu"/>
    <addaction name="help_menu"/>
   </widget>
   <widget class="QStatusBar" name="status_bar"/>
@@ -80,8 +119,10 @@
    <addaction name="add_action"/>
    <addaction name="remove_action"/>
    <addaction name="separator"/>
-   <addaction name="capture_action"/>
+   <addaction name="identify_action"/>
    <addaction name="configure_action"/>
+   <addaction name="capture_action"/>
+   <addaction name="download_action"/>
    <addaction name="separator"/>
    <addaction name="quit_action"/>
   </widget>
@@ -99,11 +140,17 @@
    </property>
   </action>
   <action name="remove_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>&amp;Remove</string>
    </property>
   </action>
   <action name="configure_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>C&amp;onfigure...</string>
    </property>
@@ -139,8 +186,61 @@
    </property>
   </action>
   <action name="capture_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>&amp;Capture</string>
+   </property>
+  </action>
+  <action name="identify_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Identify</string>
+   </property>
+  </action>
+  <action name="refresh_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Refresh</string>
+   </property>
+  </action>
+  <action name="status_bar_action">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="checked">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Status &amp;Bar</string>
+   </property>
+  </action>
+  <action name="select_all_action">
+   <property name="text">
+    <string>Select &amp;All</string>
+   </property>
+  </action>
+  <action name="clear_action">
+   <property name="text">
+    <string>C&amp;lear</string>
+   </property>
+  </action>
+  <action name="copy_action">
+   <property name="text">
+    <string>&amp;Copy</string>
+   </property>
+  </action>
+  <action name="download_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Download</string>
    </property>
   </action>
  </widget>
