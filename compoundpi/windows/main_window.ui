@@ -44,8 +44,23 @@
        </property>
       </widget>
       <widget class="QListView" name="image_list">
+       <property name="editTriggers">
+        <set>QAbstractItemView::NoEditTriggers</set>
+       </property>
+       <property name="selectionMode">
+        <enum>QAbstractItemView::ExtendedSelection</enum>
+       </property>
+       <property name="movement">
+        <enum>QListView::Static</enum>
+       </property>
+       <property name="resizeMode">
+        <enum>QListView::Adjust</enum>
+       </property>
        <property name="viewMode">
         <enum>QListView::IconMode</enum>
+       </property>
+       <property name="uniformItemSizes">
+        <bool>true</bool>
        </property>
       </widget>
      </widget>
@@ -208,6 +223,9 @@
    <property name="text">
     <string>&amp;Refresh</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+R</string>
+   </property>
   </action>
   <action name="status_bar_action">
    <property name="checkable">
@@ -224,6 +242,9 @@
    <property name="text">
     <string>Select &amp;All</string>
    </property>
+   <property name="shortcut">
+    <string>Ctrl+A</string>
+   </property>
   </action>
   <action name="clear_action">
    <property name="text">
@@ -233,6 +254,9 @@
   <action name="copy_action">
    <property name="text">
     <string>&amp;Copy</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+C</string>
    </property>
   </action>
   <action name="download_action">
