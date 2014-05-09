@@ -31,13 +31,13 @@ import sys
 import re
 import warnings
 import datetime
-import fractions
 import time
 import threading
 import select
 import struct
 import socket
 import SocketServer as socketserver
+from fractions import Fraction
 from collections import namedtuple
 try:
     from ipaddress import IPv4Address, IPv4Network
@@ -186,6 +186,13 @@ class CompoundPiTransactionFailed(CompoundPiError):
         msg = '\n'.join([msg] + [str(e) for e in errors])
         super(CompoundPiTransactionFailed, self).__init__(msg)
         self.errors = errors
+
+
+class Resolution(namedtuple('Resolution', ('width', 'height'))):
+    __slots__ = ()
+
+    def __str__(self):
+        return '%dx%d' % (self.width, self.height)
 
 
 CompoundPiStatus = namedtuple('CompoundPiStatus', (
@@ -400,8 +407,8 @@ class CompoundPiClient(object):
                 errors.append(CompoundPiInvalidResponse(address))
             else:
                 result[address] = CompoundPiStatus(
-                    (int(match.group('width')), int(match.group('height'))),
-                    fractions.Fraction(match.group('rate')),
+                    Resolution(int(match.group('width')), int(match.group('height'))),
+                    Fraction(match.group('rate')),
                     datetime.datetime.fromtimestamp(float(match.group('time'))),
                     int(match.group('images')),
                     )

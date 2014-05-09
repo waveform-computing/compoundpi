@@ -36,6 +36,7 @@ from PyQt4 import QtCore, QtGui, uic
 from . import get_icon, get_ui_file
 from .find_dialog import FindDialog
 from .configure_dialog import ConfigureDialog
+from .capture_dialog import CaptureDialog
 from ..client import CompoundPiClient
 
 
@@ -63,6 +64,13 @@ class MainWindow(QtGui.QMainWindow):
                         'position', QtCore.QPoint(100, 100)))
         finally:
             self.settings.endGroup()
+        self.settings.beginGroup('capture')
+        try:
+            self.capture_count = int(self.settings.value('count', 1))
+            self.capture_delay = float(self.settings.value('delay', 0.00))
+            self.capture_video_port = bool(self.settings.value('video_port', False))
+        finally:
+            self.settings.endGroup()
         # Set up menu icons
         self.ui.quit_action.setIcon(get_icon('application-exit'))
         self.ui.about_action.setIcon(get_icon('help-about'))
@@ -72,6 +80,7 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.remove_action.setIcon(get_icon('list-remove'))
         self.ui.identify_action.setIcon(get_icon('dialog-information'))
         self.ui.capture_action.setIcon(get_icon('camera-photo'))
+        self.ui.capture_now_action.setIcon(get_icon('camera-photo'))
         self.ui.configure_action.setIcon(get_icon('preferences-system'))
         self.ui.copy_action.setIcon(get_icon('edit-copy'))
         self.ui.clear_action.setIcon(get_icon('edit-clear'))
@@ -89,6 +98,7 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.remove_action.triggered.connect(self.servers_remove)
         self.ui.identify_action.triggered.connect(self.servers_identify)
         self.ui.capture_action.triggered.connect(self.servers_capture)
+        self.ui.capture_now_action.triggered.connect(self.servers_capture_now)
         self.ui.configure_action.triggered.connect(self.servers_configure)
         self.ui.copy_action.triggered.connect(self.edit_copy)
         self.ui.clear_action.triggered.connect(self.edit_clear)
@@ -115,7 +125,7 @@ class MainWindow(QtGui.QMainWindow):
 
     @property
     def selected_addresses(self):
-        return self.ui.server_list.model().addresses(self.selected_indexes)
+        return [a for (a, s) in self.ui.server_list.model().get(self.selected_indexes)]
 
     def close(self):
         "Called when the main window is closed"
@@ -150,7 +160,7 @@ Project homepage is at
 
     def servers_find(self):
         dialog = FindDialog(self)
-        self.settings.beginGroup('last_used')
+        self.settings.beginGroup('network')
         try:
             dialog.interface = self.settings.value('interface', '')
             dialog.port = self.settings.value('port', '5647')
@@ -188,7 +198,29 @@ Project homepage is at
         self.client.identify(self.selected_addresses)
 
     def servers_capture(self):
-        self.client.capture(addresses=self.selected_addresses)
+        dialog = CaptureDialog(self)
+        dialog.capture_count = self.capture_count
+        dialog.capture_delay = self.capture_delay
+        dialog.capture_video_port = self.capture_video_port
+        if dialog.exec_():
+            self.capture_count = dialog.capture_count
+            self.capture_delay = dialog.capture_delay
+            self.capture_video_port = dialog.capture_video_port
+            self.settings.beginGroup('capture')
+            try:
+                self.settings.setValue('count', self.capture_count)
+                self.settings.setValue('delay', self.capture_delay)
+                self.settings.setValue('video_port', self.capture_video_port)
+            finally:
+                self.settings.endGroup()
+            self.servers_capture_now()
+
+    def servers_capture_now(self):
+        self.client.capture(
+                count=self.capture_count,
+                video_port=self.capture_video_port,
+                delay=self.capture_delay,
+                addresses=self.selected_addresses)
         responses = self.client.list(self.selected_addresses)
         for (address, images) in responses.items():
             for image in images:
@@ -204,12 +236,24 @@ Project homepage is at
 
     def servers_configure(self):
         dialog = ConfigureDialog(self)
-        self.settings.beginGroup('last_used')
-        try:
-            if dialog.exec_():
-                pass
-        finally:
-            self.settings.endGroup()
+        resolutions = set(
+            status.resolution
+            for (addr, status) in self.ui.server_list.model().get(
+                self.selected_indexes)
+            )
+        framerates = set(
+            status.framerate
+            for (addr, status) in self.ui.server_list.model().get(
+                self.selected_indexes)
+            )
+        dialog.resolution = resolutions.pop() if len(resolutions) == 1 else None
+        dialog.framerate = framerates.pop() if len(framerates) == 1 else None
+        if dialog.exec_():
+            self.client.resolution(
+                    *dialog.resolution, addresses=self.selected_addresses)
+            self.client.framerate(
+                    dialog.framerate, addresses=self.selected_addresses)
+            self.ui.server_list.model().refresh_selected()
 
     def edit_copy(self):
         pass
@@ -224,7 +268,7 @@ Project homepage is at
         self.ui.server_list.selectAll()
 
     def view_refresh(self):
-        self.ui.server_list.model().refresh_data()
+        self.ui.server_list.model().refresh_all(update=True)
 
     def server_list_double_clicked(self, index):
         pass
@@ -241,6 +285,7 @@ Project homepage is at
         self.ui.remove_action.setEnabled(bool(selected))
         self.ui.identify_action.setEnabled(bool(selected))
         self.ui.capture_action.setEnabled(bool(selected))
+        self.ui.capture_now_action.setEnabled(bool(selected))
         self.ui.configure_action.setEnabled(bool(selected))
         self.ui.image_list.model().refresh()
 
@@ -280,18 +325,24 @@ class ServersModel(QtCore.QAbstractTableModel):
         finally:
             self.endResetModel()
 
-    def refresh_data(self):
-        self._data = sorted(self.parent.client.status().items())
-        self.refresh_all()
-
-    def refresh_all(self):
+    def refresh_all(self, update=False):
+        if update:
+            self._data = sorted(self.parent.client.status().items())
         first = self.index(0, 0)
-        last = self.index(self.rowCount(), 3)
+        last = self.index(self.rowCount(), self.columnCount() - 1)
         self.dataChanged.emit(first, last)
 
-    def refresh_selected(self, first_col=0, last_col=3):
+    def refresh_selected(self, update=False):
+        if update:
+            data = dict(self._data)
+            data.update(self.parent.client.status(
+                addresses=self.parent.selected_addresses))
+            self._data = sorted(data.items())
         for index in self.parent.selected_indexes:
-            self.dataChanged.emit(self.index(index, first_col), self.index(index, last_col))
+            self.dataChanged.emit(
+                self.index(index, 0),
+                self.index(index, self.columnCount() - 1)
+                )
 
     def add(self, address):
         raise NotImplementedError
@@ -299,8 +350,8 @@ class ServersModel(QtCore.QAbstractTableModel):
     def remove(self, addresses):
         raise NotImplementedError
 
-    def addresses(self, indexes):
-        return [self._data[index][0] for index in indexes]
+    def get(self, indexes):
+        return [self._data[index] for index in indexes]
 
     def images(self, address):
         # XXX Improve this

@@ -56,7 +56,7 @@ def main(args=None):
         args = sys.argv
     atexit.register(pkg_resources.cleanup_resources)
     APPLICATION = QtGui.QApplication(args)
-    APPLICATION.setApplicationName('Compound Pi')
+    APPLICATION.setApplicationName('cpigui')
     APPLICATION.setApplicationVersion(__version__)
     APPLICATION.setOrganizationName('Waveform')
     APPLICATION.setOrganizationDomain('waveform.org.uk')

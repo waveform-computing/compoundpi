@@ -490,8 +490,8 @@ class CompoundPiCmd(Cmd):
                 (
                     address,
                     '%dx%d@%s' % (
-                        status.resolution[0],
-                        status.resolution[1],
+                        status.resolution.width,
+                        status.resolution.height,
                         status.framerate,
                         ),
                     status.timestamp,

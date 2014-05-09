@@ -86,6 +86,7 @@
     <addaction name="separator"/>
     <addaction name="identify_action"/>
     <addaction name="configure_action"/>
+    <addaction name="capture_now_action"/>
     <addaction name="capture_action"/>
     <addaction name="separator"/>
     <addaction name="quit_action"/>
@@ -135,13 +136,16 @@
    <addaction name="separator"/>
    <addaction name="identify_action"/>
    <addaction name="configure_action"/>
-   <addaction name="capture_action"/>
+   <addaction name="capture_now_action"/>
    <addaction name="separator"/>
    <addaction name="quit_action"/>
   </widget>
   <action name="find_action">
    <property name="text">
     <string>&amp;Find...</string>
+   </property>
+   <property name="toolTip">
+    <string>Find servers on the network</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+O</string>
@@ -151,6 +155,9 @@
    <property name="text">
     <string>&amp;Add...</string>
    </property>
+   <property name="toolTip">
+    <string>Manually add server addresses to the list</string>
+   </property>
   </action>
   <action name="remove_action">
    <property name="enabled">
@@ -158,6 +165,9 @@
    </property>
    <property name="text">
     <string>&amp;Remove</string>
+   </property>
+   <property name="toolTip">
+    <string>Remove the selected servers from the list</string>
    </property>
   </action>
   <action name="configure_action">
@@ -167,10 +177,16 @@
    <property name="text">
     <string>C&amp;onfigure...</string>
    </property>
+   <property name="toolTip">
+    <string>Configure all selected servers</string>
+   </property>
   </action>
   <action name="quit_action">
    <property name="text">
     <string>&amp;Quit</string>
+   </property>
+   <property name="toolTip">
+    <string>Exit the application</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+Q</string>
@@ -203,7 +219,10 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>&amp;Capture</string>
+    <string>&amp;Capture...</string>
+   </property>
+   <property name="toolTip">
+    <string>Capture images on all selected servers after configuration</string>
    </property>
   </action>
   <action name="identify_action">
@@ -212,6 +231,9 @@
    </property>
    <property name="text">
     <string>&amp;Identify</string>
+   </property>
+   <property name="toolTip">
+    <string>Blink LEDs on all selected servers</string>
    </property>
   </action>
   <action name="refresh_action">
@@ -235,10 +257,16 @@
    <property name="text">
     <string>Status &amp;Bar</string>
    </property>
+   <property name="toolTip">
+    <string>Toggle visibility of the status bar</string>
+   </property>
   </action>
   <action name="select_all_action">
    <property name="text">
     <string>Select &amp;All</string>
+   </property>
+   <property name="toolTip">
+    <string>Select all servers</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+A</string>
@@ -248,6 +276,9 @@
    <property name="text">
     <string>C&amp;lear</string>
    </property>
+   <property name="toolTip">
+    <string>Clear images from the selected servers</string>
+   </property>
   </action>
   <action name="copy_action">
    <property name="text">
@@ -255,6 +286,17 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+C</string>
+   </property>
+  </action>
+  <action name="capture_now_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Capture &amp;Now</string>
+   </property>
+   <property name="toolTip">
+    <string>Capture images on all selected servers</string>
    </property>
   </action>
  </widget>

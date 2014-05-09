@@ -26,11 +26,12 @@ from __future__ import (
     )
 str = type('')
 
-import fractions
+from fractions import Fraction
 
 from PyQt4 import QtCore, QtGui, uic
 
 from . import get_ui_file
+from ..client import Resolution
 
 
 class ConfigureDialog(QtGui.QDialog):
@@ -53,23 +54,34 @@ class ConfigureDialog(QtGui.QDialog):
             width, height = s.split('x', 1)
             width = int(width)
             height = int(height)
+            return Resolution(width, height)
         except (TypeError, ValueError):
             return None
-        return width, height
     def _set_resolution(self, value):
-        if not isinstance(value, str):
-            value = '%dx%d' % value
-        self.ui.resolution_combo.setEditText(value)
+        if value is None:
+            self.ui.resolution_combo.setCurrentIndex(-1)
+        elif isinstance(value, str):
+            self.ui.resolution_combo.setEditText(value)
+        else:
+            self.ui.resolution_combo.setCurrentIndex(
+                    self.ui.resolution_combo.model().find(value))
     resolution = property(_get_resolution, _set_resolution)
 
     def _get_framerate(self):
         try:
-            return fractions.Fraction(
-                    self.ui.framerate_combo.currentText()).limit_denominator(1000)
+            return Fraction(
+                self.ui.framerate_combo.currentText()
+                ).limit_denominator(1000)
         except ValueError:
             return None
     def _set_framerate(self, value):
-        self.ui.framerate_combo.setEditText(str(value))
+        if value is None:
+            self.ui.framerate_combo.setCurrentIndex(-1)
+        elif isinstance(value, str):
+            self.ui.framerate_combo.setEditText(value)
+        else:
+            self.ui.framerate_combo.setCurrentIndex(
+                    self.ui.framerate_combo.model().find(value))
     framerate = property(_get_framerate, _set_framerate)
 
     def resolution_changed(self, text):
@@ -87,19 +99,28 @@ class ResolutionsModel(QtCore.QAbstractListModel):
     def __init__(self):
         super(ResolutionsModel, self).__init__()
         self._data = [
-            ('320x240',   'QVGA',    '4:3'),
-            ('640x480',   'VGA',     '4:3'),
-            ('768x576',   'PAL',     '4:3'),
-            ('800x600',   'SVGA',    '4:3'),
-            ('1024x576',  'PAL',     '16:9'),
-            ('1024x768',  'XGA',     '4:3'),
-            ('1280x720',  'HD 720',  '16:9'),
-            ('1680x1050', 'WSXGA+',  '16:10'),
-            ('1920x1080', 'HD 1080', '16:9'),
-            ('2048x1536', 'QXGA',    '4:3'),
-            ('2560x1440', 'WQHD',    '16:9'),
-            ('2592x1944', 'Max res', '4:3'),
+            (Resolution(320, 240),   'QVGA'),
+            (Resolution(640, 480),   'VGA'),
+            (Resolution(768, 576),   'PAL'),
+            (Resolution(800, 600),   'SVGA'),
+            (Resolution(1024, 576),  'PAL'),
+            (Resolution(1024, 768),  'XGA'),
+            (Resolution(1280, 720),  'HD 720'),
+            (Resolution(1680, 1050), 'WSXGA+'),
+            (Resolution(1920, 1080), 'HD 1080'),
+            (Resolution(2048, 1536), 'QXGA'),
+            (Resolution(2560, 1440), 'WQHD'),
+            (Resolution(2592, 1944), 'Max res'),
             ]
+
+    def get(self, index):
+        return self._data[index]
+
+    def find(self, resolution):
+        for i, d in enumerate(self._data):
+            if d[0] == resolution:
+                return i
+        return -1
 
     def rowCount(self, parent=None):
         if parent is None:
@@ -110,10 +131,12 @@ class ResolutionsModel(QtCore.QAbstractListModel):
 
     def data(self, index, role):
         if index.isValid():
+            resolution, name = self._data[index.row()]
             if role == QtCore.Qt.DisplayRole:
-                return '%s\t(%s - %s)' % self._data[index.row()]
+                ratio = Fraction(*resolution)
+                return '%s\t(%s - %s)' % (resolution, name, ratio)
             elif role == QtCore.Qt.EditRole:
-                return self._data[index.row()][0]
+                return str(resolution)
 
 
 class FrameratesModel(QtCore.QAbstractListModel):
@@ -131,6 +154,15 @@ class FrameratesModel(QtCore.QAbstractListModel):
             15,
             1,
             ]
+
+    def get(self, index):
+        return self._data[index]
+
+    def find(self, framerate):
+        for i, d in enumerate(self._data):
+            if abs(d - framerate) < 0.001:
+                return i
+        return -1
 
     def rowCount(self, parent=None):
         if parent is None:

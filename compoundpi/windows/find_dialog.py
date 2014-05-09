@@ -33,13 +33,6 @@ from PyQt4 import QtCore, QtGui, uic
 
 from . import get_ui_file
 
-def debug_trace():
-  '''Set a tracepoint in the Python debugger that works with Qt'''
-  from PyQt4.QtCore import pyqtRemoveInputHook
-  from pdb import set_trace
-  pyqtRemoveInputHook()
-  set_trace()
-
 
 class FindDialog(QtGui.QDialog):
     "Implements the servers/find dialog"
