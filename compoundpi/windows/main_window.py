@@ -25,15 +25,17 @@ from __future__ import (
     division,
     )
 str = type('')
-range = xrange
 
 
 import io
 from collections import defaultdict
 
+import netifaces
 from PyQt4 import QtCore, QtGui, uic
 
 from . import get_icon, get_ui_file
+from .find_dialog import FindDialog
+from .configure_dialog import ConfigureDialog
 from ..client import CompoundPiClient
 
 
@@ -70,7 +72,6 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.remove_action.setIcon(get_icon('list-remove'))
         self.ui.identify_action.setIcon(get_icon('dialog-information'))
         self.ui.capture_action.setIcon(get_icon('camera-photo'))
-        self.ui.download_action.setIcon(get_icon('go-down'))
         self.ui.configure_action.setIcon(get_icon('preferences-system'))
         self.ui.copy_action.setIcon(get_icon('edit-copy'))
         self.ui.clear_action.setIcon(get_icon('edit-clear'))
@@ -88,7 +89,6 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.remove_action.triggered.connect(self.servers_remove)
         self.ui.identify_action.triggered.connect(self.servers_identify)
         self.ui.capture_action.triggered.connect(self.servers_capture)
-        self.ui.download_action.triggered.connect(self.servers_download)
         self.ui.configure_action.triggered.connect(self.servers_configure)
         self.ui.copy_action.triggered.connect(self.edit_copy)
         self.ui.clear_action.triggered.connect(self.edit_clear)
@@ -97,7 +97,7 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.status_bar_action.triggered.connect(self.toggle_status)
         self.ui.view_menu.aboutToShow.connect(self.update_status)
         # Connect the lists to their models
-        self.ui.server_list.setModel(ServersModel(self.client))
+        self.ui.server_list.setModel(ServersModel(self))
         self.ui.image_list.setModel(ImagesModel(self))
         # XXX What about pressing Enter instead of double clicking?
         self.ui.server_list.model().modelReset.connect(
@@ -110,9 +110,12 @@ class MainWindow(QtGui.QMainWindow):
             self.server_list_double_clicked)
 
     @property
+    def selected_indexes(self):
+        return [i.row() for i in self.ui.server_list.selectionModel().selectedRows()]
+
+    @property
     def selected_addresses(self):
-        return set(self.ui.server_list.model().addresses(
-            i.row() for i in self.ui.server_list.selectionModel().selectedRows()))
+        return self.ui.server_list.model().addresses(self.selected_indexes)
 
     def close(self):
         "Called when the main window is closed"
@@ -146,9 +149,33 @@ Project homepage is at
         QtGui.QMessageBox.aboutQt(self, self.tr('About QT'))
 
     def servers_find(self):
-        self.ui.server_list.model().find(count=3)
-        for col in range(self.ui.server_list.model().columnCount()):
-            self.ui.server_list.resizeColumnToContents(col)
+        dialog = FindDialog(self)
+        self.settings.beginGroup('last_used')
+        try:
+            dialog.interface = self.settings.value('interface', '')
+            dialog.port = self.settings.value('port', '5647')
+            dialog.expected_count = self.settings.value('expected_count', '0')
+            if dialog.exec_():
+                try:
+                    iface = netifaces.ifaddresses(dialog.interface)[netifaces.AF_INET][0]
+                except KeyError:
+                    raise ValueError(
+                        'Interface %s has no IPv4 address' % dialog.interface)
+                except IndexError:
+                    raise ValueError(
+                        'Interface %s has no addresses' % dialog.interface)
+                if not (1 <= dialog.port <= 65535):
+                    raise ValueError('Port %d is invalid' % dialog.port)
+                self.settings.setValue('interface', dialog.interface)
+                self.settings.setValue('port', dialog.port)
+                self.settings.setValue('expected_count', dialog.expected_count)
+                self.client.network = '%s/%s' % (iface['addr'], iface['netmask'])
+                self.client.port = dialog.port
+                self.ui.server_list.model().find(count=dialog.expected_count)
+                for col in range(self.ui.server_list.model().columnCount()):
+                    self.ui.server_list.resizeColumnToContents(col)
+        finally:
+            self.settings.endGroup()
 
     def servers_add(self):
         raise NotImplementedError
@@ -162,9 +189,6 @@ Project homepage is at
 
     def servers_capture(self):
         self.client.capture(addresses=self.selected_addresses)
-        self.ui.server_list.model().refresh()
-
-    def servers_download(self):
         responses = self.client.list(self.selected_addresses)
         for (address, images) in responses.items():
             for image in images:
@@ -175,23 +199,32 @@ Project homepage is at
                 self.images[address].append((image.timestamp, stream))
         # XXX Rollback in the case of a partial download...
         self.client.clear(self.selected_addresses)
-        self.ui.server_list.model().refresh()
+        self.ui.server_list.model().refresh_selected()
         self.ui.image_list.model().refresh()
 
     def servers_configure(self):
-        pass
+        dialog = ConfigureDialog(self)
+        self.settings.beginGroup('last_used')
+        try:
+            if dialog.exec_():
+                pass
+        finally:
+            self.settings.endGroup()
 
     def edit_copy(self):
         pass
 
     def edit_clear(self):
-        pass
+        for address in self.selected_addresses:
+            del self.images[address]
+        self.ui.server_list.model().refresh_selected()
+        self.ui.image_list.model().refresh()
 
     def edit_select_all(self):
-        pass
+        self.ui.server_list.selectAll()
 
     def view_refresh(self):
-        self.ui.server_list.model().refresh()
+        self.ui.server_list.model().refresh_data()
 
     def server_list_double_clicked(self, index):
         pass
@@ -199,9 +232,6 @@ Project homepage is at
     def server_list_model_reset(self):
         self.ui.refresh_action.setEnabled(self.ui.server_list.model().rowCount())
         self.ui.select_all_action.setEnabled(self.ui.server_list.model().rowCount())
-        self.ui.download_action.setEnabled(
-            any(self.ui.server_list.model().images(addr) > 0
-                for addr in self.selected_addresses))
 
     def server_list_data_changed(self, top_left, bottom_right):
         self.server_list_model_reset()
@@ -212,9 +242,6 @@ Project homepage is at
         self.ui.identify_action.setEnabled(bool(selected))
         self.ui.capture_action.setEnabled(bool(selected))
         self.ui.configure_action.setEnabled(bool(selected))
-        self.ui.download_action.setEnabled(
-            any(self.ui.server_list.model().images(addr) > 0
-                for addr in self.selected_addresses))
         self.ui.image_list.model().refresh()
 
     def update_status(self):
@@ -240,27 +267,37 @@ Project homepage is at
 
 
 class ServersModel(QtCore.QAbstractTableModel):
-    def __init__(self, client):
+    def __init__(self, parent):
         super(ServersModel, self).__init__()
-        self.client = client
+        self.parent = parent
         self._data = []
 
     def find(self, count=0):
-        self.client.find(count)
-        self.refresh()
+        self.beginResetModel()
+        try:
+            self.parent.client.find(count)
+            self._data = sorted(self.parent.client.status().items())
+        finally:
+            self.endResetModel()
+
+    def refresh_data(self):
+        self._data = sorted(self.parent.client.status().items())
+        self.refresh_all()
+
+    def refresh_all(self):
+        first = self.index(0, 0)
+        last = self.index(self.rowCount(), 3)
+        self.dataChanged.emit(first, last)
+
+    def refresh_selected(self, first_col=0, last_col=3):
+        for index in self.parent.selected_indexes:
+            self.dataChanged.emit(self.index(index, first_col), self.index(index, last_col))
 
     def add(self, address):
         raise NotImplementedError
 
     def remove(self, addresses):
         raise NotImplementedError
-
-    def refresh(self):
-        self.beginResetModel()
-        try:
-            self._data = sorted(self.client.status().items())
-        finally:
-            self.endResetModel()
 
     def addresses(self, indexes):
         return [self._data[index][0] for index in indexes]
@@ -293,7 +330,7 @@ class ServersModel(QtCore.QAbstractTableModel):
                 str(address),
                 '%dx%d@%s' % (status.resolution[0], status.resolution[1], status.framerate),
                 status.timestamp.strftime('%Y-%m-%d %H:%M:%S.%f'),
-                str(status.images),
+                str(len(self.parent.images[address])),
                 ][index.column()]
 
     def headerData(self, section, orientation, role):
@@ -313,6 +350,7 @@ class ImagesModel(QtCore.QAbstractListModel):
         super(ImagesModel, self).__init__()
         self.parent = parent
         self._data = []
+        self._cache = {}
 
     def refresh(self):
         self.beginResetModel()
@@ -320,9 +358,13 @@ class ImagesModel(QtCore.QAbstractListModel):
             self._data = []
             for address in self.parent.selected_addresses:
                 for timestamp, stream in self.parent.images[address]:
-                    image = QtGui.QPixmap()
-                    image.loadFromData(stream.getvalue())
-                    thumbnail = image.scaledToWidth(200)
+                    try:
+                        thumbnail = self._cache[(address, timestamp)]
+                    except KeyError:
+                        image = QtGui.QPixmap()
+                        image.loadFromData(stream.getvalue())
+                        thumbnail = image.scaledToWidth(200)
+                        self._cache[(address, timestamp)] = thumbnail
                     self._data.append(
                         (timestamp, address, thumbnail, stream))
         finally:

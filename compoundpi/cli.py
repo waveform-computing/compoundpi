@@ -53,7 +53,7 @@ def service(s):
     try:
         return int(s)
     except ValueError:
-        return socket.servbyname(s)
+        return socket.getservbyname(s)
 
 def address(s):
     host, port = s.rsplit(':', 1)

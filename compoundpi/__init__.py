@@ -39,10 +39,9 @@ __platforms__    = 'ALL'
 __requires__ = ['ipaddr']
 
 __extra_requires__ = {
-    'client': [],
+    'client': ['netifaces', 'pyqt'],
     'server': ['picamera', 'rpi.gpio', 'python-daemon'],
     'doc':    ['sphinx'],
-    'GUI':    ['pyqt'],
     }
 
 if sys.version_info[:2] == (3, 2):

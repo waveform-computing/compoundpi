@@ -36,7 +36,7 @@ for api in ('QDate', 'QDateTime', 'QTime', 'QString', 'QTextStream', 'QUrl', 'QV
 from PyQt4 import QtCore, QtGui
 
 from . import __version__
-from .windows.main import MainWindow
+from .windows.main_window import MainWindow
 
 
 APPLICATION = None

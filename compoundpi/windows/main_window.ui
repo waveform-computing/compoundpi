@@ -87,7 +87,6 @@
     <addaction name="identify_action"/>
     <addaction name="configure_action"/>
     <addaction name="capture_action"/>
-    <addaction name="download_action"/>
     <addaction name="separator"/>
     <addaction name="quit_action"/>
    </widget>
@@ -137,7 +136,6 @@
    <addaction name="identify_action"/>
    <addaction name="configure_action"/>
    <addaction name="capture_action"/>
-   <addaction name="download_action"/>
    <addaction name="separator"/>
    <addaction name="quit_action"/>
   </widget>
@@ -257,14 +255,6 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+C</string>
-   </property>
-  </action>
-  <action name="download_action">
-   <property name="enabled">
-    <bool>false</bool>
-   </property>
-   <property name="text">
-    <string>&amp;Download</string>
    </property>
   </action>
  </widget>
