@@ -28,7 +28,9 @@ str = type('')
 
 
 import io
-from collections import defaultdict
+import os
+import shutil
+from collections import defaultdict, OrderedDict
 
 import netifaces
 from PyQt4 import QtCore, QtGui, uic
@@ -45,12 +47,13 @@ class MainWindow(QtGui.QMainWindow):
 
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
+        self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
         self.client = CompoundPiClient(progress=(
             self.progress_start,
             self.progress_update,
             self.progress_finish,
             ))
-        self.images = defaultdict(list)
+        self.images = defaultdict(OrderedDict)
         self.ui = uic.loadUi(get_ui_file('main_window.ui'), self)
         # Read configuration
         self.settings = QtCore.QSettings()
@@ -64,13 +67,6 @@ class MainWindow(QtGui.QMainWindow):
                         'position', QtCore.QPoint(100, 100)))
         finally:
             self.settings.endGroup()
-        self.settings.beginGroup('capture')
-        try:
-            self.capture_count = int(self.settings.value('count', 1))
-            self.capture_delay = float(self.settings.value('delay', 0.00))
-            self.capture_video_port = bool(self.settings.value('video_port', False))
-        finally:
-            self.settings.endGroup()
         # Set up menu icons
         self.ui.quit_action.setIcon(get_icon('application-exit'))
         self.ui.about_action.setIcon(get_icon('help-about'))
@@ -79,12 +75,11 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.add_action.setIcon(get_icon('list-add'))
         self.ui.remove_action.setIcon(get_icon('list-remove'))
         self.ui.identify_action.setIcon(get_icon('dialog-information'))
-        self.ui.capture_action.setIcon(get_icon('camera-photo'))
-        self.ui.capture_now_action.setIcon(get_icon('camera-photo'))
         self.ui.configure_action.setIcon(get_icon('preferences-system'))
+        self.ui.capture_action.setIcon(get_icon('camera-photo'))
         self.ui.copy_action.setIcon(get_icon('edit-copy'))
         self.ui.clear_action.setIcon(get_icon('edit-clear'))
-        self.ui.select_all_action.setIcon(get_icon('edit-select-all'))
+        self.ui.export_action.setIcon(get_icon('document-save'))
         self.ui.refresh_action.setIcon(get_icon('view-refresh'))
         # Configure status bar elements
         self.ui.progress_label = QtGui.QLabel('')
@@ -98,14 +93,14 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.remove_action.triggered.connect(self.servers_remove)
         self.ui.identify_action.triggered.connect(self.servers_identify)
         self.ui.capture_action.triggered.connect(self.servers_capture)
-        self.ui.capture_now_action.triggered.connect(self.servers_capture_now)
         self.ui.configure_action.triggered.connect(self.servers_configure)
-        self.ui.copy_action.triggered.connect(self.edit_copy)
-        self.ui.clear_action.triggered.connect(self.edit_clear)
-        self.ui.select_all_action.triggered.connect(self.edit_select_all)
+        self.ui.copy_action.triggered.connect(self.images_copy)
+        self.ui.export_action.triggered.connect(self.images_export)
+        self.ui.clear_action.triggered.connect(self.images_clear)
         self.ui.refresh_action.triggered.connect(self.view_refresh)
-        self.ui.status_bar_action.triggered.connect(self.toggle_status)
-        self.ui.view_menu.aboutToShow.connect(self.update_status)
+        self.ui.toolbar_action.triggered.connect(self.view_toolbar)
+        self.ui.status_bar_action.triggered.connect(self.view_status_bar)
+        self.ui.view_menu.aboutToShow.connect(self.update_view)
         # Connect the lists to their models
         self.ui.server_list.setModel(ServersModel(self))
         self.ui.image_list.setModel(ImagesModel(self))
@@ -118,24 +113,40 @@ class MainWindow(QtGui.QMainWindow):
             self.server_list_selection_changed)
         self.ui.server_list.doubleClicked.connect(
             self.server_list_double_clicked)
+        self.ui.image_list.model().modelReset.connect(
+            self.image_list_model_reset)
+        self.ui.image_list.model().dataChanged.connect(
+            self.image_list_data_changed)
+        self.ui.image_list.selectionModel().selectionChanged.connect(
+            self.image_list_selection_changed)
 
     @property
-    def selected_indexes(self):
-        return [i.row() for i in self.ui.server_list.selectionModel().selectedRows()]
+    def selected_images(self):
+        return self.ui.image_list.model().get(
+            [i.row() for i in self.ui.image_list.selectionModel().selectedIndexes()]
+            )
+
+    @property
+    def selected_servers(self):
+        return self.ui.server_list.model().get(
+            [i.row() for i in self.ui.server_list.selectionModel().selectedRows()]
+            )
 
     @property
     def selected_addresses(self):
-        return [a for (a, s) in self.ui.server_list.model().get(self.selected_indexes)]
+        return [a for (a, s) in self.selected_servers]
 
-    def close(self):
-        "Called when the main window is closed"
+    def closeEvent(self, event):
+        super(MainWindow, self).closeEvent(event)
+        app = QtGui.QApplication.instance()
+        if app.clipboard().ownsClipboard():
+            app.clipboard().clear()
         self.settings.beginGroup('window')
         try:
             self.settings.setValue('size', self.size())
             self.settings.setValue('position', self.pos())
         finally:
             self.settings.endGroup()
-        super(MainWindow, self).close()
 
     def help_about(self):
         QtGui.QMessageBox.about(self,
@@ -199,53 +210,40 @@ Project homepage is at
 
     def servers_capture(self):
         dialog = CaptureDialog(self)
-        dialog.capture_count = self.capture_count
-        dialog.capture_delay = self.capture_delay
-        dialog.capture_video_port = self.capture_video_port
-        if dialog.exec_():
-            self.capture_count = dialog.capture_count
-            self.capture_delay = dialog.capture_delay
-            self.capture_video_port = dialog.capture_video_port
-            self.settings.beginGroup('capture')
-            try:
-                self.settings.setValue('count', self.capture_count)
-                self.settings.setValue('delay', self.capture_delay)
-                self.settings.setValue('video_port', self.capture_video_port)
-            finally:
-                self.settings.endGroup()
-            self.servers_capture_now()
-
-    def servers_capture_now(self):
-        self.client.capture(
-                count=self.capture_count,
-                video_port=self.capture_video_port,
-                delay=self.capture_delay,
-                addresses=self.selected_addresses)
-        responses = self.client.list(self.selected_addresses)
-        for (address, images) in responses.items():
-            for image in images:
-                stream = io.BytesIO()
-                self.client.download(address, image.index, stream)
-                if stream.tell() != image.size:
-                    raise IOError('Incorrect download size')
-                self.images[address].append((image.timestamp, stream))
-        # XXX Rollback in the case of a partial download...
-        self.client.clear(self.selected_addresses)
-        self.ui.server_list.model().refresh_selected()
-        self.ui.image_list.model().refresh()
+        self.settings.beginGroup('capture')
+        try:
+            dialog.capture_count = int(self.settings.value('count', 1))
+            dialog.capture_delay = float(self.settings.value('delay', 0.00))
+            dialog.capture_video_port = int(self.settings.value('video_port', 0))
+            if dialog.exec_():
+                self.settings.setValue('count', dialog.capture_count)
+                self.settings.setValue('delay', dialog.capture_delay or 0.0)
+                self.settings.setValue('video_port', int(dialog.capture_video_port))
+                self.client.capture(
+                        count=dialog.capture_count,
+                        video_port=dialog.capture_video_port,
+                        delay=dialog.capture_delay,
+                        addresses=self.selected_addresses)
+                responses = self.client.list(self.selected_addresses)
+                for (address, images) in responses.items():
+                    for image in images:
+                        stream = io.BytesIO()
+                        self.client.download(address, image.index, stream)
+                        if stream.tell() != image.size:
+                            raise IOError('Incorrect download size')
+                        self.images[address][image.timestamp] = stream
+                # XXX Check ordering of self.images[address]
+                # XXX Rollback in the case of a partial download...
+                self.client.clear(self.selected_addresses)
+                self.ui.server_list.model().refresh_selected()
+                self.ui.image_list.model().refresh()
+        finally:
+            self.settings.endGroup()
 
     def servers_configure(self):
         dialog = ConfigureDialog(self)
-        resolutions = set(
-            status.resolution
-            for (addr, status) in self.ui.server_list.model().get(
-                self.selected_indexes)
-            )
-        framerates = set(
-            status.framerate
-            for (addr, status) in self.ui.server_list.model().get(
-                self.selected_indexes)
-            )
+        resolutions = set(status.resolution for (addr, status) in self.selected_servers)
+        framerates = set(status.framerate for (addr, status) in self.selected_servers)
         dialog.resolution = resolutions.pop() if len(resolutions) == 1 else None
         dialog.framerate = framerates.pop() if len(framerates) == 1 else None
         if dialog.exec_():
@@ -253,50 +251,100 @@ Project homepage is at
                     *dialog.resolution, addresses=self.selected_addresses)
             self.client.framerate(
                     dialog.framerate, addresses=self.selected_addresses)
-            self.ui.server_list.model().refresh_selected()
+            self.ui.server_list.model().refresh_selected(update=True)
 
-    def edit_copy(self):
-        pass
+    def images_copy(self):
+        _, _, _, stream = self.selected_images[0]
+        image = QtGui.QImage()
+        image.loadFromData(stream.getvalue())
+        QtGui.QApplication.instance().clipboard().setImage(image)
 
-    def edit_clear(self):
-        for address in self.selected_addresses:
-            del self.images[address]
+    def images_export(self):
+        directory = QtGui.QFileDialog.getExistingDirectory(
+            self, 'Select Export Directory', os.getcwd())
+        if directory:
+            self.settings.beginGroup('export')
+            try:
+                pattern = self.settings.value('pattern', '{timestamp:%Y%m%d%H%M%S}-{address}.jpg')
+            finally:
+                self.settings.endGroup()
+            QtGui.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
+            try:
+                for index, (address, timestamp, _, source) in enumerate(self.selected_images):
+                    filename = os.path.join(directory, pattern.format(
+                        timestamp=timestamp,
+                        address=address,
+                        index=index,
+                        count=len(os.listdir(directory))
+                        ))
+                    with io.open(filename, 'wb') as target:
+                        source.seek(0)
+                        shutil.copyfileobj(source, target)
+            finally:
+                QtGui.QApplication.instance().restoreOverrideCursor()
+
+    def images_clear(self):
+        for address, timestamp, _, _ in self.selected_images:
+            del self.images[address][timestamp]
         self.ui.server_list.model().refresh_selected()
         self.ui.image_list.model().refresh()
 
-    def edit_select_all(self):
-        self.ui.server_list.selectAll()
-
     def view_refresh(self):
         self.ui.server_list.model().refresh_all(update=True)
+
+    def view_toolbar(self):
+        if self.ui.tool_bar.isVisible():
+            self.ui.tool_bar.hide()
+        else:
+            self.ui.tool_bar.show()
+
+    def view_status_bar(self):
+        if self.statusBar().isVisible():
+            self.statusBar().hide()
+        else:
+            self.statusBar().show()
 
     def server_list_double_clicked(self, index):
         pass
 
     def server_list_model_reset(self):
-        self.ui.refresh_action.setEnabled(self.ui.server_list.model().rowCount())
-        self.ui.select_all_action.setEnabled(self.ui.server_list.model().rowCount())
+        self.update_server_actions()
 
     def server_list_data_changed(self, top_left, bottom_right):
-        self.server_list_model_reset()
+        self.update_server_actions()
 
     def server_list_selection_changed(self, selected, deselected):
-        selected = selected.indexes()
-        self.ui.remove_action.setEnabled(bool(selected))
-        self.ui.identify_action.setEnabled(bool(selected))
-        self.ui.capture_action.setEnabled(bool(selected))
-        self.ui.capture_now_action.setEnabled(bool(selected))
-        self.ui.configure_action.setEnabled(bool(selected))
+        self.update_server_actions()
+
+    def image_list_model_reset(self):
+        self.update_image_actions()
+
+    def image_list_data_changed(self, top_left, bottom_right):
+        self.update_image_actions()
+
+    def image_list_selection_changed(self, selected, deselected):
+        self.update_image_actions()
+
+    def update_server_actions(self):
+        has_rows = self.ui.server_list.model().rowCount() > 0
+        has_selection = self.ui.server_list.selectionModel().hasSelection()
+        self.ui.remove_action.setEnabled(has_selection)
+        self.ui.identify_action.setEnabled(has_selection)
+        self.ui.capture_action.setEnabled(has_selection)
+        self.ui.configure_action.setEnabled(has_selection)
+        self.ui.refresh_action.setEnabled(has_rows)
         self.ui.image_list.model().refresh()
 
-    def update_status(self):
-        self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
+    def update_image_actions(self):
+        has_selection = self.ui.image_list.selectionModel().hasSelection()
+        one_selected = len(self.ui.image_list.selectionModel().selectedIndexes()) == 1
+        self.ui.copy_action.setEnabled(one_selected)
+        self.ui.export_action.setEnabled(has_selection)
+        self.ui.clear_action.setEnabled(has_selection)
 
-    def toggle_status(self):
-        if self.statusBar().isVisible():
-            self.statusBar().hide()
-        else:
-            self.statusBar().show()
+    def update_view(self):
+        self.ui.toolbar_action.setChecked(self.ui.tool_bar.isVisible())
+        self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
 
     def progress_start(self):
         QtGui.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
@@ -335,14 +383,11 @@ class ServersModel(QtCore.QAbstractTableModel):
     def refresh_selected(self, update=False):
         if update:
             data = dict(self._data)
-            data.update(self.parent.client.status(
-                addresses=self.parent.selected_addresses))
+            data.update(self.parent.client.status(self.parent.selected_addresses))
             self._data = sorted(data.items())
-        for index in self.parent.selected_indexes:
-            self.dataChanged.emit(
-                self.index(index, 0),
-                self.index(index, self.columnCount() - 1)
-                )
+        first = self.index(0, 0)
+        last = self.index(self.rowCount(), self.columnCount() - 1)
+        self.dataChanged.emit(first, last)
 
     def add(self, address):
         raise NotImplementedError
@@ -352,13 +397,6 @@ class ServersModel(QtCore.QAbstractTableModel):
 
     def get(self, indexes):
         return [self._data[index] for index in indexes]
-
-    def images(self, address):
-        # XXX Improve this
-        try:
-            return [s.images for (a, s) in self._data if a == address][0]
-        except IndexError:
-            raise KeyError(address)
 
     def rowCount(self, parent=None):
         if parent is None:
@@ -403,12 +441,15 @@ class ImagesModel(QtCore.QAbstractListModel):
         self._data = []
         self._cache = {}
 
+    def get(self, indexes):
+        return [self._data[index] for index in indexes]
+
     def refresh(self):
         self.beginResetModel()
         try:
             self._data = []
             for address in self.parent.selected_addresses:
-                for timestamp, stream in self.parent.images[address]:
+                for timestamp, stream in self.parent.images[address].items():
                     try:
                         thumbnail = self._cache[(address, timestamp)]
                     except KeyError:
@@ -417,7 +458,7 @@ class ImagesModel(QtCore.QAbstractListModel):
                         thumbnail = image.scaledToWidth(200)
                         self._cache[(address, timestamp)] = thumbnail
                     self._data.append(
-                        (timestamp, address, thumbnail, stream))
+                        (address, timestamp, thumbnail, stream))
         finally:
             self.endResetModel()
 
@@ -430,7 +471,7 @@ class ImagesModel(QtCore.QAbstractListModel):
 
     def data(self, index, role):
         if index.isValid():
-            timestamp, address, thumbnail, _ = self._data[index.row()]
+            address, timestamp, thumbnail, _ = self._data[index.row()]
             if role == QtCore.Qt.DisplayRole:
                 return '{ts:%Y-%m-%d %H:%M:%S}\n{addr}'.format(ts=timestamp, addr=address)
             elif role == QtCore.Qt.DecorationRole:

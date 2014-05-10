@@ -13,6 +13,9 @@
   <property name="windowTitle">
    <string>Compound Pi</string>
   </property>
+  <property name="toolButtonStyle">
+   <enum>Qt::ToolButtonFollowStyle</enum>
+  </property>
   <widget class="QWidget" name="centralwidget">
    <layout class="QVBoxLayout" name="verticalLayout">
     <property name="margin">
@@ -86,7 +89,6 @@
     <addaction name="separator"/>
     <addaction name="identify_action"/>
     <addaction name="configure_action"/>
-    <addaction name="capture_now_action"/>
     <addaction name="capture_action"/>
     <addaction name="separator"/>
     <addaction name="quit_action"/>
@@ -98,13 +100,13 @@
     <addaction name="about_action"/>
     <addaction name="about_qt_action"/>
    </widget>
-   <widget class="QMenu" name="edit_menu">
+   <widget class="QMenu" name="images_menu">
     <property name="title">
-     <string>&amp;Edit</string>
+     <string>&amp;Images</string>
     </property>
     <addaction name="copy_action"/>
+    <addaction name="export_action"/>
     <addaction name="clear_action"/>
-    <addaction name="select_all_action"/>
    </widget>
    <widget class="QMenu" name="view_menu">
     <property name="title">
@@ -112,10 +114,11 @@
     </property>
     <addaction name="refresh_action"/>
     <addaction name="separator"/>
+    <addaction name="toolbar_action"/>
     <addaction name="status_bar_action"/>
    </widget>
    <addaction name="servers_menu"/>
-   <addaction name="edit_menu"/>
+   <addaction name="images_menu"/>
    <addaction name="view_menu"/>
    <addaction name="help_menu"/>
   </widget>
@@ -136,7 +139,7 @@
    <addaction name="separator"/>
    <addaction name="identify_action"/>
    <addaction name="configure_action"/>
-   <addaction name="capture_now_action"/>
+   <addaction name="capture_action"/>
    <addaction name="separator"/>
    <addaction name="quit_action"/>
   </widget>
@@ -255,24 +258,16 @@
     <bool>false</bool>
    </property>
    <property name="text">
-    <string>Status &amp;Bar</string>
+    <string>Show Status &amp;Bar</string>
    </property>
    <property name="toolTip">
     <string>Toggle visibility of the status bar</string>
    </property>
   </action>
-  <action name="select_all_action">
-   <property name="text">
-    <string>Select &amp;All</string>
-   </property>
-   <property name="toolTip">
-    <string>Select all servers</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+A</string>
-   </property>
-  </action>
   <action name="clear_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>C&amp;lear</string>
    </property>
@@ -288,15 +283,23 @@
     <string>Ctrl+C</string>
    </property>
   </action>
-  <action name="capture_now_action">
-   <property name="enabled">
-    <bool>false</bool>
+  <action name="export_action">
+   <property name="text">
+    <string>E&amp;xport</string>
+   </property>
+   <property name="shortcut">
+    <string>Ctrl+S</string>
+   </property>
+  </action>
+  <action name="toolbar_action">
+   <property name="checkable">
+    <bool>true</bool>
    </property>
    <property name="text">
-    <string>Capture &amp;Now</string>
+    <string>Show &amp;Toolbar</string>
    </property>
    <property name="toolTip">
-    <string>Capture images on all selected servers</string>
+    <string>Toggle visibility of the toolbar</string>
    </property>
   </action>
  </widget>
