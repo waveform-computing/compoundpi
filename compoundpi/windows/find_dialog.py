@@ -75,6 +75,12 @@ class FindDialog(QtGui.QDialog):
         self.ui.port_edit.setText(str(value))
     port = property(_get_port, _set_port)
 
+    def _get_timeout(self):
+        return self.ui.timeout_spinbox.value()
+    def _set_timeout(self, value):
+        self.ui.timeout_spinbox.setValue(int(value))
+    timeout = property(_get_timeout, _set_timeout)
+
     def _get_expected_count(self):
         return self.ui.expected_spinbox.value()
     def _set_expected_count(self, value):

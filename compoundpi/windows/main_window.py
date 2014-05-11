@@ -113,12 +113,16 @@ class MainWindow(QtGui.QMainWindow):
             self.server_list_selection_changed)
         self.ui.server_list.doubleClicked.connect(
             self.server_list_double_clicked)
+        self.ui.server_list.customContextMenuRequested.connect(
+            self.server_list_context_menu)
         self.ui.image_list.model().modelReset.connect(
             self.image_list_model_reset)
         self.ui.image_list.model().dataChanged.connect(
             self.image_list_data_changed)
         self.ui.image_list.selectionModel().selectionChanged.connect(
             self.image_list_selection_changed)
+        self.ui.image_list.customContextMenuRequested.connect(
+            self.image_list_context_menu)
 
     @property
     def selected_images(self):
@@ -174,7 +178,8 @@ Project homepage is at
         self.settings.beginGroup('network')
         try:
             dialog.interface = self.settings.value('interface', '')
-            dialog.port = self.settings.value('port', '5647')
+            dialog.port = self.settings.value('port', 5647)
+            dialog.timeout = self.settings.value('timeout', 5)
             dialog.expected_count = self.settings.value('expected_count', '0')
             if dialog.exec_():
                 try:
@@ -189,9 +194,11 @@ Project homepage is at
                     raise ValueError('Port %d is invalid' % dialog.port)
                 self.settings.setValue('interface', dialog.interface)
                 self.settings.setValue('port', dialog.port)
+                self.settings.setValue('timeout', dialog.timeout)
                 self.settings.setValue('expected_count', dialog.expected_count)
                 self.client.network = '%s/%s' % (iface['addr'], iface['netmask'])
                 self.client.port = dialog.port
+                self.client.timeout = dialog.timeout
                 self.ui.server_list.model().find(count=dialog.expected_count)
                 for col in range(self.ui.server_list.model().columnCount()):
                     self.ui.server_list.resizeColumnToContents(col)
@@ -316,6 +323,16 @@ Project homepage is at
     def server_list_selection_changed(self, selected, deselected):
         self.update_server_actions()
 
+    def server_list_context_menu(self, pos):
+        menu = QtGui.QMenu(self)
+        menu.addAction(self.ui.add_action)
+        menu.addAction(self.ui.remove_action)
+        menu.addSeparator()
+        menu.addAction(self.ui.identify_action)
+        menu.addAction(self.ui.configure_action)
+        menu.addAction(self.ui.capture_action)
+        menu.popup(self.ui.server_list.viewport().mapToGlobal(pos))
+
     def image_list_model_reset(self):
         self.update_image_actions()
 
@@ -324,6 +341,13 @@ Project homepage is at
 
     def image_list_selection_changed(self, selected, deselected):
         self.update_image_actions()
+
+    def image_list_context_menu(self, pos):
+        menu = QtGui.QMenu(self)
+        menu.addAction(self.ui.copy_action)
+        menu.addAction(self.ui.export_action)
+        menu.addAction(self.ui.clear_action)
+        menu.popup(self.ui.image_list.viewport().mapToGlobal(pos))
 
     def update_server_actions(self):
         has_rows = self.ui.server_list.model().rowCount() > 0

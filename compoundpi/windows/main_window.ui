@@ -27,6 +27,9 @@
        <enum>Qt::Horizontal</enum>
       </property>
       <widget class="QTreeView" name="server_list">
+       <property name="contextMenuPolicy">
+        <enum>Qt::CustomContextMenu</enum>
+       </property>
        <property name="editTriggers">
         <set>QAbstractItemView::NoEditTriggers</set>
        </property>
@@ -47,6 +50,9 @@
        </property>
       </widget>
       <widget class="QListView" name="image_list">
+       <property name="contextMenuPolicy">
+        <enum>Qt::CustomContextMenu</enum>
+       </property>
        <property name="editTriggers">
         <set>QAbstractItemView::NoEditTriggers</set>
        </property>
@@ -276,6 +282,9 @@
    </property>
   </action>
   <action name="copy_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>&amp;Copy</string>
    </property>
@@ -284,6 +293,9 @@
    </property>
   </action>
   <action name="export_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
    <property name="text">
     <string>E&amp;xport</string>
    </property>
