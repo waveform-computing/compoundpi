@@ -30,16 +30,18 @@ str = type('')
 import io
 import os
 import shutil
+import bisect
 from collections import defaultdict, OrderedDict
 
 import netifaces
 from PyQt4 import QtCore, QtGui, uic
 
 from . import get_icon, get_ui_file
+from ..client import CompoundPiClient
 from .find_dialog import FindDialog
 from .configure_dialog import ConfigureDialog
 from .capture_dialog import CaptureDialog
-from ..client import CompoundPiClient
+from .add_dialog import AddDialog
 
 
 class MainWindow(QtGui.QMainWindow):
@@ -104,15 +106,12 @@ class MainWindow(QtGui.QMainWindow):
         # Connect the lists to their models
         self.ui.server_list.setModel(ServersModel(self))
         self.ui.image_list.setModel(ImagesModel(self))
-        # XXX What about pressing Enter instead of double clicking?
         self.ui.server_list.model().modelReset.connect(
             self.server_list_model_reset)
         self.ui.server_list.model().dataChanged.connect(
             self.server_list_data_changed)
         self.ui.server_list.selectionModel().selectionChanged.connect(
             self.server_list_selection_changed)
-        self.ui.server_list.doubleClicked.connect(
-            self.server_list_double_clicked)
         self.ui.server_list.customContextMenuRequested.connect(
             self.server_list_context_menu)
         self.ui.image_list.model().modelReset.connect(
@@ -206,11 +205,16 @@ Project homepage is at
             self.settings.endGroup()
 
     def servers_add(self):
-        raise NotImplementedError
-        self.ui.server_list.model().add()
+        dialog = AddDialog(self)
+        if dialog.exec_():
+            self.ui.server_list.model().add(dialog.server)
+            for col in range(self.ui.server_list.model().columnCount()):
+                self.ui.server_list.resizeColumnToContents(col)
 
     def servers_remove(self):
         self.ui.server_list.model().remove(self.selected_addresses)
+        for col in range(self.ui.server_list.model().columnCount()):
+            self.ui.server_list.resizeColumnToContents(col)
 
     def servers_identify(self):
         self.client.identify(self.selected_addresses)
@@ -311,9 +315,6 @@ Project homepage is at
         else:
             self.statusBar().show()
 
-    def server_list_double_clicked(self, index):
-        pass
-
     def server_list_model_reset(self):
         self.update_server_actions()
 
@@ -409,15 +410,27 @@ class ServersModel(QtCore.QAbstractTableModel):
             data = dict(self._data)
             data.update(self.parent.client.status(self.parent.selected_addresses))
             self._data = sorted(data.items())
-        first = self.index(0, 0)
-        last = self.index(self.rowCount(), self.columnCount() - 1)
-        self.dataChanged.emit(first, last)
+        self.refresh_all()
 
     def add(self, address):
-        raise NotImplementedError
+        self.parent.client.add([address])
+        i = bisect.bisect_left(self._data, (address, None))
+        self.beginInsertRows(QtCore.QModelIndex(), i, i)
+        try:
+            self._data.insert(i,
+                (address, self.parent.client.status([address])[address]))
+        finally:
+            self.endInsertRows()
 
     def remove(self, addresses):
-        raise NotImplementedError
+        for address in addresses:
+            i = bisect.bisect_left(self._data, (address, None))
+            self.beginRemoveRows(QtCore.QModelIndex(), i, i)
+            try:
+                self.parent.client.remove([address])
+                del self._data[i]
+            finally:
+                self.endRemoveRows()
 
     def get(self, indexes):
         return [self._data[index] for index in indexes]

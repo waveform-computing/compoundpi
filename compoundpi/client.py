@@ -376,13 +376,26 @@ class CompoundPiClient(object):
         return set(responses.keys())
 
     def add(self, addresses):
+        addresses = set(addresses) - self._servers
         self._seqno += 1
         for address in addresses:
             self._unicast('%d PING' % self._seqno, address)
-        self._servers |= self._parse_ping(self._responses(addresses))
+        # Abuse catch_warnings to mutate warnings in parse_ping into errors
+        # associated with our transaction. We don't do this in find() as the
+        # assumption is that a user explicitly calling add() expects the
+        # addresses passed to work, whereas find() merely locates compatible
+        # servers on the subnet
+        to_add = self._parse_ping(self._responses(addresses))
+        addresses -= to_add
+        if addresses:
+            errors = []
+            for address in addresses:
+                errors.append(CompoundPiMissingResponse(address))
+            raise CompoundPiTransactionFailed(errors)
+        self._servers |= to_add
 
     def remove(self, addresses):
-        self._servers -= addresses
+        self._servers -= set(addresses)
 
     def find(self, count=0):
         self._servers = set()

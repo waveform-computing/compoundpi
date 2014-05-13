@@ -36,7 +36,7 @@ __author_email__ = 'dave@waveform.org.uk'
 __url__          = 'http://compoundpi.readthedocs.org/'
 __platforms__    = 'ALL'
 
-__requires__ = ['ipaddr']
+__requires__ = []
 
 __extra_requires__ = {
     'client': ['netifaces', 'pyqt'],
@@ -44,6 +44,9 @@ __extra_requires__ = {
     'doc':    ['sphinx'],
     }
 
+if sys.version_info[:2] < (3, 3):
+    # Python 3.3+ has an equivalent ipaddress module built-in
+    __requires__.append('ipaddr')
 if sys.version_info[:2] == (3, 2):
     __extra_requires__['doc'].extend([
         # Particular versions are required for Python 3.2 compatibility.
