@@ -184,7 +184,7 @@ class CompoundPiCmd(Cmd):
 
     def __init__(self):
         Cmd.__init__(self)
-        self.pprint('CompoundPi Client')
+        self.pprint('CompoundPi Client version %s' % __version__)
         self.pprint(
             'Type "help" for more information, '
             'or "find" to locate Pi servers')
@@ -215,7 +215,7 @@ class CompoundPiCmd(Cmd):
             a = IPv4Address(s.strip())
         except ValueError:
             raise CmdSyntaxError('Invalid address "%s"' % s)
-        if not a in self.network:
+        if not a in self.client.network:
             raise CmdSyntaxError(
                 'Address "%s" does not belong to the configured network '
                 '"%s"' % (a, self.network))
@@ -490,14 +490,15 @@ class CompoundPiCmd(Cmd):
                 (
                     address,
                     '%dx%d@%s' % (
-                        status.resolution.width,
-                        status.resolution.height,
-                        status.framerate,
+                        responses[address].resolution.width,
+                        responses[address].resolution.height,
+                        responses[address].framerate,
                         ),
-                    status.timestamp,
-                    status.images,
+                    responses[address].timestamp,
+                    responses[address].images,
                     )
-                for (address, status) in responses.items()
+                for address in self.client
+                if address in responses
                 ])
         if len(set(
                 status.resolution

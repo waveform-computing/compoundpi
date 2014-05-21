@@ -32,6 +32,7 @@ import re
 import warnings
 import datetime
 import time
+import random
 import threading
 import select
 import struct
@@ -45,147 +46,25 @@ except ImportError:
     from ipaddr import IPv4Address, IPv4Network
 
 from . import __version__
-
-
-class CompoundPiWarning(Warning):
-    "Base class for warnings raised by the Compound Pi client"
-
-
-class CompoundPiServerWarning(CompoundPiWarning):
-    "Warning raised when a Compound Pi server does something unexpected"
-
-    def __init__(self, address, msg):
-        super(CompoundPiServerWarning, self).__init__(
-            '%s: %s' % (address, msg))
-        self.address = address
-
-
-class CompoundPiWrongPort(CompoundPiServerWarning):
-    "Warning raised when packets are received from the wrong port"
-
-    def __init__(self, address, port):
-        super(CompoundPiWrongPort, self).__init__(
-                address, 'response from wrong port %d' % port)
-
-
-class CompoundPiUnknownAddress(CompoundPiServerWarning):
-    "Warning raised when a packet is received from an unexpected address"
-
-    def __init__(self, address):
-        super(CompoundPiUnknownAddress, self).__init__(
-            address, 'unknown server')
-
-
-class CompoundPiMultiResponse(CompoundPiServerWarning):
-    "Warning raised when multiple responses are received"
-
-    def __init__(self, address):
-        super(CompoundPiMultiResponse, self).__init__(
-            address, 'multiple responses received')
-
-
-class CompoundPiBadResponse(CompoundPiServerWarning):
-    "Warning raised when a response is badly formed"
-
-    def __init__(self, address):
-        super(CompoundPiBadResponse, self).__init__(
-            address, 'badly formed response')
-
-
-class CompoundPiStaleResponse(CompoundPiServerWarning):
-    "Warning raised when a stale response (old sequence number) is received"
-
-    def __init__(self, address):
-        super(CompoundPiStaleResponse, self).__init__(
-            address, 'stale response')
-
-
-class CompoundPiFutureResponse(CompoundPiServerWarning):
-    "Warning raised when a response with a future sequence number is received"
-
-    def __init__(self, address):
-        super(CompoundPiFutureResponse, self).__init__(
-            address, 'future response')
-
-
-class CompoundPiWrongVersion(CompoundPiServerWarning):
-    "Warning raised when a server reports an incompatible version"
-
-    def __init__(self, address, version):
-        super(CompoundPiWrongVersion, self).__init__(
-            address, 'wrong version "%s"' % version)
-        self.version = version
-
-
-class CompoundPiPingError(CompoundPiServerWarning):
-    "Warning raised when a server reports an error in response to PING"
-
-    def __init__(self, address, error):
-        super(CompoundPiPingError, self).__init__(address, error)
-        self.error = error
-
-
-class CompoundPiError(Exception):
-    "Base class for errors raised by the Compound Pi client"
-
-
-class CompoundPiNoServers(CompoundPiError):
-    "Exception raised when a command is execute with no servers defined"
-
-    def __init__(self):
-        super(CompoundPiNoServers, self).__init__('no servers defined')
-
-
-class CompoundPiUndefinedServers(CompoundPiError):
-    "Exception raised when a transaction is attempted with undefined servers"
-
-    def __init__(self, addresses):
-        super(CompoundPiUndefinedServers, self).__init__(
-                'transaction with undefined servers: %s' %
-                ','.join(str(addr) for addr in addresses))
-
-
-class CompoundPiServerError(CompoundPiError):
-    "Exception raised when a Compound Pi server reports an error"
-
-    def __init__(self, address, msg):
-        super(CompoundPiServerError, self).__init__('%s: %s' % (address, msg))
-        self.address = address
-
-
-class CompoundPiInvalidResponse(CompoundPiServerError):
-    "Exception raised when a server returns an unexpected response"
-
-    def __init__(self, address):
-        super(CompoundPiInvalidResponse, self).__init__(
-                address, 'invalid response')
-
-
-class CompoundPiMissingResponse(CompoundPiServerError):
-    "Exception raised when a server fails to return a response"
-
-    def __init__(self, address):
-        super(CompoundPiMissingResponse, self).__init__(
-                address, 'no response')
-
-
-class CompoundPiSendTimeout(CompoundPiServerError):
-    "Exception raised when a server fails to open a connection for SEND"
-
-    def __init__(self, address):
-        super(CompoundPiSendTimeout, self).__init__(
-                address, 'timed out waiting for SEND connection')
-
-
-class CompoundPiTransactionFailed(CompoundPiError):
-    "Compound exception which represents all errors encountered in a transaction"
-
-    def __init__(self, errors, msg=None):
-        if msg is None:
-            msg = '%d errors encountered while executing' % len(errors)
-        msg = '\n'.join([msg] + [str(e) for e in errors])
-        super(CompoundPiTransactionFailed, self).__init__(msg)
-        self.errors = errors
+from .common import NetworkRepeater
+from .exc import (
+    CompoundPiBadResponse,
+    CompoundPiFutureResponse,
+    CompoundPiHelloError,
+    CompoundPiInvalidResponse,
+    CompoundPiMissingResponse,
+    CompoundPiMultiResponse,
+    CompoundPiNoServers,
+    CompoundPiRedefinedServers,
+    CompoundPiSendTimeout,
+    CompoundPiServerError,
+    CompoundPiStaleResponse,
+    CompoundPiTransactionFailed,
+    CompoundPiUndefinedServers,
+    CompoundPiUnknownAddress,
+    CompoundPiWrongPort,
+    CompoundPiWrongVersion,
+    )
 
 
 class Resolution(namedtuple('Resolution', ('width', 'height'))):
@@ -226,6 +105,7 @@ class CompoundPiClient(object):
         self._server = None
         self._server_thread = None
         self._servers = set()
+        self._senders = {}
         self._progress_start = self._progress_update = self._progress_finish = None
         if progress is not None:
             (
@@ -265,13 +145,12 @@ class CompoundPiClient(object):
         self._servers = set()
     network = property(_get_network, _set_network)
 
-    def _unicast(self, data, address):
+    def _send_command(self, address, seqno, data):
         assert self.request_re.match(data)
-        self._socket.sendto(data, (str(address), self.port))
-
-    def _broadcast(self, data):
-        assert self.request_re.match(data)
-        self._socket.sendto(data, (str(self.network.broadcast), self.port))
+        if isinstance(data, str):
+            data = data.encode('utf-8')
+        self._senders[(address, seqno)] = NetworkRepeater(
+            self._socket, address, data)
 
     def _responses(self, servers=None, count=0):
         if self._progress_start:
@@ -289,9 +168,9 @@ class CompoundPiClient(object):
                 if self._progress_update:
                     self._progress_update()
                 if select.select([self._socket], [], [], 1)[0]:
-                    data, address = self._socket.recvfrom(512)
+                    data, server_address = self._socket.recvfrom(512)
                     match = self.response_re.match(data.decode('utf-8'))
-                    address, port = address
+                    address, port = server_address
                     address = IPv4Address(address)
                     if port != self.port:
                         warnings.warn(CompoundPiWrongPort(address, port))
@@ -303,7 +182,17 @@ class CompoundPiClient(object):
                         warnings.warn(CompoundPiBadResponse(address))
                     else:
                         seqno = int(match.group('seqno'))
-                        self._unicast('%d ACK' % seqno, address)
+                        # Unconditionally send an ACK to silence the responder
+                        # of whatever server sent the message
+                        self._socket.sendto('%d ACK' % seqno, server_address)
+                        # Silence the sender that the response corresponds
+                        # to (if any)
+                        sender = self._senders.get((server_address, seqno))
+                        if sender:
+                            sender.terminate = True
+                            # We deliberately don't join() the sender here
+                            # to ensure we don't delay receiving the next
+                            # response
                         if seqno < self._seqno:
                             warnings.warn(CompoundPiStaleResponse(address))
                         elif seqno > self._seqno:
@@ -317,27 +206,30 @@ class CompoundPiClient(object):
                                 break
             return result
         finally:
+            while self._senders:
+                _, sender = self._senders.popitem()
+                sender.terminate = True
+                sender.join()
             if self._progress_finish:
                 self._progress_finish()
 
     def _transact(self, data, addresses=None):
-        if addresses:
-            addresses = set(addresses)
+        if addresses is None:
+            if not self._servers:
+                raise CompoundPiNoServers()
+            addresses = self._servers
+        elif set(addresses) - self._servers:
+            raise CompoundPiUndefinedServers(set(addresses) - self._servers)
         errors = []
         self._seqno += 1
         data = '%d %s' % (self._seqno, data)
-        if addresses is None:
-            addresses = self._servers
-            if not addresses:
-                raise CompoundPiNoServers()
-            self._broadcast(data)
-        elif addresses == self._servers:
-            self._broadcast(data)
-        elif addresses - self._servers:
-            raise CompoundPiUndefinedServers(addresses - self._servers)
+        if set(addresses) == self._servers:
+            self._send_command(
+                (str(self.network.broadcast), self.port), self._seqno, data)
         else:
             for address in addresses:
-                self._unicast(data, address)
+                self._send_command(
+                    (str(address), self.port), self._seqno, data)
         responses = self._responses(addresses)
         for address in addresses:
             try:
@@ -371,27 +263,30 @@ class CompoundPiClient(object):
                     warnings.warn(CompoundPiWrongVersion(address, response))
                     del responses[address]
             else:
-                warnings.warn(CompoundPiPingError(address, response))
+                warnings.warn(CompoundPiHelloError(address, response))
                 del responses[address]
         return set(responses.keys())
 
     def add(self, addresses):
-        addresses = set(addresses) - self._servers
+        if set(addresses) & self._servers:
+            raise CompoundPiRedefinedServers(set(addresses) & self._servers)
         self._seqno += 1
+        data = '%d HELLO %f' % (self._seqno, time.time())
         for address in addresses:
-            self._unicast('%d PING' % self._seqno, address)
+            self._send_command(
+                (str(address), self.port), self._seqno, data)
         # Abuse catch_warnings to mutate warnings in parse_ping into errors
         # associated with our transaction. We don't do this in find() as the
         # assumption is that a user explicitly calling add() expects the
         # addresses passed to work, whereas find() merely locates compatible
         # servers on the subnet
         to_add = self._parse_ping(self._responses(addresses))
-        addresses -= to_add
-        if addresses:
-            errors = []
-            for address in addresses:
-                errors.append(CompoundPiMissingResponse(address))
-            raise CompoundPiTransactionFailed(errors)
+        errors = []
+        if set(addresses) - to_add:
+            raise CompoundPiTransactionFailed([
+                CompoundPiMissingResponse(address)
+                for address in set(addresses) - to_add
+                ])
         self._servers |= to_add
 
     def remove(self, addresses):
@@ -400,7 +295,9 @@ class CompoundPiClient(object):
     def find(self, count=0):
         self._servers = set()
         self._seqno += 1
-        self._broadcast('%d PING' % self._seqno)
+        data = '%d HELLO %f' % (self._seqno, time.time())
+        self._send_command(
+            (str(self.network.broadcast), self.port), self._seqno, data)
         self._servers = self._parse_ping(self._responses(count=count))
 
     status_re = re.compile(

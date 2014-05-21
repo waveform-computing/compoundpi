@@ -43,6 +43,7 @@ import socket
 import SocketServer as socketserver
 import shutil
 import signal
+import warnings
 
 import daemon
 import daemon.runner
@@ -50,6 +51,12 @@ import RPi.GPIO as GPIO
 
 from . import __version__
 from .terminal import TerminalApplication
+from .common import NetworkRepeater
+from .exc import (
+    CompoundPiInvalidClient,
+    CompoundPiStaleSequence,
+    CompoundPiStaleClientTime,
+    )
 
 
 def service(s):
@@ -131,7 +138,8 @@ class CompoundPiServer(TerminalApplication):
         # earlier than later)
         GPIO.setmode(GPIO.BCM)
         GPIO.gpio_function(5)
-        # Ensure the server's socket, any log file, and stderr (if not forking)
+        # Ensure the server's socket, any log file, and stderr are preserved
+        # (if not forking)
         files_preserve = [self.server.socket]
         for handler in logging.getLogger().handlers:
             if isinstance(handler, logging.FileHandler):
@@ -158,6 +166,8 @@ class CompoundPiServer(TerminalApplication):
             import picamera
             logging.info('Initializing camera')
             self.server.seqno = 0
+            self.server.client_address = None
+            self.server.client_timestamp = None
             self.server.responders = {}
             self.server.images = []
             self.server.camera = picamera.PiCamera()
@@ -182,23 +192,6 @@ class CompoundPiServer(TerminalApplication):
         self.server.shutdown()
 
 
-class ResponderThread(threading.Thread):
-    def __init__(self, socket, client_address, data):
-        super(ResponderThread, self).__init__()
-        self.socket = socket
-        self.client_address = client_address
-        self.data = data
-        self.terminate = False
-        self.daemon = True
-        self.start()
-
-    def run(self):
-        start = time.time()
-        while not self.terminate and time.time() < start + 5:
-            self.socket.sendto(self.data, self.client_address)
-            time.sleep(random.uniform(0.0, 0.2))
-
-
 class CameraRequestHandler(socketserver.DatagramRequestHandler):
     request_re = re.compile(
             r'(?P<seqno>\d+) '
@@ -209,7 +202,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def handle(self):
         data = self.rfile.read().strip()
-        logging.info(
+        logging.debug(
                 '%s:%d > %r',
                 self.client_address[0], self.client_address[1], data)
         seqno = 0
@@ -225,8 +218,8 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 params = ()
             try:
                 handler = {
+                    'HELLO':       self.do_hello,
                     'ACK':         self.do_ack,
-                    'PING':        self.do_ping,
                     'STATUS':      self.do_status,
                     'RESOLUTION':  self.do_resolution,
                     'FRAMERATE':   self.do_framerate,
@@ -241,36 +234,48 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             if handler == self.do_ack:
                 self.do_ack(seqno)
                 return
-            elif handler == self.do_ping:
-                self.server.seqno = seqno
-            elif seqno <= self.server.seqno:
-                raise ValueError('Invalid sequence number')
+            elif handler != self.do_hello:
+                if self.client_address != self.server.client_address:
+                    raise CompoundPiInvalidClient(self.client_address[0])
+                elif seqno <= self.server.seqno:
+                    raise CompoundPiStaleSequence(self.client_address[0], seqno)
             response = handler(*params)
+            self.server.seqno = seqno
             if not response:
                 response = ''
             self.send_response(seqno, '%d OK\n%s' % (seqno, response))
-        except Exception as exc:
-            logging.error(str(exc))
-            self.send_response(seqno, '%d ERROR\n%s' % (seqno, exc))
+        except Warning as w:
+            # Don't respond to raised warnings, just log them
+            warnings.warn(w)
+        except Exception as e:
+            # Otherwise, send an ERROR response
+            logging.error(str(e))
+            self.send_response(seqno, '%d ERROR\n%s' % (seqno, e))
 
     def send_response(self, seqno, data):
         assert self.response_re.match(data)
         if isinstance(data, str):
             data = data.encode('utf-8')
-        logging.info(
+        logging.debug(
                 '%s:%d < %r',
                 self.client_address[0], self.client_address[1], data)
-        self.server.responders[seqno] = ResponderThread(
+        self.server.responders[(self.client_address, seqno)] = NetworkRepeater(
                 self.socket, self.client_address, data)
 
     def do_ack(self, seqno):
         seqno = int(seqno)
-        responder = self.server.responders.pop(seqno, None)
+        responder = self.server.responders.pop((self.client_address, seqno), None)
         if responder:
             responder.terminate = True
             responder.join()
 
-    def do_ping(self):
+    def do_hello(self, timestamp):
+        timestamp = float(timestamp)
+        if self.server.client_address == self.client_address:
+            if timestamp <= self.server.client_timestamp:
+                raise CompoundPiStaleClientTime(self.client_address, timestamp)
+        self.server.client_address = self.client_address
+        self.server.client_timestamp = timestamp
         return 'VERSION %s' % __version__
 
     def blink_led(self, timeout):
