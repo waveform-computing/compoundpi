@@ -28,6 +28,7 @@ str = type('')
 
 import sys
 import atexit
+import warnings
 
 import pkg_resources
 import sip
@@ -37,6 +38,10 @@ from PyQt4 import QtCore, QtGui
 
 from . import __version__
 from .windows.main_window import MainWindow
+from .exc import (
+    CompoundPiBadResponse,
+    CompoundPiMultiResponse,
+    )
 
 
 APPLICATION = None
@@ -51,6 +56,10 @@ def excepthook(type, value, tb):
         str(value))
 
 def main(args=None):
+    # Ignore extremely common warnings - they're only useful for protocol
+    # debugging
+    warnings.simplefilter('ignore', category=CompoundPiBadResponse)
+    warnings.simplefilter('ignore', category=CompoundPiMultiResponse)
     global APPLICATION, MAIN_WINDOW
     if args is None:
         args = sys.argv
