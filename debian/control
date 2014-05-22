@@ -33,7 +33,7 @@ Description: multi-camera capture system - server component.
 
 Package: compoundpi-client
 Architecture: all
-Depends: ${misc:Depends}, ${python:Depends}, compoundpi-common (>= ${binary:Version})
+Depends: ${misc:Depends}, ${python:Depends}, compoundpi-common (>= ${binary:Version}), python-qt4
 Description: multi-camera capture system - server component.
  Compound Pi is a system for controlling camera modules attached to multiple
  Raspberry Pis all connected to the same local subnet. It consists of a server
