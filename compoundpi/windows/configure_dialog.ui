@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>360</width>
-    <height>113</height>
+    <width>394</width>
+    <height>446</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -50,6 +50,226 @@
        </property>
       </widget>
      </item>
+     <item row="2" column="0">
+      <widget class="QLabel" name="shutter_speed_label">
+       <property name="text">
+        <string>Shutter speed</string>
+       </property>
+       <property name="buddy">
+        <cstring>shutter_speed_spinbox</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="2" column="1">
+      <widget class="QDoubleSpinBox" name="shutter_speed_spinbox">
+       <property name="specialValueText">
+        <string>auto</string>
+       </property>
+       <property name="suffix">
+        <string> ms</string>
+       </property>
+       <property name="decimals">
+        <number>4</number>
+       </property>
+       <property name="maximum">
+        <double>1000.000000000000000</double>
+       </property>
+       <property name="singleStep">
+        <double>10.000000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="0">
+      <widget class="QLabel" name="awb_label">
+       <property name="text">
+        <string>White balance</string>
+       </property>
+       <property name="buddy">
+        <cstring>awb_combo</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="3" column="1">
+      <widget class="QComboBox" name="awb_combo"/>
+     </item>
+     <item row="4" column="0">
+      <widget class="QLabel" name="exposure_mode_label">
+       <property name="text">
+        <string>Exposure</string>
+       </property>
+       <property name="buddy">
+        <cstring>exposure_mode_combo</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <widget class="QComboBox" name="exposure_mode_combo"/>
+     </item>
+     <item row="5" column="0">
+      <widget class="QLabel" name="exposure_comp_label">
+       <property name="text">
+        <string>Exposure comp.</string>
+       </property>
+       <property name="buddy">
+        <cstring>exposure_comp_slider</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="0">
+      <widget class="QLabel" name="iso_label">
+       <property name="text">
+        <string>ISO</string>
+       </property>
+       <property name="buddy">
+        <cstring>iso_combo</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="6" column="1">
+      <widget class="QComboBox" name="iso_combo">
+       <property name="editable">
+        <bool>true</bool>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="0">
+      <widget class="QLabel" name="metering_label">
+       <property name="text">
+        <string>Metering</string>
+       </property>
+       <property name="buddy">
+        <cstring>metering_combo</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="1">
+      <widget class="QComboBox" name="metering_combo"/>
+     </item>
+     <item row="8" column="0">
+      <widget class="QLabel" name="brightness_label">
+       <property name="text">
+        <string>Brightness</string>
+       </property>
+       <property name="buddy">
+        <cstring>brightness_slider</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="0">
+      <widget class="QLabel" name="contrast_label">
+       <property name="text">
+        <string>Contrast</string>
+       </property>
+       <property name="buddy">
+        <cstring>contrast_slider</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="10" column="0">
+      <widget class="QLabel" name="saturation_label">
+       <property name="text">
+        <string>Saturation</string>
+       </property>
+       <property name="buddy">
+        <cstring>saturation_slider</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="11" column="0">
+      <widget class="QLabel" name="flip_label">
+       <property name="text">
+        <string>Flip</string>
+       </property>
+       <property name="buddy">
+        <cstring>hflip_checkbox</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="11" column="1">
+      <layout class="QHBoxLayout" name="flip_layout">
+       <item>
+        <widget class="QCheckBox" name="hflip_checkbox">
+         <property name="text">
+          <string>Horizontal</string>
+         </property>
+        </widget>
+       </item>
+       <item>
+        <widget class="QCheckBox" name="vflip_checkbox">
+         <property name="text">
+          <string>Vertical</string>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="8" column="1">
+      <widget class="QSlider" name="brightness_slider">
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="value">
+        <number>50</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="1">
+      <widget class="QSlider" name="contrast_slider">
+       <property name="minimum">
+        <number>-100</number>
+       </property>
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="pageStep">
+        <number>20</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="10" column="1">
+      <widget class="QSlider" name="saturation_slider">
+       <property name="minimum">
+        <number>-100</number>
+       </property>
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="pageStep">
+        <number>20</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="1">
+      <widget class="QSlider" name="exposure_comp_slider">
+       <property name="minimum">
+        <number>-24</number>
+       </property>
+       <property name="maximum">
+        <number>24</number>
+       </property>
+       <property name="pageStep">
+        <number>6</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+       <property name="tickPosition">
+        <enum>QSlider::TicksBelow</enum>
+       </property>
+       <property name="tickInterval">
+        <number>6</number>
+       </property>
+      </widget>
+     </item>
     </layout>
    </item>
    <item>
@@ -58,7 +278,7 @@
       <enum>Qt::Horizontal</enum>
      </property>
      <property name="standardButtons">
-      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok</set>
+      <set>QDialogButtonBox::Cancel|QDialogButtonBox::Ok|QDialogButtonBox::RestoreDefaults</set>
      </property>
     </widget>
    </item>
@@ -67,6 +287,17 @@
  <tabstops>
   <tabstop>resolution_combo</tabstop>
   <tabstop>framerate_combo</tabstop>
+  <tabstop>shutter_speed_spinbox</tabstop>
+  <tabstop>awb_combo</tabstop>
+  <tabstop>exposure_mode_combo</tabstop>
+  <tabstop>exposure_comp_slider</tabstop>
+  <tabstop>iso_combo</tabstop>
+  <tabstop>metering_combo</tabstop>
+  <tabstop>brightness_slider</tabstop>
+  <tabstop>contrast_slider</tabstop>
+  <tabstop>saturation_slider</tabstop>
+  <tabstop>hflip_checkbox</tabstop>
+  <tabstop>vflip_checkbox</tabstop>
   <tabstop>button_box</tabstop>
  </tabstops>
  <resources/>
@@ -78,8 +309,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>227</x>
-     <y>278</y>
+     <x>236</x>
+     <y>430</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -94,8 +325,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>295</x>
-     <y>284</y>
+     <x>304</x>
+     <y>430</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>

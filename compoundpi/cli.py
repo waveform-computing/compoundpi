@@ -484,21 +484,48 @@ class CompoundPiCmd(Cmd):
         cpi> status
         """
         responses = self.client.status(self.parse_arg(arg))
+        min_time = min(status.timestamp for status in responses.values())
+        min_speed = min(status.shutter_speed for status in responses.values())
         self.pprint_table(
-            [('Address', 'Resolution', 'Time', '#')] +
             [
+                (
+                    'Address',
+                    'Mode',
+                    'Shutter',
+                    'AWB',
+                    'Exp',
+                    'Meter',
+                    'Flip',
+                    'Time Delta',
+                    '#',
+                    )
+            ] + [
                 (
                     address,
                     '%dx%d@%s' % (
-                        responses[address].resolution.width,
-                        responses[address].resolution.height,
-                        responses[address].framerate,
+                        status.resolution.width,
+                        status.resolution.height,
+                        status.framerate,
                         ),
-                    responses[address].timestamp,
-                    responses[address].images,
+                    (
+                        'auto' if status.shutter_speed == 0 else
+                        '%.3fms' % (status.shutter_speed / 1000)
+                        ),
+                    status.awb_mode,
+                    status.exposure_mode,
+                    status.metering_mode,
+                    (
+                        'both' if status.vflip and status.hflip else
+                        'vert' if status.vflip else
+                        'horz' if status.hflip else
+                        'none'
+                        ),
+                    status.timestamp - min_time,
+                    status.images,
                     )
-                for address in self.client
+                for address in sorted(self.client)
                 if address in responses
+                for status in (responses[address],)
                 ])
         if len(set(
                 status.resolution
@@ -510,13 +537,40 @@ class CompoundPiCmd(Cmd):
                 for status in responses.values()
                 )) > 1:
             logging.warning('Warning: multiple framerates configured')
-        for (address1, status1) in responses.items():
-            for (address2, status2) in responses.items():
-                if address1 < address2:
-                    if abs(status1.timestamp - status2.timestamp).total_seconds() > self.time_delta:
-                        logging.warning(
-                            'Warning: timestamps of %s and %s are >%.2fs apart',
-                            address1, address2, self.time_delta)
+        if len(set(
+                status.awb_mode
+                for status in responses.values()
+                )) > 1:
+            logging.warning('Warning: multiple white-balance modes configured')
+        if len(set(
+                status.exposure_mode
+                for status in responses.values()
+                )) > 1:
+            logging.warning('Warning: multiple exposure modes configured')
+        if len(set(
+                status.exposure_compensation
+                for status in responses.values()
+                )) > 1:
+            logging.warning('Warning: multiple exposure compensations configured')
+        if len(set(
+                status.metering_mode
+                for status in responses.values()
+                )) > 1:
+            logging.warning('Warning: multiple metering modes configured')
+        if len(set(
+                (status.hflip, status.vflip)
+                for status in responses.values()
+                )) > 1:
+            logging.warning('Warning: multiple orientations configured')
+        for address, status in responses.items():
+            if (status.shutter_speed - min_speed) > 1000:
+                logging.warning(
+                    'Warning: shutter speed of %s deviates from min by >1ms',
+                    address)
+            if (status.timestamp - min_time).total_seconds() > self.time_delta:
+                logging.warning(
+                    'Warning: time delta of %s is >%.2fs',
+                    address, self.time_delta)
 
     def complete_status(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -539,7 +593,7 @@ class CompoundPiCmd(Cmd):
 
         [1] http://picamera.readthedocs.org/en/latest/fov.html
 
-        See also: status, framerate.
+        See also: status, framerate, shutter.
 
         cpi> resolution 640x480
         cpi> resolution 1280x720 192.168.0.54
@@ -604,7 +658,7 @@ class CompoundPiCmd(Cmd):
 
         [1] http://picamera.readthedocs.org/en/latest/fov.html
 
-        See also: status, resolution.
+        See also: status, resolution, shutter.
 
         cpi> framerate 30
         cpi> framerate 90 192.168.0.1
@@ -614,7 +668,7 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError('You must specify a framerate')
         arg = arg.split(' ', 1)
         try:
-            rate = fractions.Fraction(rate)
+            rate = fractions.Fraction(arg[0])
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid framerate "%s"' % arg[0])
         self.client.framerate(
@@ -645,6 +699,390 @@ class CompoundPiCmd(Cmd):
                 framerate
                 for framerate in framerates
                 if framerate.startswith(text)
+                ]
+
+    def do_shutter(self, arg):
+        """
+        Sets the shutter speed on the defined servers.
+
+        Syntax: shutter <speed> [addresses]
+
+        The 'shutter' command is used to set the shutter speed of the camera on
+        all or some of the defined servers. The speed can be specified as a
+        floating-point number (in milli-seconds), or 'auto' which leaves the
+        camera to determine the shutter speed. The framerate of the camera
+        limits the shutter speed that can be set. For example, if framerate is
+        30fps, then shutter speed cannot be slower than 33.333ms.
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status, resolution, framerate.
+
+        cpi> shutter auto
+        cpi> shutter 33.333 192.168.0.1
+        cpi> shutter 100 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a shutter speed')
+        arg = arg.split(' ', 1)
+        if arg[0].lower() == 'auto':
+            speed = 0
+        else:
+            try:
+                speed = int(float(arg[0]) * 1000)
+            except ValueError:
+                raise CmdSyntaxError('Invalid shutter speed "%s"' % arg[0])
+        self.client.shutter_speed(
+            speed, self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_shutter(self, text, line, start, finish):
+        cmd_re = re.compile(r'shutter(?P<speed> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('speed') < finish <= match.end('speed'):
+            # Some common shutter speeds; this list isn't intended to be
+            # exhaustive, just useful for completion
+            speeds = [
+                'auto',
+                '16.666',
+                '33.333',
+                '100',
+                '250',
+                '500',
+                '1000',
+                ]
+            return [
+                speed
+                for speed in speeds
+                if speed.startswith(text)
+                ]
+
+    def do_awb(self, arg):
+        """
+        Sets the auto-white-balance (AWB) mode on the defined servers.
+
+        Syntax: awb <mode> [addresses]
+
+        The 'awb' command is used to set the AWB mode of the camera on all or
+        some of the defined servers. The mode can be one of the following:
+
+        auto, cloudy, flash, fluorescent, horizon, incandescent, shade,
+        sunlight, tungsten
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status, exposure, metering.
+
+        cpi> awb auto
+        cpi> awb fluorescent 192.168.0.1
+        cpi> awb sunlight 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a mode')
+        arg = arg.split(' ', 1)
+        self.client.awb(
+            arg[0].lower(),
+            addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_awb(self, text, line, start, finish):
+        cmd_re = re.compile(r'awb(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('mode') < finish <= match.end('mode'):
+            modes = [
+                'auto',
+                'cloudy',
+                'flash',
+                'fluorescent',
+                'horizon',
+                'incandescent',
+                'shade',
+                'sunlight',
+                'tungsten',
+                ]
+            return [
+                mode
+                for mode in modes
+                if mode.startswith(text)
+                ]
+
+    def do_exposure(self, arg):
+        """
+        Sets the exposure mode on the defined servers.
+
+        Syntax: exposure <mode> [addresses]
+
+        The 'exposure' command is used to set the exposure mode of the camera
+        on all or some of the defined servers. The mode can be one of the
+        following:
+
+        antishake, auto, backlight, beach, fireworks, fixedfps, night,
+        nightpreview, snow, sports, spotlight, verylong
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status, awb, metering.
+
+        cpi> exposure auto
+        cpi> exposure night 192.168.0.1
+        cpi> exposure backlight 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a mode')
+        arg = arg.split(' ', 1)
+        self.client.exposure(
+            arg[0].lower(),
+            addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_exposure(self, text, line, start, finish):
+        cmd_re = re.compile(r'exposure(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('mode') < finish <= match.end('mode'):
+            modes = [
+                'antishake',
+                'auto',
+                'backlight',
+                'beach',
+                'fireworks',
+                'fixedfps',
+                'night',
+                'nightpreview',
+                'snow',
+                'sports',
+                'spotlight',
+                'verylong',
+                ]
+            return [
+                mode
+                for mode in modes
+                if mode.startswith(text)
+                ]
+
+    def do_metering(self, arg):
+        """
+        Sets the metering mode on the defined servers.
+
+        Syntax: metering <mode> [addresses]
+
+        The 'metering' command is used to set the metering mode of the camera
+        on all or some of the defined servers. The mode can be one of the
+        following:
+
+        average, backlit, matrix, spot
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status, awb, exposure.
+
+        cpi> metering average
+        cpi> metering spot 192.168.0.1
+        cpi> metering backlit 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a mode')
+        arg = arg.split(' ', 1)
+        self.client.metering(
+            arg[0].lower(),
+            addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_metering(self, text, line, start, finish):
+        cmd_re = re.compile(r'metering(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('mode') < finish <= match.end('mode'):
+            modes = [
+                'average',
+                'backlit',
+                'matrix',
+                'spot',
+                ]
+            return [
+                mode
+                for mode in modes
+                if mode.startswith(text)
+                ]
+
+    def do_iso(self, arg):
+        """
+        Sets the ISO value on the defined servers.
+
+        Syntax: iso <value> [addresses]
+
+        The 'iso' command is used to set the emulated ISO value of the camera
+        on all or some of the defined servers. The value can be specified as an
+        integer number between 0 and 1600, or 'auto' which leaves the camera to
+        determine the optimal ISO value.
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status, exposure.
+
+        cpi> iso auto
+        cpi> iso 100 192.168.0.1
+        cpi> iso 800 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify an ISO value')
+        arg = arg.split(' ', 1)
+        if arg[0].lower() == 'auto':
+            iso = 0
+        else:
+            try:
+                iso = int(arg[0])
+            except ValueError:
+                raise CmdSyntaxError('Invalid ISO value "%s"' % arg[0])
+        self.client.iso(
+            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_iso(self, text, line, start, finish):
+        cmd_re = re.compile(r'iso(?P<value> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('value') < finish <= match.end('value'):
+            # Some common ISO values; this list isn't intended to be
+            # exhaustive, just useful for completion
+            values = [
+                'auto',
+                '100',
+                '200',
+                '400',
+                '800',
+                '1600',
+                ]
+            return [
+                value
+                for value in values
+                if value.startswith(text)
+                ]
+
+    def do_levels(self, arg):
+        """
+        Sets the brightness, contrast, and saturation on the defined servers.
+
+        Syntax: levels <brightness> <contrast> <saturation> [addresses]
+
+        The 'levels' command is used to simultaneously set the brightness,
+        contrast, and saturation levels on all or some of the defined servers.
+        Each level is specified as an integer number between 0 and 100. The
+        default for each level is 50.
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status.
+
+        cpi> levels 50 50 50
+        cpi> levels 70 50 50 192.168.0.1
+        cpi> levels 40 60 70 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify any levels')
+        arg = arg.split(' ', 3)
+        values = {}
+        for index, name in enumerate(('brightness', 'contrast', 'saturation')):
+            try:
+                value = int(arg[index])
+                if not (0 <= value <= 100):
+                    raise ValueError('Out of range')
+            except ValueError:
+                raise CmdSyntaxError('Invalid %s "%s"' % (name, arg[index]))
+            if index > 0:
+                # Contrast and saturation are actually from -100..100, but
+                # we're keeping the interface simple...
+                values[name] = (value * 2) - 100
+            else:
+                values[name] = value
+        self.client.flip(
+            values['brightness'], values['contrast'], values['saturation'],
+            self.parse_arg(arg[3] if len(arg) > 3 else None))
+
+    def complete_levels(self, text, line, start, finish):
+        cmd_re = re.compile(r'levels(?P<values>( +[^ ]+){,3}(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('values') < finish <= match.end('values'):
+            # No completions for levels
+            return []
+
+    def do_flip(self, arg):
+        """
+        Sets the picture orientation on the defined servers.
+
+        Syntax: flip <value> [addresses]
+
+        The 'flip' command is used to set the picture orientation on all or
+        some of the defined servers. The following values can be specified:
+
+        none, horizontal, vertical, both
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status.
+
+        cpi> flip none
+        cpi> flip vertical 192.168.0.1
+        cpi> flip both 192.168.0.1-192.168.0.10
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify an orientation')
+        arg = arg.split(' ', 1)
+        try:
+            hflip, vflip = {
+                'none':       (False, False),
+                'horizontal': (True,  False),
+                'horz':       (True,  False),
+                'vertical':   (False, True),
+                'vert':       (False, True),
+                'both':       (True,  True),
+                }[arg[0].lower()]
+        except KeyError:
+            raise CmdSyntaxError('Invalid orientation "%s"' % arg[0])
+        self.client.flip(
+            hflip, vflip, self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_flip(self, text, line, start, finish):
+        cmd_re = re.compile(r'flip(?P<value> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('value') < finish <= match.end('value'):
+            values = [
+                'none',
+                'horizontal',
+                'vertical',
+                'both',
+                ]
+            return [
+                value
+                for value in values
+                if value.startswith(text)
                 ]
 
     def do_capture(self, arg=''):

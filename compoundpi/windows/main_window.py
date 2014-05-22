@@ -31,6 +31,7 @@ import io
 import os
 import shutil
 import bisect
+from fractions import Fraction
 from collections import defaultdict, OrderedDict
 
 import netifaces
@@ -252,17 +253,80 @@ Project homepage is at
             self.settings.endGroup()
 
     def servers_configure(self):
+        settings = {
+            attr: set(getattr(status, attr) for (addr, status) in self.selected_servers)
+            for attr in (
+                'resolution',
+                'framerate',
+                'shutter_speed',
+                'awb_mode',
+                'exposure_mode',
+                'exposure_compensation',
+                'iso',
+                'metering_mode',
+                'brightness',
+                'contrast',
+                'saturation',
+                'hflip',
+                'vflip',
+                )}
+        settings = {
+            attr: values.pop() if len(values) == 1 else None
+            for (attr, values) in settings.items()
+            }
         dialog = ConfigureDialog(self)
-        resolutions = set(status.resolution for (addr, status) in self.selected_servers)
-        framerates = set(status.framerate for (addr, status) in self.selected_servers)
-        dialog.resolution = resolutions.pop() if len(resolutions) == 1 else None
-        dialog.framerate = framerates.pop() if len(framerates) == 1 else None
+        for attr, value in settings.items():
+            setattr(dialog, attr, value)
         if dialog.exec_():
-            self.client.resolution(
-                    *dialog.resolution, addresses=self.selected_addresses)
-            self.client.framerate(
-                    dialog.framerate, addresses=self.selected_addresses)
-            self.ui.server_list.model().refresh_selected(update=True)
+            try:
+                if dialog.resolution != settings['resolution']:
+                    self.client.resolution(
+                            *dialog.resolution,
+                            addresses=self.selected_addresses)
+                if dialog.framerate != settings['framerate']:
+                    self.client.framerate(
+                            dialog.framerate,
+                            addresses=self.selected_addresses)
+                if dialog.shutter_speed != settings['shutter_speed']:
+                    self.client.shutter_speed(
+                            dialog.shutter_speed,
+                            addresses=self.selected_addresses)
+                if dialog.awb_mode != settings['awb_mode']:
+                    self.client.awb(
+                            dialog.awb,
+                            addresses=self.selected_addresses)
+                if (
+                        dialog.exposure_mode != settings['exposure_mode'] or
+                        dialog.exposure_compensation != settings['exposure_compensation']
+                        ):
+                    self.client.exposure(
+                            dialog.exposure_mode, dialog.exposure_compensation,
+                            addresses=self.selected_addresses)
+                if dialog.metering_mode != settings['metering_mode']:
+                    self.client.metering(
+                            dialog.metering_mode,
+                            addresses=self.selected_addresses)
+                if dialog.iso != settings['iso']:
+                    self.client.iso(
+                            dialog.iso,
+                            addresses=self.selected_addresses)
+                if (
+                        dialog.brightness != settings['brightness'] or
+                        dialog.contrast != settings['contrast'] or
+                        dialog.saturation != settings['saturation']
+                        ):
+                    self.client.levels(
+                            dialog.brightness, dialog.contrast, dialog.saturation,
+                            addresses=self.selected_addresses)
+                if (
+                        dialog.hflip != settings['hflip'] or
+                        dialog.vflip != settings['vflip']
+                        ):
+                    self.client.flip(
+                            dialog.hflip, dialog.vflip,
+                            addresses=self.selected_addresses)
+            finally:
+                self.ui.server_list.model().refresh_selected(update=True)
 
     def images_copy(self):
         _, _, _, stream = self.selected_images[0]
@@ -447,14 +511,28 @@ class ServersModel(QtCore.QAbstractTableModel):
             parent = QtCore.QModelIndex()
         if parent.isValid():
             return 0
-        return 4
+        return 9
 
     def data(self, index, role):
         if index.isValid() and role == QtCore.Qt.DisplayRole:
             (address, status) = self._data[index.row()]
             return [
                 str(address),
-                '%dx%d@%s' % (status.resolution[0], status.resolution[1], status.framerate),
+                '%dx%d@%sfps' % (status.resolution[0], status.resolution[1], status.framerate),
+                'auto' if status.shutter_speed == 0 else '%.2fms' % (status.shutter_speed / 1000),
+                status.awb_mode,
+                '%s (%s%s stops)' % (
+                    status.exposure_mode,
+                    '+' if status.exposure_compensation >= 0 else '',
+                    Fraction(status.exposure_compensation, 6)
+                    ),
+                status.metering_mode,
+                (
+                    'both' if status.vflip and status.hflip else
+                    'vert' if status.vflip else
+                    'horz' if status.hflip else
+                    'none'
+                    ),
                 status.timestamp.strftime('%Y-%m-%d %H:%M:%S.%f'),
                 str(len(self.parent.images[address])),
                 ][index.column()]
@@ -464,6 +542,11 @@ class ServersModel(QtCore.QAbstractTableModel):
             return [
                 'Address',
                 'Mode',
+                'Shutter',
+                'AWB',
+                'Exposure',
+                'Metering',
+                'Flip',
                 'Time',
                 'Images',
                 ][section]

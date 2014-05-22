@@ -222,16 +222,23 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 params = ()
             try:
                 handler = {
-                    'HELLO':       self.do_hello,
-                    'ACK':         self.do_ack,
-                    'STATUS':      self.do_status,
-                    'RESOLUTION':  self.do_resolution,
-                    'FRAMERATE':   self.do_framerate,
-                    'CAPTURE':     self.do_capture,
-                    'SEND':        self.do_send,
-                    'LIST':        self.do_list,
-                    'CLEAR':       self.do_clear,
-                    'BLINK':       self.do_blink,
+                    'HELLO':        self.do_hello,
+                    'ACK':          self.do_ack,
+                    'STATUS':       self.do_status,
+                    'RESOLUTION':   self.do_resolution,
+                    'FRAMERATE':    self.do_framerate,
+                    'SHUTTERSPEED': self.do_shutter_speed,
+                    'AWB':          self.do_awb,
+                    'EXPOSURE':     self.do_exposure,
+                    'METERING':     self.do_metering,
+                    'ISO':          self.do_iso,
+                    'LEVELS':       self.do_levels,
+                    'FLIP':         self.do_flip,
+                    'CAPTURE':      self.do_capture,
+                    'SEND':         self.do_send,
+                    'LIST':         self.do_list,
+                    'CLEAR':        self.do_clear,
+                    'BLINK':        self.do_blink,
                     }[command]
             except KeyError:
                 raise ValueError('Unknown command %s' % command)
@@ -308,11 +315,29 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         return (
             'RESOLUTION {width} {height}\n'
             'FRAMERATE {framerate}\n'
+            'SHUTTERSPEED {shutter_speed}\n'
+            'AWB {awb_mode}\n'
+            'EXPOSURE {exposure_mode} {exposure_compensation}\n'
+            'ISO {iso}\n'
+            'METERING {meter_mode}\n'
+            'LEVELS {brightness} {contrast} {saturation}\n'
+            'FLIP {hflip} {vflip}\n'
             'TIMESTAMP {timestamp}\n'
             'IMAGES {images}\n'.format(
                 width=self.server.camera.resolution[0],
                 height=self.server.camera.resolution[1],
                 framerate=self.server.camera.framerate,
+                shutter_speed=self.server.camera.shutter_speed,
+                awb_mode=self.server.camera.awb_mode,
+                exposure_mode=self.server.camera.exposure_mode,
+                exposure_compensation=self.server.camera.exposure_compensation,
+                iso=self.server.camera.ISO,
+                meter_mode=self.server.camera.meter_mode,
+                brightness=self.server.camera.brightness,
+                contrast=self.server.camera.contrast,
+                saturation=self.server.camera.saturation,
+                hflip=int(self.server.camera.hflip),
+                vflip=int(self.server.camera.vflip),
                 timestamp=time.time(),
                 images=len(self.server.images),
                 ))
@@ -326,6 +351,65 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         rate = fractions.Fraction(rate)
         logging.info('Changing camera framerate to %.2ffps', rate)
         self.server.camera.framerate = rate
+
+    def do_shutter_speed(self, speed):
+        speed = int(speed)
+        logging.info('Changing camera shutter speed to %.4fms', speed / 1000)
+        self.server.camera.shutter_speed = speed
+
+    def do_awb(self, mode, red=0.0, blue=0.0):
+        red = float(red)
+        blue = float(blue)
+        logging.info('Changing camera AWB mode to %s', mode)
+        self.server.camera.awb_mode = mode
+        if mode == 'off':
+            logging.info('Changing camera AWB gains to %.2f, %.2f', red, blue)
+            self.server.camera.awb_gains = (red, blue)
+
+    def do_exposure(self, mode, compensation):
+        compensation = int(compensation)
+        logging.info('Changing camera exposure mode to %s', mode)
+        self.server.camera.exposure_mode = mode
+        logging.info('Changing camera exposure compensation to %d', compensation)
+        self.server.camera.exposure_compensation = compensation
+
+    def do_metering(self, mode):
+        logging.info('Changing camera metering mode to %s', mode)
+        self.server.camera.meter_mode = mode
+
+    def do_iso(self, iso):
+        iso = int(iso)
+        logging.info('Changing camera ISO to %d', iso)
+        self.server.camera.iso = iso
+
+    def do_levels(self, brightness, contrast, saturation):
+        brightness = int(brightness)
+        contrast = int(contrast)
+        saturation = int(saturation)
+        logging.info('Changing camera brightness to %d', brightness)
+        self.server.camera.brightness = brightness
+        logging.info('Changing camera contrast to %d', contrast)
+        self.server.camera.contrast = contrast
+        logging.info('Changing camera saturation to %d', saturation)
+        self.server.camera.saturation = saturation
+
+    def do_contrast(self, value):
+        value = int(value)
+        logging.info('Changing camera contrast to %d', value)
+        self.server.camera.contrast = value
+
+    def do_saturation(self, value):
+        value = int(value)
+        logging.info('Changing camera saturation to %d', value)
+        self.server.camera.saturation = value
+
+    def do_flip(self, horizontal, vertical):
+        horizontal = bool(int(horizontal))
+        vertical = bool(int(vertical))
+        logging.info('Changing camera horizontal flip to %s', horizontal)
+        self.server.camera.hflip = horizontal
+        logging.info('Changing camera vertical flip to %s', vertical)
+        self.server.camera.vflip = vertical
 
     def stream_generator(self, count):
         for i in range(count):

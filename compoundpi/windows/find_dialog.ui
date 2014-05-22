@@ -68,6 +68,9 @@
        <property name="toolTip">
         <string>Specify how many Compound Pi servers you have, or 0 if you are unsure</string>
        </property>
+       <property name="specialValueText">
+        <string>unknown</string>
+       </property>
        <property name="suffix">
         <string> servers</string>
        </property>
@@ -123,8 +126,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>227</x>
-     <y>124</y>
+     <x>236</x>
+     <y>169</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -139,8 +142,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>295</x>
-     <y>130</y>
+     <x>304</x>
+     <y>169</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>

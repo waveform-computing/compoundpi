@@ -77,6 +77,17 @@ class Resolution(namedtuple('Resolution', ('width', 'height'))):
 CompoundPiStatus = namedtuple('CompoundPiStatus', (
     'resolution',
     'framerate',
+    'shutter_speed',
+    'awb_mode',
+    'exposure_mode',
+    'exposure_compensation',
+    'iso',
+    'metering_mode',
+    'brightness',
+    'contrast',
+    'saturation',
+    'hflip',
+    'vflip',
     'timestamp',
     'images',
     ))
@@ -303,6 +314,13 @@ class CompoundPiClient(object):
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
+            r'SHUTTERSPEED (?P<speed>\d+(\.\d+)?)\n'
+            r'AWB (?P<awb_mode>[a-z]+)\n'
+            r'EXPOSURE (?P<exposure_mode>[a-z]+) (?P<exposure_compensation>\d+)\n'
+            r'ISO (?P<iso>\d+)\n'
+            r'METERING (?P<metering_mode>[a-z]+)\n'
+            r'LEVELS (?P<brightness>\d+) (?P<contrast>\d+) (?P<saturation>\d+)\n'
+            r'FLIP (?P<hflip>0|1) (?P<vflip>0|1)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
             r'IMAGES (?P<images>\d{,3})\n')
     def status(self, addresses=None):
@@ -317,10 +335,21 @@ class CompoundPiClient(object):
                 errors.append(CompoundPiInvalidResponse(address))
             else:
                 result[address] = CompoundPiStatus(
-                    Resolution(int(match.group('width')), int(match.group('height'))),
-                    Fraction(match.group('rate')),
-                    datetime.datetime.fromtimestamp(float(match.group('time'))),
-                    int(match.group('images')),
+                    resolution=Resolution(int(match.group('width')), int(match.group('height'))),
+                    framerate=Fraction(match.group('rate')),
+                    shutter_speed=float(match.group('speed')),
+                    awb_mode=match.group('awb_mode'),
+                    exposure_mode=match.group('exposure_mode'),
+                    exposure_compensation=int(match.group('exposure_compensation')),
+                    iso=int(match.group('iso')),
+                    metering_mode=match.group('metering_mode'),
+                    brightness=int(match.group('brightness')),
+                    contrast=int(match.group('contrast')),
+                    saturation=int(match.group('saturation')),
+                    hflip=bool(int(match.group('hflip'))),
+                    vflip=bool(int(match.group('vflip'))),
+                    timestamp=datetime.datetime.fromtimestamp(float(match.group('time'))),
+                    images=int(match.group('images')),
                     )
         if errors:
             raise CompoundPiTransactionFailed(
@@ -332,6 +361,27 @@ class CompoundPiClient(object):
 
     def framerate(self, rate, addresses=None):
         self._transact('FRAMERATE %s' % rate, addresses)
+
+    def shutter_speed(self, speed, addresses=None):
+        self._transact('SHUTTERSPEED %d' % speed, addresses)
+
+    def awb(self, mode, red=0.0, blue=0.0, addresses=None):
+        self._transact('AWB %s %f %f' % (mode, red, blue), addresses)
+
+    def exposure(self, mode, compensation=0, addresses=None):
+        self._transact('EXPOSURE %s %d' % (mode, compensation), addresses)
+
+    def metering(self, mode, addresses=None):
+        self._transact('METERING %s' % mode, addresses)
+
+    def iso(self, value, addresses=None):
+        self._transact('ISO %d' % value, addresses)
+
+    def levels(self, brightness, contrast, saturation, addresses=None):
+        self._transact('LEVELS %d %d %d' % (brightness, contrast, saturation), addresses)
+
+    def flip(self, horizontal, vertical, addresses=None):
+        self._transact('FLIP %d %d' % (horizontal, vertical), addresses)
 
     def capture(self, count=1, video_port=False, delay=None, addresses=None):
         cmd = 'CAPTURE %d %d'
