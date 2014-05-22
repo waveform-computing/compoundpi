@@ -47,6 +47,7 @@ import warnings
 
 import daemon
 import daemon.runner
+import picamera
 import RPi.GPIO as GPIO
 
 from . import __version__
@@ -126,6 +127,9 @@ class CompoundPiServer(TerminalApplication):
             '(default: %(default)s)')
 
     def main(self, args):
+        warnings.showwarning = self.showwarning
+        warnings.filterwarnings('ignore', category=CompoundPiStaleSequence)
+        warnings.filterwarnings('ignore', category=CompoundPiStaleClientTime)
         pidfile = daemon.runner.make_pidlockfile(args.pidfile, 5)
         if daemon.runner.is_pidfile_stale(pidfile):
             pidfile.break_lock()
@@ -160,10 +164,6 @@ class CompoundPiServer(TerminalApplication):
                 ):
             # seed the random number generator from the system clock
             random.seed()
-            # picamera has to be imported here (currently) partly because the
-            # camera doesn't like forks after initialization, and partly
-            # because the author stupidly runs bcm_host_init on module import
-            import picamera
             logging.info('Initializing camera')
             self.server.seqno = 0
             self.server.client_address = None
@@ -182,6 +182,10 @@ class CompoundPiServer(TerminalApplication):
                 logging.info('Closing camera')
                 self.server.camera.close()
         logging.info('Exiting daemon context')
+
+    def showwarning(self, message, category, filename, lineno, file=None,
+            line=None):
+        logging.warning(str(message))
 
     def terminate(self, signum, frame):
         logging.info('Recevied SIGTERM signal')
