@@ -1,4 +1,7 @@
 prune debian
 prune docs
+prune icons
+prune etc
 include README.rst
 include LICENSE.txt
+recursive-include compoundpi/windows *.ui *.png *.svg

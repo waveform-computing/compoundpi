@@ -180,5 +180,5 @@ upload-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	dput waveform-ppa dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
 	git push --tags
 
-.PHONY: all install develop test doc source egg zip tar deb dist clean tags release-pi release-ubuntu upload-pi upload-ubuntu
+.PHONY: all install develop test doc source egg zip tar deb dist clean tags release-pi release-ubuntu upload-pi upload-ubuntu $(SUBDIRS)
 

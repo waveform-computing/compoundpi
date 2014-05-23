@@ -20,7 +20,9 @@ override_dh_auto_install:
 	# Strip out binaries as necessary
 	rm debian/compoundpi-common/usr/bin/cpi
 	rm debian/compoundpi-common/usr/bin/cpid
+	rm debian/compoundpi-common/usr/bin/cpigui
 	rm debian/compoundpi-server/usr/bin/cpi
+	rm debian/compoundpi-server/usr/bin/cpigui
 	rm debian/compoundpi-client/usr/bin/cpid
 	# Correct path of cpid to /usr/sbin
 	mv debian/compoundpi-server/usr/bin debian/compoundpi-server/usr/sbin

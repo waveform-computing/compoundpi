@@ -5,6 +5,18 @@ Change log
 ==========
 
 
+Release 0.3 (2014-05-23)
+========================
+
+Several major enhancements in this release:
+
+* A GUI client (cpigui) is now included. This is currently undocumented, but
+  should be pretty intuitive to anyone familiar with the command line
+  interface.
+* Both clients and the server now support many more camera settings including
+  white-balance, exposure, ISO, shutter speed, etc.
+
+
 Release 0.2 (2014-04-27)
 ========================
 
