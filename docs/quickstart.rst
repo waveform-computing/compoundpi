@@ -143,7 +143,7 @@ Testing the Servers
 Back on the Ubuntu client machine, execute :ref:`cpi` to run the client.
 You will be presented with a command line like the following::
 
-    CompoundPi Client
+    CompoundPi Client version 0.3
     Type "help" for more information, or "find" to locate Pi servers
     cpi>
 
@@ -162,6 +162,7 @@ Firstly, ensure that the network configuration is correct. The
     video_port    False
     time_delta    0.25
     output        /tmp
+    warnings      False
 
 Assuming we're using a typical home router which gives out addresses in the
 192.168.1.x network, this is incorrect. In order for broadcasts to work, the
@@ -182,6 +183,7 @@ network definition, use the :ref:`command_set` command::
     video_port    False
     time_delta    0.25
     output        /tmp
+    warnings      False
 
 To make permanent configuration changes, simply place them in a file named
 ``~/.cpi.ini`` like so::
@@ -209,13 +211,14 @@ server. If you only want to query a specific set of servers you can give their
 addresses as a parameter::
 
     cpi> status 192.168.1.154
-    Address        Resolution  Time                       #
-    -------------- ----------- -------------------------- -
-    192.168.80.154 1280x720@30 2014-04-26 13:44:53.400000 0
+    Address        Mode        Shutter AWB    Exp  Meter   Flip Time Delta     #
+    -------------- ----------- ------- ------ ---- ------- ---- -------------- -
+    192.168.80.154 1280x720@30 auto    auto   auto average none 0:00:00        0
 
-If any major discrepancies are detected (resolution, framerate, or timestamp),
-the status command should notify you of them. The maximum discrepancy permitted
-in the timestamp is configured with the ``time_delta`` configuration setting.
+If any major discrepancies are detected (resolution, framerate, timestamp,
+etc.), the status command should notify you of them. The maximum discrepancy
+permitted in the timestamp is configured with the ``time_delta`` configuration
+setting.
 
 To shoot an image, use the :ref:`command_capture` command::
 
@@ -230,6 +233,11 @@ Finally, to download the captured images from all Pis, simply use the
 
 You can use the :ref:`command_config` and :ref:`command_set` commands to
 configure capture options, the download target directory, and so on.
+
+Since version 0.3 a GUI client is also provided. The basic operations of the
+GUI client are essentially the same as the command line client, the only major
+difference being that download is performed automatically after capture. You
+can start the GUI client with the :ref:`cpigui` command.
 
 Troubleshooting
 ===============

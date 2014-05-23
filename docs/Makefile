@@ -6,10 +6,10 @@ SPHINXOPTS    =
 SPHINXBUILD   = sphinx-build
 PAPER         =
 BUILDDIR      = _build
-DOT_DIAGRAMS  = $(wildcard *.dot)
-MSC_DIAGRAMS  = $(wildcard *.mscgen)
-SVG_IMAGES    = $(DOT_DIAGRAMS:.dot=.svg) $(MSC_DIAGRAMS:.mscgen=.svg)
-PDF_IMAGES    = $(DOT_DIAGRAMS:.dot=.pdf) $(MSC_DIAGRAMS:.mscgen=.pdf)
+DOT_DIAGRAMS  := $(wildcard *.dot)
+MSC_DIAGRAMS  := $(wildcard *.mscgen)
+SVG_IMAGES    := $(DOT_DIAGRAMS:%.dot=%.svg) $(MSC_DIAGRAMS:%.mscgen=%.svg)
+PDF_IMAGES    := $(DOT_DIAGRAMS:%.dot=%.pdf) $(MSC_DIAGRAMS:%.mscgen=%.pdf)
 
 # User-friendly check for sphinx-build
 ifeq ($(shell which $(SPHINXBUILD) >/dev/null 2>&1; echo $$?), 1)
@@ -22,8 +22,6 @@ PAPEROPT_letter = -D latex_paper_size=letter
 ALLSPHINXOPTS   = -d $(BUILDDIR)/doctrees $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
 # the i18n builder cannot share the environment and doctrees with the others
 I18NSPHINXOPTS  = $(PAPEROPT_$(PAPER)) $(SPHINXOPTS) .
-
-.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest gettext
 
 help:
 	@echo "Please use \`make <target>' where <target> is one of"
@@ -58,12 +56,12 @@ html: $(SVG_IMAGES)
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/html."
 
-dirhtml:
+dirhtml: $(SVG_IMAGES)
 	$(SPHINXBUILD) -b dirhtml $(ALLSPHINXOPTS) $(BUILDDIR)/dirhtml
 	@echo
 	@echo "Build finished. The HTML pages are in $(BUILDDIR)/dirhtml."
 
-singlehtml:
+singlehtml: $(SVG_IMAGES)
 	$(SPHINXBUILD) -b singlehtml $(ALLSPHINXOPTS) $(BUILDDIR)/singlehtml
 	@echo
 	@echo "Build finished. The HTML page is in $(BUILDDIR)/singlehtml."
@@ -180,9 +178,11 @@ pseudoxml:
 	@echo
 	@echo "Build finished. The pseudo-XML files are in $(BUILDDIR)/pseudoxml."
 
-%.svg: %.msc
+%.svg: %.mscgen
 	mscgen -T svg -o $@ $<
 
-%.pdf: %.msc
+%.pdf: %.mscgen
 	mscgen -T eps -o - $< | ps2pdf -dEPSCrop - $@
+
+.PHONY: help clean html dirhtml singlehtml pickle json htmlhelp qthelp devhelp epub latex latexpdf text man changes linkcheck doctest gettext
 

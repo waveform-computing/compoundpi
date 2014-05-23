@@ -35,9 +35,9 @@ server3
 <line x1="375" y1="33" x2="365" y2="39" stroke="black"/>
 <line x1="75" y1="33" x2="525" y2="33" stroke="black"/>
 <line x1="525" y1="33" x2="515" y2="39" stroke="black"/>
-<polygon fill="white" points="279,23 320,23 320,32 279,32"/>
-<text x="280" y="32" textLength="39" font-family="Helvetica" font-size="12" fill="black">
-1 PING
+<polygon fill="white" points="217,23 382,23 382,32 217,32"/>
+<text x="218" y="32" textLength="163" font-family="Helvetica" font-size="12" fill="black">
+1 HELLO 1400803122.359911
 </text>
 <line x1="75" y1="50" x2="75" y2="78" stroke="black"/>
 <line x1="225" y1="50" x2="225" y2="78" stroke="black"/>

@@ -63,6 +63,40 @@ See also: :ref:`command_find`, :ref:`command_remove`, :ref:`command_servers`.
   cpi> add 192.168.0.1,192.168.0.5-192.168.0.10
 
 
+.. _command_awb:
+
+awb
+===
+
+**Syntax:** awb *mode* *[addresses]*
+
+The :ref:`command_awb` command is used to set the AWB mode of the camera on all
+or some of the defined servers. The mode can be one of the following:
+
+* auto
+* cloudy
+* flash
+* fluorescent
+* horizon
+* incandescent
+* shade
+* sunlight
+* tungsten
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`, :ref:`command_exposure`,
+:ref:`command_metering`.
+
+::
+
+    cpi> awb auto
+    cpi> awb fluorescent 192.168.0.1
+    cpi> awb sunlight 192.168.0.1-192.168.0.10
+
+
 .. _command_capture:
 
 capture
@@ -162,6 +196,44 @@ The :ref:`command_exit` command is used to terminate the application. You can
 also use the standard UNIX :kbd:`Ctrl+D` end of file sequence to quit.
 
 
+
+.. _command_exposure:
+
+exposure
+========
+
+**Syntax:** exposure *mode* *[addresses]*
+
+The :ref:`command_exposure` command is used to set the exposure mode of the
+camera on all or some of the defined servers. The mode can be one of the
+following:
+
+* antishake
+* auto
+* backlight
+* beach
+* fireworks
+* fixedfps
+* night
+* nightpreview
+* snow
+* sports
+* spotlight
+* verylong
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`, :ref:`command_awb`, :ref:`command_metering`.
+
+::
+
+    cpi> exposure auto
+    cpi> exposure night 192.168.0.1
+    cpi> exposure backlight 192.168.0.1-192.168.0.10
+
+
 .. _command_find:
 
 find
@@ -180,6 +252,34 @@ See also: :ref:`command_add`, :ref:`command_remove`, :ref:`command_servers`,
 
   cpi> find
   cpi> find 20
+
+
+.. _command_flip:
+
+flip
+====
+
+**Syntax:** flip *value* *[addresses]*
+
+The :ref:`command_flip` command is used to set the picture orientation on all
+or some of the defined servers. The following values can be specified:
+
+* none
+* horizontal
+* vertical
+* both
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`.
+
+::
+
+    cpi> flip none
+    cpi> flip vertical 192.168.0.1
+    cpi> flip both 192.168.0.1-192.168.0.10
 
 
 .. _command_framerate:
@@ -243,6 +343,85 @@ See also: :ref:`command_find`.
   cpi> identify
   cpi> identify 192.168.0.1
   cpi> identify 192.168.0.3-192.168.0.5
+
+
+.. _command_iso:
+
+iso
+===
+
+**Syntax:** iso *value* *[addresses]*
+
+The :ref:`command_iso` command is used to set the emulated ISO value of the
+camera on all or some of the defined servers. The value can be specified as an
+integer number between 0 and 1600, or ``auto`` which leaves the camera to
+determine the optimal ISO value.
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`, :ref:`command_exposure`.
+
+::
+
+    cpi> iso auto
+    cpi> iso 100 192.168.0.1
+    cpi> iso 800 192.168.0.1-192.168.0.10
+
+
+.. _command_levels:
+
+levels
+======
+
+**Syntax:** levels *brightness* *contrast* *saturation* *[addresses]*
+
+The :ref:`command_levels` command is used to simultaneously set the brightness,
+contrast, and saturation levels on all or some of the defined servers.  Each
+level is specified as an integer number between 0 and 100. The default for each
+level is 50.
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`.
+
+::
+
+    cpi> levels 50 50 50
+    cpi> levels 70 50 50 192.168.0.1
+    cpi> levels 40 60 70 192.168.0.1-192.168.0.10
+
+
+.. _command_metering:
+
+metering
+========
+
+**Syntax:** metering *mode* *[addresses]*
+
+The :ref:`command_metering` command is used to set the metering mode of the
+camera on all or some of the defined servers. The mode can be one of the
+following:
+
+* average
+* backlit
+* matrix
+* spot
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`, :ref:`command_awb`, :ref:`command_exposure`.
+
+::
+
+    cpi> metering average
+    cpi> metering spot 192.168.0.1
+    cpi> metering backlit 192.168.0.1-192.168.0.10
 
 
 .. _command_quit:
@@ -338,6 +517,34 @@ See also: :ref:`command_config`.
   cpi> set timeout 10
   cpi> set output ~/Pictures/
   cpi> set capture_count 5
+
+
+.. _command_shutter:
+
+shutter
+=======
+
+**Syntax:** shutter *speed* *[addresses]*
+
+The :ref:`command_shutter` command is used to set the shutter speed of the
+camera on all or some of the defined servers. The speed can be specified as a
+floating-point number (in milli-seconds), or ``auto`` which leaves the camera
+to determine the shutter speed. The :ref:`command_framerate` of the camera
+limits the shutter speed that can be set. For example, if framerate is 30fps,
+then shutter speed cannot be slower than 33.333ms.
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`, :ref:`command_resolution`,
+:ref:`command_framerate`.
+
+::
+
+    cpi> shutter auto
+    cpi> shutter 33.333 192.168.0.1
+    cpi> shutter 100 192.168.0.1-192.168.0.10
 
 
 .. _command_status:

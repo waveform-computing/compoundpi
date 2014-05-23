@@ -1,10 +1,11 @@
 msc {
     client,server1,server2,server3;
 
-    client->* [label="2 PING"];
+    client->* [label="2 HELLO 1400803173.991651"];
     server1->client [label="2 OK"];
     server2-xclient [label="2 OK"];
     server3-xclient [label="2 OK"];
+    client->* [label="2 HELLO 1400803173.991651"];
     client->server1 [label="2 ACK"];
     ...;
     server2->client [label="2 OK"];

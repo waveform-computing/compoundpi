@@ -42,3 +42,8 @@ in all dependencies required by the client component::
 
     $ sudo pip install "compoundpi[client]"
 
+.. warning::
+
+    Currently, the version of client and server must match exactly. The client
+    will not work with a different version server (either older or newer).
+

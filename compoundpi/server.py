@@ -222,23 +222,23 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 params = ()
             try:
                 handler = {
-                    'HELLO':        self.do_hello,
                     'ACK':          self.do_ack,
-                    'STATUS':       self.do_status,
-                    'RESOLUTION':   self.do_resolution,
-                    'FRAMERATE':    self.do_framerate,
-                    'SHUTTERSPEED': self.do_shutter_speed,
                     'AWB':          self.do_awb,
+                    'BLINK':        self.do_blink,
+                    'CAPTURE':      self.do_capture,
+                    'CLEAR':        self.do_clear,
                     'EXPOSURE':     self.do_exposure,
-                    'METERING':     self.do_metering,
+                    'FLIP':         self.do_flip,
+                    'FRAMERATE':    self.do_framerate,
+                    'HELLO':        self.do_hello,
                     'ISO':          self.do_iso,
                     'LEVELS':       self.do_levels,
-                    'FLIP':         self.do_flip,
-                    'CAPTURE':      self.do_capture,
-                    'SEND':         self.do_send,
                     'LIST':         self.do_list,
-                    'CLEAR':        self.do_clear,
-                    'BLINK':        self.do_blink,
+                    'METERING':     self.do_metering,
+                    'RESOLUTION':   self.do_resolution,
+                    'SEND':         self.do_send,
+                    'SHUTTERSPEED': self.do_shutter_speed,
+                    'STATUS':       self.do_status,
                     }[command]
             except KeyError:
                 raise ValueError('Unknown command %s' % command)
