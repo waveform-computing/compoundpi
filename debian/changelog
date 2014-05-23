@@ -1,3 +1,9 @@
+compoundpi (0.3-1ubuntu1) precise; urgency=medium
+
+  * Ubuntu release of 0.3
+
+ -- Dave Hughes <dave@waveform.org.uk>  Fri, 23 May 2014 13:48:41 +0100
+
 compoundpi (0.2-1ubuntu1) precise; urgency=low
 
   * Ubuntu release of 0.2
