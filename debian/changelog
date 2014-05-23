@@ -1,3 +1,15 @@
+compoundpi (0.3-1) stable; urgency=low
+
+  * A GUI client (cpigui) is now included. This is currently undocumented, but
+    should be pretty intuitive to anyone familiar with the command line
+    interface (#3)
+  * Both clients and the server now support many more camera settings
+    including white-balance, exposure, ISO, shutter speed, etc (#12)
+  * All UDP messages (client and server) are now retried to ensure
+    reliability, particularly during multiple unicast messages (#13)
+
+ -- Dave Hughes <dave@waveform.org.uk>  Fri, 23 May 2014 18:38:43 +0100
+
 compoundpi (0.2-1ubuntu1) precise; urgency=low
 
   * Ubuntu release of 0.2
