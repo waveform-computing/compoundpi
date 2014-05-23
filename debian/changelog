@@ -1,3 +1,9 @@
+compoundpi (0.3-1ubuntu1) precise; urgency=medium
+
+  * Ubuntu release of 0.3
+
+ -- Dave Hughes <dave@waveform.org.uk>  Fri, 23 May 2014 19:14:02 +0100
+
 compoundpi (0.3-1) stable; urgency=low
 
   * A GUI client (cpigui) is now included. This is currently undocumented, but
