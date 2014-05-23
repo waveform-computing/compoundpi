@@ -1,0 +1,9 @@
+[Desktop Entry]
+Name=cpigui
+Comment=Control multiple Compound Pi camera servers
+Exec=cpigui
+Icon=cpigui
+Terminal=false
+Type=Application
+Categories=Graphics;Photography
+StartupNotify=true

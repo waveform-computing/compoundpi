@@ -45,6 +45,7 @@ DOC_SOURCES:=docs/conf.py \
 	$(wildcard docs/*.svg) \
 	$(wildcard docs/*.rst) \
 	$(wildcard docs/*.pdf)
+SUBDIRS:=icons $(NAME)/windows/fallback-theme
 
 # Calculate the name of all outputs
 DIST_EGG=dist/$(NAME)-$(VER)-$(PYVER).egg
@@ -76,7 +77,7 @@ all:
 	@echo "make release - Create and tag a new release"
 	@echo "make upload - Upload the new release to repositories"
 
-install:
+install: $(SUBDIRS)
 	$(PYTHON) $(PYFLAGS) setup.py install --root $(DEST_DIR)
 
 doc: $(DOC_SOURCES)
@@ -106,26 +107,32 @@ clean:
 	$(MAKE) -f $(CURDIR)/debian/rules clean
 	$(MAKE) -C docs clean
 	rm -fr build/ dist/ $(NAME).egg-info/ tags
+	for dir in $(SUBDIRS); do \
+		$(MAKE) -C $$dir clean; \
+	done
 	find $(CURDIR) -name "*.pyc" -delete
 
 tags: $(PY_SOURCES)
 	ctags -R --exclude="build/*" --exclude="debian/*" --exclude="docs/*" --languages="Python"
+
+$(SUBDIRS):
+	$(MAKE) -C $@
 
 $(MAN_PAGES): $(DOC_SOURCES)
 	$(PYTHON) $(PYFLAGS) setup.py build_sphinx -b man
 	mkdir -p man/
 	cp build/sphinx/man/*.1 man/
 
-$(DIST_TAR): $(PY_SOURCES)
+$(DIST_TAR): $(PY_SOURCES) $(SUBDIRS)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats gztar
 
-$(DIST_ZIP): $(PY_SOURCES)
+$(DIST_ZIP): $(PY_SOURCES) $(SUBDIRS)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats zip
 
-$(DIST_EGG): $(PY_SOURCES)
+$(DIST_EGG): $(PY_SOURCES) $(SUBDIRS)
 	$(PYTHON) $(PYFLAGS) setup.py bdist_egg
 
-$(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
+$(DIST_DEB): $(PY_SOURCES) $(SUBDIRS) $(DEB_SOURCES) $(MAN_PAGES)
 	# build the binary package in the parent directory then rename it to
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
@@ -134,7 +141,7 @@ $(DIST_DEB): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
 	mkdir -p dist/
 	for f in $(DIST_DEB); do cp ../$${f##*/} dist/; done
 
-$(DIST_DSC): $(PY_SOURCES) $(DEB_SOURCES) $(MAN_PAGES)
+$(DIST_DSC): $(PY_SOURCES) $(SUBDIRS) $(DEB_SOURCES) $(MAN_PAGES)
 	# build the source package in the parent directory then rename it to
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
