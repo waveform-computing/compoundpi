@@ -293,7 +293,7 @@ Project homepage is at
                             addresses=self.selected_addresses)
                 if dialog.awb_mode != settings['awb_mode']:
                     self.client.awb(
-                            dialog.awb,
+                            dialog.awb_mode,
                             addresses=self.selected_addresses)
                 if (
                         dialog.exposure_mode != settings['exposure_mode'] or

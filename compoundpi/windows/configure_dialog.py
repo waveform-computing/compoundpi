@@ -77,6 +77,7 @@ class ConfigureDialog(QtGui.QDialog):
             'spot',
             ]))
         # Connect up signals
+        self.ui.button_box.clicked.connect(self.button_box_clicked)
         self.ui.resolution_combo.editTextChanged.connect(self.edit_changed)
         self.ui.framerate_combo.editTextChanged.connect(self.edit_changed)
         self.ui.iso_combo.editTextChanged.connect(self.edit_changed)
@@ -239,6 +240,23 @@ class ConfigureDialog(QtGui.QDialog):
                     self.metering_mode and
                     self.hflip is not None and
                     self.vflip is not None))
+
+    def button_box_clicked(self, button):
+        if self.ui.button_box.standardButton(button) == QtGui.QDialogButtonBox.RestoreDefaults:
+            self.resolution = (1280, 720)
+            self.framerate = 30
+            self.shutter_speed = 0
+            self.awb_mode = 'auto'
+            self.exposure_mode = 'auto'
+            self.exposure_compensation = 0
+            self.iso = 0
+            self.metering_mode = 'average'
+            self.brightness = 50
+            self.contrast = 0
+            self.saturation = 0
+            self.hflip = False
+            self.vflip = False
+            self.update_ok()
 
 
 class ListModel(QtCore.QAbstractListModel):
