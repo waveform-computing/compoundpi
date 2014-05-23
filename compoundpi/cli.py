@@ -131,7 +131,7 @@ class CompoundPiClientApplication(TerminalApplication):
         self.parser.add_argument(
             '-p', '--port', type=service, default='5647', metavar='PORT',
             help='specifies the port that the servers are listening on '
-            '(default: %(default)d)')
+            '(default: %(default)s)')
         self.parser.add_argument(
             '-b', '--bind', type=address, default='0.0.0.0:5647', metavar='ADDRESS:PORT',
             help='specifies the address and port that the client listens on '
