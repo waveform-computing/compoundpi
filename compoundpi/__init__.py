@@ -4,8 +4,8 @@
 #
 # This file is part of compoundpi.
 #
-# compoundpi is free software: you can redistribute it and/or modify it under the
-# terms of the GNU General Public License as published by the Free Software
+# compoundpi is free software: you can redistribute it and/or modify it under
+# the terms of the GNU General Public License as published by the Free Software
 # Foundation, either version 3 of the License, or (at your option) any later
 # version.
 #
@@ -58,6 +58,8 @@ if sys.version_info[:2] == (3, 2):
 __classifiers__ = [
     'Development Status :: 4 - Beta',
     'Environment :: Console',
+    'Environment :: X11 Applications :: Qt',
+    'Environment :: No Input/Output (Daemon)',
     'Intended Audience :: Science/Research',
     'License :: OSI Approved :: GNU General Public License v3 or later (GPLv3+)',
     'Operating System :: POSIX',
