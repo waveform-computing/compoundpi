@@ -28,10 +28,9 @@ str = type('')
 
 from fractions import Fraction
 
-from PyQt4 import QtCore, QtGui, uic
-
 from . import get_ui_file
 from ..client import Resolution
+from ..qt import QtCore, QtGui, loadUi
 
 
 class ConfigureDialog(QtGui.QDialog):
@@ -39,7 +38,7 @@ class ConfigureDialog(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(ConfigureDialog, self).__init__(parent)
-        self.ui = uic.loadUi(get_ui_file('configure_dialog.ui'), self)
+        self.ui = loadUi(get_ui_file('configure_dialog.ui'), self)
         # Populate the combo lists
         self.ui.resolution_combo.setModel(ResolutionsModel())
         self.ui.framerate_combo.setModel(FrameratesModel())
@@ -201,7 +200,7 @@ class ConfigureDialog(QtGui.QDialog):
             }[self.ui.hflip_checkbox.checkState()]
     def _set_hflip(self, value):
         if value is None:
-            self.ui.hflip_checkbox.setTriState()
+            self.ui.hflip_checkbox.setTristate()
             self.ui.hflip_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
         else:
             self.ui.hflip_checkbox.setChecked(value)
@@ -215,7 +214,7 @@ class ConfigureDialog(QtGui.QDialog):
             }[self.ui.vflip_checkbox.checkState()]
     def _set_vflip(self, value):
         if value is None:
-            self.ui.vflip_checkbox.setTriState()
+            self.ui.vflip_checkbox.setTristate()
             self.ui.vflip_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
         else:
             self.ui.vflip_checkbox.setChecked(value)

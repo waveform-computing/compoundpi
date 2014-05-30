@@ -31,7 +31,7 @@ import io
 import os
 import sys
 
-from PyQt4 import QtCore, QtGui, uic
+from ..qt import QtCore, QtGui
 
 
 if getattr(sys, 'frozen', None):
@@ -65,7 +65,7 @@ else:
 
 def get_ui_file(ui_file):
     "Returns a file-like object for the specified .ui file"
-    return resource_stream(__name__, ui_file)
+    return resource_filename(__name__, ui_file)
 
 def get_icon(icon_id):
     "Returns an icon from the system theme or our fallback theme if required"

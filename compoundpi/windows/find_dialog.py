@@ -29,9 +29,9 @@ str = type('')
 import socket
 
 import netifaces
-from PyQt4 import QtCore, QtGui, uic
 
 from . import get_ui_file
+from ..qt import QtCore, QtGui, loadUi
 
 
 class FindDialog(QtGui.QDialog):
@@ -39,7 +39,7 @@ class FindDialog(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(FindDialog, self).__init__(parent)
-        self.ui = uic.loadUi(get_ui_file('find_dialog.ui'), self)
+        self.ui = loadUi(get_ui_file('find_dialog.ui'), self)
         # Populate the interface list
         for interface in sorted(netifaces.interfaces()):
             self.ui.interface_combo.addItem(interface)

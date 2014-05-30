@@ -26,9 +26,8 @@ from __future__ import (
     )
 str = type('')
 
-from PyQt4 import QtCore, QtGui, uic
-
 from . import get_ui_file
+from ..qt import QtCore, QtGui, loadUi
 
 
 class CaptureDialog(QtGui.QDialog):
@@ -36,7 +35,7 @@ class CaptureDialog(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(CaptureDialog, self).__init__(parent)
-        self.ui = uic.loadUi(get_ui_file('capture_dialog.ui'), self)
+        self.ui = loadUi(get_ui_file('capture_dialog.ui'), self)
 
     def _get_capture_count(self):
         return self.ui.count_spinbox.value()

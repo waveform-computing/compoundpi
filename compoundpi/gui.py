@@ -31,12 +31,9 @@ import atexit
 import warnings
 
 import pkg_resources
-import sip
-for api in ('QDate', 'QDateTime', 'QTime', 'QString', 'QTextStream', 'QUrl', 'QVariant'):
-    sip.setapi(api, 2)
-from PyQt4 import QtCore, QtGui
 
 from . import __version__
+from .qt import QtCore, QtGui
 from .windows.main_window import MainWindow
 from .exc import (
     CompoundPiBadResponse,

@@ -35,10 +35,10 @@ from fractions import Fraction
 from collections import defaultdict, OrderedDict
 
 import netifaces
-from PyQt4 import QtCore, QtGui, uic
 
 from . import get_icon, get_ui_file
 from ..client import CompoundPiClient
+from ..qt import QtCore, QtGui, loadUi
 from .find_dialog import FindDialog
 from .configure_dialog import ConfigureDialog
 from .capture_dialog import CaptureDialog
@@ -57,7 +57,7 @@ class MainWindow(QtGui.QMainWindow):
             self.progress_finish,
             ))
         self.images = defaultdict(OrderedDict)
-        self.ui = uic.loadUi(get_ui_file('main_window.ui'), self)
+        self.ui = loadUi(get_ui_file('main_window.ui'), self)
         # Read configuration
         self.settings = QtCore.QSettings()
         self.settings.beginGroup('window')
@@ -111,16 +111,19 @@ class MainWindow(QtGui.QMainWindow):
             self.server_list_model_reset)
         self.ui.server_list.model().dataChanged.connect(
             self.server_list_data_changed)
-        self.ui.server_list.selectionModel().selectionChanged.connect(
-            self.server_list_selection_changed)
+        # Workaround: PySide has a nasty bug causing a segfault without this
+        # intermediate model variable...
+        model = self.ui.server_list.selectionModel()
+        model.selectionChanged.connect(self.server_list_selection_changed)
         self.ui.server_list.customContextMenuRequested.connect(
             self.server_list_context_menu)
         self.ui.image_list.model().modelReset.connect(
             self.image_list_model_reset)
         self.ui.image_list.model().dataChanged.connect(
             self.image_list_data_changed)
-        self.ui.image_list.selectionModel().selectionChanged.connect(
-            self.image_list_selection_changed)
+        # Workaround: same as above
+        model = self.ui.image_list.selectionModel()
+        model.selectionChanged.connect(self.image_list_selection_changed)
         self.ui.image_list.customContextMenuRequested.connect(
             self.image_list_context_menu)
 
@@ -154,15 +157,15 @@ class MainWindow(QtGui.QMainWindow):
 
     def help_about(self):
         QtGui.QMessageBox.about(self,
-            str(self.tr('About {}')).format(
+            'About {}'.format(
                 QtGui.QApplication.instance().applicationName()),
-            str(self.tr("""\
+            """\
 <b>{application}</b>
 <p>Version {version}</p>
-<p>{application} is a GUI for interrogating an OxiTop OC110 Data Logger.
-Project homepage is at
+<p>{application} is a GUI for controlling multiple Compound Pi servers.
+The project homepage and documentation is at
 <a href="{url}">{url}</a></p>
-<p>Copyright &copy; 2012-2013 {author} &lt;<a href="mailto:{author_email}">{author_email}</a>&gt;</p>""")).format(
+<p>Copyright &copy; 2012-2013 {author} &lt;<a href="mailto:{author_email}">{author_email}</a>&gt;</p>""".format(
                 application=QtGui.QApplication.instance().applicationName(),
                 version=QtGui.QApplication.instance().applicationVersion(),
                 url='http://compoundpi.readthedocs.org/',
@@ -171,7 +174,7 @@ Project homepage is at
             ))
 
     def help_about_qt(self):
-        QtGui.QMessageBox.aboutQt(self, self.tr('About QT'))
+        QtGui.QMessageBox.aboutQt(self, 'About QT')
 
     def servers_find(self):
         dialog = FindDialog(self)

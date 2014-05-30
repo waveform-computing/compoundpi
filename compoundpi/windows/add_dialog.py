@@ -30,9 +30,9 @@ try:
     from ipaddress import IPv4Address
 except ImportError:
     from ipaddr import IPv4Address
-from PyQt4 import QtCore, QtGui, uic
 
 from . import get_ui_file
+from ..qt import QtCore, QtGui, loadUi
 
 
 class AddDialog(QtGui.QDialog):
@@ -40,7 +40,8 @@ class AddDialog(QtGui.QDialog):
 
     def __init__(self, parent=None):
         super(AddDialog, self).__init__(parent)
-        self.ui = uic.loadUi(get_ui_file('add_dialog.ui'), self)
+        self.ui = loadUi(get_ui_file('add_dialog.ui'), self)
+        # Connect up signals
         self.ui.server_edit.textChanged.connect(self.server_changed)
         self.update_ok()
 
