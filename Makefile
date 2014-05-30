@@ -121,7 +121,7 @@ $(SUBDIRS):
 $(MAN_PAGES): $(DOC_SOURCES)
 	$(PYTHON) $(PYFLAGS) setup.py build_sphinx -b man
 	mkdir -p man/
-	cp build/sphinx/man/*.1 man/
+	cp build/sphinx/man/*.[0-9] man/
 
 $(DIST_TAR): $(PY_SOURCES) $(SUBDIRS)
 	$(PYTHON) $(PYFLAGS) setup.py sdist --formats gztar

@@ -113,8 +113,9 @@ latex_documents = [
 # -- Options for manual page output ---------------------------------------
 
 man_pages = [
-        ('cpi',  'cpi',  'Compound Pi Client', [_setup.__author__], 1),
-        ('cpid', 'cpid', 'Compound Pi Daemon', [_setup.__author__], 1),
+        ('cpi',      'cpi',          'Compound Pi Client',           [_setup.__author__], 1),
+        ('cpid',     'cpid',         'Compound Pi Daemon',           [_setup.__author__], 1),
+        ('commands', 'cpi-commands', 'Compound Pi Client Commands',  [_setup.__author__], 7),
         ]
 
 #man_show_urls = False
