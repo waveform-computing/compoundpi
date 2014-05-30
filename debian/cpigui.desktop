@@ -1,5 +1,5 @@
 [Desktop Entry]
-Name=cpigui
+Name=Compound Pi Client
 Comment=Control multiple Compound Pi camera servers
 Exec=cpigui
 Icon=cpigui
