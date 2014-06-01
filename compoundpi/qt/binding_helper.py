@@ -167,7 +167,7 @@ def _load_pyqt(required_modules, optional_modules):
 
     # override specific function to improve compatibility between different
     # bindings
-    from QtGui import QFileDialog
+    from PyQt4.QtGui import QFileDialog
     QFileDialog.getOpenFileName = QFileDialog.getOpenFileNameAndFilter
     QFileDialog.getSaveFileName = QFileDialog.getSaveFileNameAndFilter
 
