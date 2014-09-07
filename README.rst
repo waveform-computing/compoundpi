@@ -9,10 +9,16 @@ This project provides a means for controlling multiple `cameras`_ attached to
 packets are utilized to permit near-simultaneous triggering of all attached
 cameras.
 
-The code is licensed under the `GPL v3`_ or above. Packages can be
-`downloaded`_ from PyPI. The `source code`_ can be obtained from GitHub, which
-also hosts the `bug tracker`_. The `documentation`_ (which includes
-installation and quick start examples) can be read on ReadTheDocs.
+Links
+=====
+
+* The code is licensed under the `GPL v3`_ or above
+* The `source code`_ can be obtained from GitHub, which also hosts the
+  `bug tracker`_
+* The `documentation`_ (which includes installation and quick start examples)
+  can be read on ReadTheDocs
+* Packages can be `downloaded`_ from PyPI, although reading the installation
+  instructions will probably be more useful
 
 .. _Raspberry Pis: http://www.raspberrypi.org/
 .. _cameras: http://www.raspberrypi.org/camera
