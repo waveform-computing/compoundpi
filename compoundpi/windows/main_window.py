@@ -261,9 +261,11 @@ The project homepage and documentation is at
             for attr in (
                 'resolution',
                 'framerate',
-                'shutter_speed',
                 'awb_mode',
+                'awb_red',
+                'awb_blue',
                 'exposure_mode',
+                'exposure_speed',
                 'exposure_compensation',
                 'iso',
                 'metering_mode',
@@ -290,20 +292,25 @@ The project homepage and documentation is at
                     self.client.framerate(
                             dialog.framerate,
                             addresses=self.selected_addresses)
-                if dialog.shutter_speed != settings['shutter_speed']:
-                    self.client.shutter_speed(
-                            dialog.shutter_speed,
-                            addresses=self.selected_addresses)
-                if dialog.awb_mode != settings['awb_mode']:
+                if (
+                        dialog.awb_mode != settings['awb_mode'] or
+                        dialog.awb_red != settings['awb_red'] or
+                        dialog.awb_blue != settings['awb_blue']
+                        ):
                     self.client.awb(
                             dialog.awb_mode,
+                            dialog.awb_red,
+                            dialog.awb_blue,
                             addresses=self.selected_addresses)
                 if (
                         dialog.exposure_mode != settings['exposure_mode'] or
+                        dialog.exposure_speed != settings['exposure_speed'] or
                         dialog.exposure_compensation != settings['exposure_compensation']
                         ):
                     self.client.exposure(
-                            dialog.exposure_mode, dialog.exposure_compensation,
+                            dialog.exposure_mode,
+                            dialog.exposure_speed,
+                            dialog.exposure_compensation,
                             addresses=self.selected_addresses)
                 if dialog.metering_mode != settings['metering_mode']:
                     self.client.metering(
@@ -514,20 +521,26 @@ class ServersModel(QtCore.QAbstractTableModel):
             parent = QtCore.QModelIndex()
         if parent.isValid():
             return 0
-        return 9
+        return 8
 
     def data(self, index, role):
         if index.isValid() and role == QtCore.Qt.DisplayRole:
             (address, status) = self._data[index.row()]
             return [
                 str(address),
-                '%dx%d@%sfps' % (status.resolution[0], status.resolution[1], status.framerate),
-                'auto' if status.shutter_speed == 0 else '%.2fms' % (status.shutter_speed / 1000),
-                status.awb_mode,
-                '%s (%s%s stops)' % (
+                '%dx%d@%sfps' % (
+                    status.resolution[0],
+                    status.resolution[1],
+                    status.framerate,
+                    ),
+                '%s (%.1f,%.1f)' % (
+                    status.awb_mode,
+                    status.awb_red,
+                    status.awb_blue,
+                    ),
+                '%s (%.2fms)' % (
                     status.exposure_mode,
-                    '+' if status.exposure_compensation >= 0 else '',
-                    Fraction(status.exposure_compensation, 6)
+                    status.exposure_speed,
                     ),
                 status.metering_mode,
                 (
@@ -545,7 +558,6 @@ class ServersModel(QtCore.QAbstractTableModel):
             return [
                 'Address',
                 'Mode',
-                'Shutter',
                 'AWB',
                 'Exposure',
                 'Metering',

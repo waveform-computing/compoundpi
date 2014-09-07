@@ -464,11 +464,6 @@ class CompoundPiCmd(Cmd):
     def complete_remove(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
 
-    status_re = re.compile(
-            r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
-            r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
-            r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
-            r'IMAGES (?P<images>\d{,3})\n')
     def do_status(self, arg=''):
         """
         Retrieves status from the defined servers.
@@ -485,18 +480,16 @@ class CompoundPiCmd(Cmd):
         """
         responses = self.client.status(self.parse_arg(arg))
         min_time = min(status.timestamp for status in responses.values())
-        min_speed = min(status.shutter_speed for status in responses.values())
         self.pprint_table(
             [
                 (
                     'Address',
                     'Mode',
-                    'Shutter',
                     'AWB',
                     'Exp',
                     'Meter',
                     'Flip',
-                    'Time Delta',
+                    'Clock',
                     '#',
                     )
             ] + [
@@ -507,12 +500,15 @@ class CompoundPiCmd(Cmd):
                         status.resolution.height,
                         status.framerate,
                         ),
-                    (
-                        'auto' if status.shutter_speed == 0 else
-                        '%.3fms' % (status.shutter_speed / 1000)
+                    '%s (%.1f,%.1f)' % (
+                        status.awb_mode,
+                        status.awb_red,
+                        status.awb_blue,
                         ),
-                    status.awb_mode,
-                    status.exposure_mode,
+                    '%s (%.2fms)' % (
+                        status.exposure_mode,
+                        status.exposure_speed,
+                        ),
                     status.metering_mode,
                     (
                         'both' if status.vflip and status.hflip else
@@ -563,10 +559,6 @@ class CompoundPiCmd(Cmd):
                 )) > 1:
             logging.warning('Warning: multiple orientations configured')
         for address, status in responses.items():
-            if (status.shutter_speed - min_speed) > 1000:
-                logging.warning(
-                    'Warning: shutter speed of %s deviates from min by >1ms',
-                    address)
             if (status.timestamp - min_time).total_seconds() > self.time_delta:
                 logging.warning(
                     'Warning: time delta of %s is >%.2fs',
@@ -701,77 +693,20 @@ class CompoundPiCmd(Cmd):
                 if framerate.startswith(text)
                 ]
 
-    def do_shutter(self, arg):
-        """
-        Sets the shutter speed on the defined servers.
-
-        Syntax: shutter <speed> [addresses]
-
-        The 'shutter' command is used to set the shutter speed of the camera on
-        all or some of the defined servers. The speed can be specified as a
-        floating-point number (in milli-seconds), or 'auto' which leaves the
-        camera to determine the shutter speed. The framerate of the camera
-        limits the shutter speed that can be set. For example, if framerate is
-        30fps, then shutter speed cannot be slower than 33.333ms.
-
-        If no address is specified then all currently defined servers will be
-        targetted. Multiple addresses can be specified with dash-separated
-        ranges, comma-separated lists, or any combination of the two.
-
-        See also: status, resolution, framerate.
-
-        cpi> shutter auto
-        cpi> shutter 33.333 192.168.0.1
-        cpi> shutter 100 192.168.0.1-192.168.0.10
-        """
-        if not arg:
-            raise CmdSyntaxError('You must specify a shutter speed')
-        arg = arg.split(' ', 1)
-        if arg[0].lower() == 'auto':
-            speed = 0
-        else:
-            try:
-                speed = int(float(arg[0]) * 1000)
-            except ValueError:
-                raise CmdSyntaxError('Invalid shutter speed "%s"' % arg[0])
-        self.client.shutter_speed(
-            speed, self.parse_arg(arg[1] if len(arg) > 1 else None))
-
-    def complete_shutter(self, text, line, start, finish):
-        cmd_re = re.compile(r'shutter(?P<speed> +[^ ]+(?P<addr> +.*)?)?')
-        match = cmd_re.match(line)
-        assert match
-        if match.start('addr') < finish <= match.end('addr'):
-            return self.complete_server(text, line, start, finish)
-        elif match.start('speed') < finish <= match.end('speed'):
-            # Some common shutter speeds; this list isn't intended to be
-            # exhaustive, just useful for completion
-            speeds = [
-                'auto',
-                '16.666',
-                '33.333',
-                '100',
-                '250',
-                '500',
-                '1000',
-                ]
-            return [
-                speed
-                for speed in speeds
-                if speed.startswith(text)
-                ]
-
     def do_awb(self, arg):
         """
         Sets the auto-white-balance (AWB) mode on the defined servers.
 
-        Syntax: awb <mode> [addresses]
+        Syntax: awb (<mode>|<red-gain>,<blue-gain>) [addresses]
 
         The 'awb' command is used to set the AWB mode of the camera on all or
         some of the defined servers. The mode can be one of the following:
 
         auto, cloudy, flash, fluorescent, horizon, incandescent, shade,
         sunlight, tungsten
+
+        Alternatively you can specify two comma-separated floating-point
+        numbers which specify the red and blue gains manually.
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
@@ -782,13 +717,24 @@ class CompoundPiCmd(Cmd):
         cpi> awb auto
         cpi> awb fluorescent 192.168.0.1
         cpi> awb sunlight 192.168.0.1-192.168.0.10
+        cpi> awb 1.8,1.5
+        cpi> awb 1.0,1.0 192.168.0.1
         """
         if not arg:
             raise CmdSyntaxError('You must specify a mode')
         arg = arg.split(' ', 1)
-        self.client.awb(
-            arg[0].lower(),
-            addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+        if re.match(r'[a-z]+', arg[0]):
+            self.client.awb(
+                arg[0].lower(),
+                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+        else:
+            try:
+                red_gain, blue_gain = (float(f) for f in arg[0].split(',', 1))
+            except ValueError:
+                raise CmdSyntaxError('Invalid red/blue gains: %s' % arg[0])
+            self.client.awb(
+                'off', red_gain, blue_gain,
+                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
 
     def complete_awb(self, text, line, start, finish):
         cmd_re = re.compile(r'awb(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
@@ -804,6 +750,7 @@ class CompoundPiCmd(Cmd):
                 'fluorescent',
                 'horizon',
                 'incandescent',
+                'off',
                 'shade',
                 'sunlight',
                 'tungsten',
@@ -818,7 +765,7 @@ class CompoundPiCmd(Cmd):
         """
         Sets the exposure mode on the defined servers.
 
-        Syntax: exposure <mode> [addresses]
+        Syntax: exposure (<mode>|<speed>) [addresses]
 
         The 'exposure' command is used to set the exposure mode of the camera
         on all or some of the defined servers. The mode can be one of the
@@ -826,6 +773,9 @@ class CompoundPiCmd(Cmd):
 
         antishake, auto, backlight, beach, fireworks, fixedfps, night,
         nightpreview, snow, sports, spotlight, verylong
+
+        Alternatively you can specify an exposure speed as a floating-point
+        number measured in ms.
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
@@ -840,9 +790,18 @@ class CompoundPiCmd(Cmd):
         if not arg:
             raise CmdSyntaxError('You must specify a mode')
         arg = arg.split(' ', 1)
-        self.client.exposure(
-            arg[0].lower(),
-            addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+        if re.match(r'[a-z]+', arg[0]):
+            self.client.exposure(
+                arg[0].lower(),
+                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+        else:
+            try:
+                speed = float(arg[0])
+            except ValueError:
+                raise CmdSyntaxError('Invalid exposure speed: %s' % arg[0])
+            self.client.exposure(
+                'off', speed,
+                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
 
     def complete_exposure(self, text, line, start, finish):
         cmd_re = re.compile(r'exposure(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
@@ -865,10 +824,18 @@ class CompoundPiCmd(Cmd):
                 'spotlight',
                 'verylong',
                 ]
+            speeds = [
+                '16.666',
+                '33.333',
+                '100',
+                '250',
+                '500',
+                '1000',
+                ]
             return [
-                mode
-                for mode in modes
-                if mode.startswith(text)
+                s
+                for s in modes + speeds
+                if s.startswith(text)
                 ]
 
     def do_metering(self, arg):

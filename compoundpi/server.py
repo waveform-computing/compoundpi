@@ -34,7 +34,6 @@ import re
 import pwd
 import grp
 import fractions
-import struct
 import time
 import random
 import logging
@@ -237,7 +236,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                     'METERING':     self.do_metering,
                     'RESOLUTION':   self.do_resolution,
                     'SEND':         self.do_send,
-                    'SHUTTERSPEED': self.do_shutter_speed,
                     'STATUS':       self.do_status,
                     }[command]
             except KeyError:
@@ -315,9 +313,8 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         return (
             'RESOLUTION {width} {height}\n'
             'FRAMERATE {framerate}\n'
-            'SHUTTERSPEED {shutter_speed}\n'
-            'AWB {awb_mode}\n'
-            'EXPOSURE {exposure_mode} {exposure_compensation}\n'
+            'AWB {awb_mode} {awb_red} {awb_blue}\n'
+            'EXPOSURE {exp_mode} {exp_speed} {exp_compensation}\n'
             'ISO {iso}\n'
             'METERING {meter_mode}\n'
             'LEVELS {brightness} {contrast} {saturation}\n'
@@ -329,8 +326,11 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 framerate=self.server.camera.framerate,
                 shutter_speed=self.server.camera.shutter_speed,
                 awb_mode=self.server.camera.awb_mode,
-                exposure_mode=self.server.camera.exposure_mode,
-                exposure_compensation=self.server.camera.exposure_compensation,
+                awb_red=self.server.camera.awb_gains[0],
+                awb_blue=self.server.camera.awb_gains[1],
+                exp_mode=self.server.camera.exposure_mode,
+                exp_speed=self.server.camera.exposure_speed / 1000.0,
+                exp_compensation=self.server.camera.exposure_compensation,
                 iso=self.server.camera.ISO,
                 meter_mode=self.server.camera.meter_mode,
                 brightness=self.server.camera.brightness,
@@ -352,11 +352,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         logging.info('Changing camera framerate to %.2ffps', rate)
         self.server.camera.framerate = rate
 
-    def do_shutter_speed(self, speed):
-        speed = int(speed)
-        logging.info('Changing camera shutter speed to %.4fms', speed / 1000)
-        self.server.camera.shutter_speed = speed
-
     def do_awb(self, mode, red=0.0, blue=0.0):
         red = float(red)
         blue = float(blue)
@@ -366,10 +361,12 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             logging.info('Changing camera AWB gains to %.2f, %.2f', red, blue)
             self.server.camera.awb_gains = (red, blue)
 
-    def do_exposure(self, mode, compensation):
+    def do_exposure(self, mode, speed, compensation):
         compensation = int(compensation)
         logging.info('Changing camera exposure mode to %s', mode)
         self.server.camera.exposure_mode = mode
+        logging.info('Changing camera exposure speed to %.4fms', speed)
+        self.server.camera.shutter_speed = int(speed * 1000)
         logging.info('Changing camera exposure compensation to %d', compensation)
         self.server.camera.exposure_compensation = compensation
 

@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>402</width>
-    <height>453</height>
+    <height>494</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -16,6 +16,9 @@
   <layout class="QVBoxLayout" name="verticalLayout">
    <item>
     <layout class="QFormLayout" name="form_layout">
+     <property name="fieldGrowthPolicy">
+      <enum>QFormLayout::AllNonFixedFieldsGrow</enum>
+     </property>
      <item row="0" column="0">
       <widget class="QLabel" name="resolution_label">
        <property name="text">
@@ -23,6 +26,13 @@
        </property>
        <property name="buddy">
         <cstring>resolution_combo</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="0" column="1">
+      <widget class="QComboBox" name="resolution_combo">
+       <property name="editable">
+        <bool>true</bool>
        </property>
       </widget>
      </item>
@@ -36,13 +46,6 @@
        </property>
       </widget>
      </item>
-     <item row="0" column="1">
-      <widget class="QComboBox" name="resolution_combo">
-       <property name="editable">
-        <bool>true</bool>
-       </property>
-      </widget>
-     </item>
      <item row="1" column="1">
       <widget class="QComboBox" name="framerate_combo">
        <property name="editable">
@@ -51,71 +54,6 @@
       </widget>
      </item>
      <item row="2" column="0">
-      <widget class="QLabel" name="shutter_speed_label">
-       <property name="text">
-        <string>Shutter speed</string>
-       </property>
-       <property name="buddy">
-        <cstring>shutter_speed_spinbox</cstring>
-       </property>
-      </widget>
-     </item>
-     <item row="2" column="1">
-      <widget class="QDoubleSpinBox" name="shutter_speed_spinbox">
-       <property name="specialValueText">
-        <string>auto</string>
-       </property>
-       <property name="suffix">
-        <string> ms</string>
-       </property>
-       <property name="decimals">
-        <number>4</number>
-       </property>
-       <property name="maximum">
-        <double>1000.000000000000000</double>
-       </property>
-       <property name="singleStep">
-        <double>10.000000000000000</double>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="0">
-      <widget class="QLabel" name="awb_label">
-       <property name="text">
-        <string>White balance</string>
-       </property>
-       <property name="buddy">
-        <cstring>awb_combo</cstring>
-       </property>
-      </widget>
-     </item>
-     <item row="3" column="1">
-      <widget class="QComboBox" name="awb_combo"/>
-     </item>
-     <item row="4" column="0">
-      <widget class="QLabel" name="exposure_mode_label">
-       <property name="text">
-        <string>Exposure</string>
-       </property>
-       <property name="buddy">
-        <cstring>exposure_mode_combo</cstring>
-       </property>
-      </widget>
-     </item>
-     <item row="4" column="1">
-      <widget class="QComboBox" name="exposure_mode_combo"/>
-     </item>
-     <item row="5" column="0">
-      <widget class="QLabel" name="exposure_comp_label">
-       <property name="text">
-        <string>Exposure comp.</string>
-       </property>
-       <property name="buddy">
-        <cstring>exposure_comp_slider</cstring>
-       </property>
-      </widget>
-     </item>
-     <item row="6" column="0">
       <widget class="QLabel" name="iso_label">
        <property name="text">
         <string>ISO</string>
@@ -125,14 +63,14 @@
        </property>
       </widget>
      </item>
-     <item row="6" column="1">
+     <item row="2" column="1">
       <widget class="QComboBox" name="iso_combo">
        <property name="editable">
         <bool>true</bool>
        </property>
       </widget>
      </item>
-     <item row="7" column="0">
+     <item row="3" column="0">
       <widget class="QLabel" name="metering_label">
        <property name="text">
         <string>Metering</string>
@@ -142,10 +80,196 @@
        </property>
       </widget>
      </item>
-     <item row="7" column="1">
+     <item row="3" column="1">
       <widget class="QComboBox" name="metering_combo"/>
      </item>
-     <item row="8" column="0">
+     <item row="4" column="0">
+      <widget class="QLabel" name="exposure_label">
+       <property name="text">
+        <string>Exposure</string>
+       </property>
+       <property name="buddy">
+        <cstring>exposure_auto_radio</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="4" column="1">
+      <layout class="QFormLayout" name="formLayout">
+       <item row="0" column="1">
+        <widget class="QComboBox" name="exposure_combo">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="MinimumExpanding" vsizetype="Fixed">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="0">
+        <widget class="QLabel" name="label_4">
+         <property name="text">
+          <string>Compensation</string>
+         </property>
+        </widget>
+       </item>
+       <item row="2" column="1">
+        <widget class="QSlider" name="exposure_comp_slider">
+         <property name="minimum">
+          <number>-24</number>
+         </property>
+         <property name="maximum">
+          <number>24</number>
+         </property>
+         <property name="pageStep">
+          <number>4</number>
+         </property>
+         <property name="orientation">
+          <enum>Qt::Horizontal</enum>
+         </property>
+         <property name="tickPosition">
+          <enum>QSlider::TicksBelow</enum>
+         </property>
+         <property name="tickInterval">
+          <number>6</number>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="0">
+        <widget class="QRadioButton" name="exposure_auto_radio">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Mode</string>
+         </property>
+         <property name="autoExclusive">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="0">
+        <widget class="QRadioButton" name="exposure_manual_radio">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Manual</string>
+         </property>
+         <property name="autoExclusive">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <widget class="QDoubleSpinBox" name="exposure_speed_spinbox">
+         <property name="suffix">
+          <string> ms</string>
+         </property>
+         <property name="decimals">
+          <number>4</number>
+         </property>
+         <property name="maximum">
+          <double>6000.000000000000000</double>
+         </property>
+         <property name="singleStep">
+          <double>10.000000000000000</double>
+         </property>
+        </widget>
+       </item>
+      </layout>
+     </item>
+     <item row="5" column="0">
+      <widget class="QLabel" name="awb_label">
+       <property name="text">
+        <string>White balance</string>
+       </property>
+       <property name="buddy">
+        <cstring>awb_auto_radio</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="5" column="1">
+      <layout class="QFormLayout" name="formLayout_2">
+       <item row="0" column="0">
+        <widget class="QRadioButton" name="awb_auto_radio">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Mode</string>
+         </property>
+         <property name="autoExclusive">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="0" column="1">
+        <widget class="QComboBox" name="awb_combo"/>
+       </item>
+       <item row="1" column="0">
+        <widget class="QRadioButton" name="awb_manual_radio">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Preferred">
+           <horstretch>0</horstretch>
+           <verstretch>0</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Manual</string>
+         </property>
+         <property name="autoExclusive">
+          <bool>false</bool>
+         </property>
+        </widget>
+       </item>
+       <item row="1" column="1">
+        <layout class="QHBoxLayout" name="horizontalLayout_2">
+         <item>
+          <widget class="QDoubleSpinBox" name="awb_red_spinbox">
+           <property name="prefix">
+            <string>Ar=</string>
+           </property>
+           <property name="decimals">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <double>8.000000000000000</double>
+           </property>
+           <property name="singleStep">
+            <double>0.100000000000000</double>
+           </property>
+          </widget>
+         </item>
+         <item>
+          <widget class="QDoubleSpinBox" name="awb_blue_spinbox">
+           <property name="prefix">
+            <string>Ab=</string>
+           </property>
+           <property name="decimals">
+            <number>1</number>
+           </property>
+           <property name="maximum">
+            <double>8.000000000000000</double>
+           </property>
+           <property name="singleStep">
+            <double>0.100000000000000</double>
+           </property>
+          </widget>
+         </item>
+        </layout>
+       </item>
+      </layout>
+     </item>
+     <item row="6" column="0">
       <widget class="QLabel" name="brightness_label">
        <property name="text">
         <string>Brightness</string>
@@ -155,7 +279,20 @@
        </property>
       </widget>
      </item>
-     <item row="9" column="0">
+     <item row="6" column="1">
+      <widget class="QSlider" name="brightness_slider">
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="value">
+        <number>50</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="7" column="0">
       <widget class="QLabel" name="contrast_label">
        <property name="text">
         <string>Contrast</string>
@@ -165,7 +302,23 @@
        </property>
       </widget>
      </item>
-     <item row="10" column="0">
+     <item row="7" column="1">
+      <widget class="QSlider" name="contrast_slider">
+       <property name="minimum">
+        <number>-100</number>
+       </property>
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="pageStep">
+        <number>20</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="8" column="0">
       <widget class="QLabel" name="saturation_label">
        <property name="text">
         <string>Saturation</string>
@@ -175,7 +328,23 @@
        </property>
       </widget>
      </item>
-     <item row="11" column="0">
+     <item row="8" column="1">
+      <widget class="QSlider" name="saturation_slider">
+       <property name="minimum">
+        <number>-100</number>
+       </property>
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="pageStep">
+        <number>20</number>
+       </property>
+       <property name="orientation">
+        <enum>Qt::Horizontal</enum>
+       </property>
+      </widget>
+     </item>
+     <item row="9" column="0">
       <widget class="QLabel" name="flip_label">
        <property name="text">
         <string>Flip</string>
@@ -185,7 +354,7 @@
        </property>
       </widget>
      </item>
-     <item row="11" column="1">
+     <item row="9" column="1">
       <layout class="QHBoxLayout" name="flip_layout">
        <item>
         <widget class="QCheckBox" name="hflip_checkbox">
@@ -202,73 +371,6 @@
         </widget>
        </item>
       </layout>
-     </item>
-     <item row="8" column="1">
-      <widget class="QSlider" name="brightness_slider">
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="value">
-        <number>50</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-      </widget>
-     </item>
-     <item row="9" column="1">
-      <widget class="QSlider" name="contrast_slider">
-       <property name="minimum">
-        <number>-100</number>
-       </property>
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="pageStep">
-        <number>20</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-      </widget>
-     </item>
-     <item row="10" column="1">
-      <widget class="QSlider" name="saturation_slider">
-       <property name="minimum">
-        <number>-100</number>
-       </property>
-       <property name="maximum">
-        <number>100</number>
-       </property>
-       <property name="pageStep">
-        <number>20</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-      </widget>
-     </item>
-     <item row="5" column="1">
-      <widget class="QSlider" name="exposure_comp_slider">
-       <property name="minimum">
-        <number>-24</number>
-       </property>
-       <property name="maximum">
-        <number>24</number>
-       </property>
-       <property name="pageStep">
-        <number>6</number>
-       </property>
-       <property name="orientation">
-        <enum>Qt::Horizontal</enum>
-       </property>
-       <property name="tickPosition">
-        <enum>QSlider::TicksBelow</enum>
-       </property>
-       <property name="tickInterval">
-        <number>6</number>
-       </property>
-      </widget>
      </item>
     </layout>
    </item>
@@ -287,12 +389,18 @@
  <tabstops>
   <tabstop>resolution_combo</tabstop>
   <tabstop>framerate_combo</tabstop>
-  <tabstop>shutter_speed_spinbox</tabstop>
-  <tabstop>awb_combo</tabstop>
-  <tabstop>exposure_mode_combo</tabstop>
-  <tabstop>exposure_comp_slider</tabstop>
   <tabstop>iso_combo</tabstop>
   <tabstop>metering_combo</tabstop>
+  <tabstop>exposure_auto_radio</tabstop>
+  <tabstop>exposure_combo</tabstop>
+  <tabstop>exposure_manual_radio</tabstop>
+  <tabstop>exposure_speed_spinbox</tabstop>
+  <tabstop>exposure_comp_slider</tabstop>
+  <tabstop>awb_auto_radio</tabstop>
+  <tabstop>awb_combo</tabstop>
+  <tabstop>awb_manual_radio</tabstop>
+  <tabstop>awb_red_spinbox</tabstop>
+  <tabstop>awb_blue_spinbox</tabstop>
   <tabstop>brightness_slider</tabstop>
   <tabstop>contrast_slider</tabstop>
   <tabstop>saturation_slider</tabstop>
@@ -309,8 +417,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>236</x>
-     <y>430</y>
+     <x>245</x>
+     <y>484</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -325,8 +433,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>304</x>
-     <y>430</y>
+     <x>313</x>
+     <y>484</y>
     </hint>
     <hint type="destinationlabel">
      <x>286</x>

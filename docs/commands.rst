@@ -68,7 +68,7 @@ See also: :ref:`command_find`, :ref:`command_remove`, :ref:`command_servers`.
 awb
 ===
 
-**Syntax:** awb *mode* *[addresses]*
+**Syntax:** awb (*mode* | *red_gain* *blue_gain*) *[addresses]*
 
 The :ref:`command_awb` command is used to set the AWB mode of the camera on all
 or some of the defined servers. The mode can be one of the following:
@@ -83,6 +83,11 @@ or some of the defined servers. The mode can be one of the following:
 * sunlight
 * tungsten
 
+Alternatively you can specify the red and blue gains of the camera manually
+as two floating point values. Valid gains for each channel are between 0.0
+and 8.0. Typical values are between 1.0 and 2.0 (for most scenes, red gain
+slightly exceeds blue gain, e.g. 1.6 and 1.2 respectively).
+
 If no address is specified then all currently defined servers will be
 targetted. Multiple addresses can be specified with dash-separated ranges,
 comma-separated lists, or any combination of the two.
@@ -93,7 +98,9 @@ See also: :ref:`command_status`, :ref:`command_exposure`,
 ::
 
     cpi> awb auto
+    cpi> awb 1.5 1.3
     cpi> awb fluorescent 192.168.0.1
+    cpi> awb 1.7 1.0 192.168.0.10
     cpi> awb sunlight 192.168.0.1-192.168.0.10
 
 
@@ -202,10 +209,10 @@ also use the standard UNIX :kbd:`Ctrl+D` end of file sequence to quit.
 exposure
 ========
 
-**Syntax:** exposure *mode* *[addresses]*
+**Syntax:** exposure *mode|speed* *[addresses]*
 
-The :ref:`command_exposure` command is used to set the exposure mode of the
-camera on all or some of the defined servers. The mode can be one of the
+The :ref:`command_exposure` command is used to set the exposure mode or speed
+of the camera on all or some of the defined servers. The mode can be one of the
 following:
 
 * antishake
@@ -221,6 +228,11 @@ following:
 * spotlight
 * verylong
 
+Alternatively you can specify an explicit exposure speed in milliseconds.  Note
+that the exposure speed is limited by the framerate. Hence, if the camera's
+framerate is currently 30fps then the exposure speed cannot be slower than
+33.333ms (1000/30). Adjust framerate prior to adjusting exposure speed.
+
 If no address is specified then all currently defined servers will be
 targetted. Multiple addresses can be specified with dash-separated ranges,
 comma-separated lists, or any combination of the two.
@@ -230,7 +242,9 @@ See also: :ref:`command_status`, :ref:`command_awb`, :ref:`command_metering`.
 ::
 
     cpi> exposure auto
+    cpi> exposure 33.33
     cpi> exposure night 192.168.0.1
+    cpi> exposure 60.00 192.168.0.10
     cpi> exposure backlight 192.168.0.1-192.168.0.10
 
 
@@ -517,34 +531,6 @@ See also: :ref:`command_config`.
   cpi> set timeout 10
   cpi> set output ~/Pictures/
   cpi> set capture_count 5
-
-
-.. _command_shutter:
-
-shutter
-=======
-
-**Syntax:** shutter *speed* *[addresses]*
-
-The :ref:`command_shutter` command is used to set the shutter speed of the
-camera on all or some of the defined servers. The speed can be specified as a
-floating-point number (in milli-seconds), or ``auto`` which leaves the camera
-to determine the shutter speed. The :ref:`command_framerate` of the camera
-limits the shutter speed that can be set. For example, if framerate is 30fps,
-then shutter speed cannot be slower than 33.333ms.
-
-If no address is specified then all currently defined servers will be
-targetted. Multiple addresses can be specified with dash-separated ranges,
-comma-separated lists, or any combination of the two.
-
-See also: :ref:`command_status`, :ref:`command_resolution`,
-:ref:`command_framerate`.
-
-::
-
-    cpi> shutter auto
-    cpi> shutter 33.333 192.168.0.1
-    cpi> shutter 100 192.168.0.1-192.168.0.10
 
 
 .. _command_status:

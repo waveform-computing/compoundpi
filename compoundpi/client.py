@@ -77,9 +77,11 @@ class Resolution(namedtuple('Resolution', ('width', 'height'))):
 CompoundPiStatus = namedtuple('CompoundPiStatus', (
     'resolution',
     'framerate',
-    'shutter_speed',
     'awb_mode',
+    'awb_red',
+    'awb_blue',
     'exposure_mode',
+    'exposure_speed',
     'exposure_compensation',
     'iso',
     'metering_mode',
@@ -314,9 +316,8 @@ class CompoundPiClient(object):
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
-            r'SHUTTERSPEED (?P<speed>\d+(\.\d+)?)\n'
-            r'AWB (?P<awb_mode>[a-z]+)\n'
-            r'EXPOSURE (?P<exposure_mode>[a-z]+) (?P<exposure_compensation>\d+)\n'
+            r'AWB (?P<awb_mode>[a-z]+) (?P<awb_red>\d+(/\d+)?) (?P<awb_blue>\d+(/\d+)?)\n'
+            r'EXPOSURE (?P<exp_mode>[a-z]+) (?P<exp_speed>\d+(\.\d+)?) (?P<exp_compensation>\d+)\n'
             r'ISO (?P<iso>\d+)\n'
             r'METERING (?P<metering_mode>[a-z]+)\n'
             r'LEVELS (?P<brightness>\d+) (?P<contrast>\d+) (?P<saturation>\d+)\n'
@@ -337,10 +338,12 @@ class CompoundPiClient(object):
                 result[address] = CompoundPiStatus(
                     resolution=Resolution(int(match.group('width')), int(match.group('height'))),
                     framerate=Fraction(match.group('rate')),
-                    shutter_speed=float(match.group('speed')),
                     awb_mode=match.group('awb_mode'),
-                    exposure_mode=match.group('exposure_mode'),
-                    exposure_compensation=int(match.group('exposure_compensation')),
+                    awb_red=Fraction(match.group('awb_red')),
+                    awb_blue=Fraction(match.group('awb_blue')),
+                    exposure_mode=match.group('exp_mode'),
+                    exposure_speed=float(match.group('exp_speed')),
+                    exposure_compensation=int(match.group('exp_compensation')),
                     iso=int(match.group('iso')),
                     metering_mode=match.group('metering_mode'),
                     brightness=int(match.group('brightness')),
@@ -362,14 +365,11 @@ class CompoundPiClient(object):
     def framerate(self, rate, addresses=None):
         self._transact('FRAMERATE %s' % rate, addresses)
 
-    def shutter_speed(self, speed, addresses=None):
-        self._transact('SHUTTERSPEED %d' % speed, addresses)
-
     def awb(self, mode, red=0.0, blue=0.0, addresses=None):
         self._transact('AWB %s %f %f' % (mode, red, blue), addresses)
 
-    def exposure(self, mode, compensation=0, addresses=None):
-        self._transact('EXPOSURE %s %d' % (mode, compensation), addresses)
+    def exposure(self, mode, speed=0, compensation=0, addresses=None):
+        self._transact('EXPOSURE %s %f %d' % (mode, speed, compensation), addresses)
 
     def metering(self, mode, addresses=None):
         self._transact('METERING %s' % mode, addresses)

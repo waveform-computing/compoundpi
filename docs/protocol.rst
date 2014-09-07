@@ -52,9 +52,8 @@ was successful, optionally followed by a new-line character (ASCII character
     4 OK
     RESOLUTION 1280 720
     FRAMERATE 30
-    SHUTTERSPEED 0
-    AWB auto
-    EXPOSURE auto 0
+    AWB auto 1.5 1.3
+    EXPOSURE auto 33.12 0
     ISO 0
     METERING average
     LEVELS 50 0 0
@@ -248,11 +247,12 @@ An OK response is expected with no data.
 EXPOSURE
 ========
 
-**Syntax:** EXPOSURE *mode* *compensation*
+**Syntax:** EXPOSURE *mode* *speed* *compensation*
 
-The :ref:`protocol_exposure` command changes the camera's exposure mode and
-compensation value. The mode is provided as a lower case string. The
-compensation value is an integer number between -24 and 24.
+The :ref:`protocol_exposure` command changes the camera's exposure mode, speed,
+and compensation value. The mode is provided as a lower case string. The speed
+is a floating point number measured in milliseconds. The compensation value is
+an integer number between -24 and 24.
 
 An OK response is expected with no data.
 
@@ -427,20 +427,6 @@ specified TCP port on the client, send the bytes of the image, and finally
 close the connection. The server must also send an OK response with no data.
 
 
-.. _protocol_shutterspeed:
-
-SHUTTERSPEED
-============
-
-**Syntax:** SHUTTERSPEED *speed*
-
-The :ref:`protocol_shutterspeed` command changes the camera's configuration to
-use the specified shutter speed which is given as an integer number between 0
-and 1000000 (where 0 indicates automatic shutter speed).
-
-An OK response is expected with no data.
-
-
 .. _protocol_status:
 
 STATUS
@@ -454,9 +440,8 @@ contain the following lines in its data portion, in the order given below::
 
     RESOLUTION <width> <height>
     FRAMERATE <num>[/denom]
-    SHUTTERSPEED <speed>
-    AWB <awb_mode>
-    EXPOSURE <exposure_mode> <exposure_comp>
+    AWB <awb_mode> <awb_red> <awb_blue>
+    EXPOSURE <exp_mode> <exp_speed> <exp_comp>
     ISO <iso>
     METERING <metering_mode>
     LEVELS <brightness> <contrast> <saturation>
@@ -473,17 +458,23 @@ Where:
     Gives the camera's currently configured framerate as an integer number or
     fractional value
 
-*<speed>*
-    Gives the camera's currently configured shutter speed as an integer number
-    between 0 and 1000000 (where 0 indicates automatic)
-
 *<awb_mode>*
     Gives the camera's current auto-white-balance mode as a lower case string
 
-*<exposure_mode>*
+*<awb_red>*
+    Gives the camera's red-gain as an integer number or fractional value
+
+*<awb_blue>*
+    Gives the camera's blue-gain as an integer number or fractional value
+
+*<exp_mode>*
     Gives the camera's current exposure mode as a lower case string
 
-*<exposure_comp>*
+*<exp_speed>*
+    Gives the camera's current exposure speed as a floating point number
+    measured in milliseconds.
+
+*<exp_comp>*
     Gives the camera's current exposure compensation value as an integer
     number between -24 and 24 (each increment represents 1/6th of a stop)
 
@@ -522,9 +513,8 @@ For example, the data portion of the OK response may look like the following::
 
     RESOLUTION 1280 720
     FRAMERATE 30
-    SHUTTERSPEED 0
-    AWB auto
-    EXPOSURE auto 0
+    AWB auto 321/256 3/2
+    EXPOSURE auto 33.158 0
     ISO 0
     METERING average
     LEVELS 50 0 0
