@@ -85,6 +85,11 @@ html_static_path = ['_static']
 #html_file_suffix = None
 htmlhelp_basename = '%sdoc' % _setup.__project__
 
+# Hack to make wide tables work properly in RTD
+# See https://github.com/snide/sphinx_rtd_theme/issues/117 for details
+def setup(app):
+    app.add_stylesheet('style_override.css')
+
 # -- Options for LaTeX output ---------------------------------------------
 
 latex_elements = {
