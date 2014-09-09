@@ -62,23 +62,26 @@ def address(s):
 def network(s):
     return IPv4Network(s)
 
-def zero_or_more(s):
-    result = int(s)
-    if result < 0:
-        raise ValueError('Value must be 0 or more')
-    return result
-
-def one_or_more(s):
-    result = int(s)
-    if result < 1:
-        raise ValueError('Value must be 1 or more')
-    return result
-
-def positive_float(s):
-    result = float(s)
-    if result > 0.0:
+def numeric_range(conversion, inclusive=True, min_value=None, max_value=None):
+    def test(value):
+        result = conversion(value)
+        if inclusive:
+            if min_value is not None and result < min_value:
+                raise ValueError('Value must be %s or more' % min_value)
+            if max_value is not None and result > max_value:
+                raise ValueError('Value must be %s or less' % max_value)
+        else:
+            if min_value is not None and result <= min_value:
+                raise ValueError('Value must be greater than %s' % min_value)
+            if max_value is not None and result >= max_value:
+                raise ValueError('Value must be less than %s' % max_value)
         return result
-    raise ValueError('Value must be greater than 0')
+    return test
+
+network_timeout = numeric_range(conversion=int, min_value=1)
+capture_count = numeric_range(conversion=int, min_value=1)
+capture_delay = numeric_range(conversion=float, min_value=0.0)
+time_delta = numeric_range(conversion=float, inclusive=False, min_value=0.0)
 
 def path(s):
     s = os.path.expanduser(s)
@@ -137,23 +140,24 @@ class CompoundPiClientApplication(TerminalApplication):
             help='specifies the address and port that the client listens on '
             'for downloads (default: %(default)s)')
         self.parser.add_argument(
-            '-t', '--timeout', type=int, default='5', metavar='SECS',
+            '-t', '--timeout', type=network_timeout,
+            default='5', metavar='SECS',
             help='specifies the timeout (in seconds) for network '
             'transactions (default: %(default)s)')
         self.parser.add_argument(
-            '--capture-delay', type=int, default='0', metavar='SECS',
+            '--capture-delay', type=capture_delay, default='0.0', metavar='SECS',
             help='specifies the delay (in seconds) used to synchronize '
             'captures. This must be less than the network delay '
             '(default: %(default)s)')
         self.parser.add_argument(
-            '--capture-count', type=int, default='1', metavar='NUM',
+            '--capture-count', type=capture_count, default='1', metavar='NUM',
             help='specifies the number of consecutive pictures to capture '
             'when requested (default: %(default)s)')
         self.parser.add_argument(
             '--video-port', action='store_true', default=False,
             help="if specified, use the camera's video port for rapid capture")
         self.parser.add_argument(
-            '--time-delta', type=float, default='0.25', metavar='SECS',
+            '--time-delta', type=time_delta, default='0.25', metavar='SECS',
             help='specifies the maximum delta between server timestamps that '
             'the client will tolerate (default: %(default)ss)')
         self.parser.set_defaults(log_level=logging.INFO)
@@ -189,7 +193,7 @@ class CompoundPiCmd(Cmd):
             'Type "help" for more information, '
             'or "find" to locate Pi servers')
         self.client = CompoundPiClient()
-        self.capture_delay = 0
+        self.capture_delay = 0.0
         self.capture_count = 1
         self.video_port = False
         self.time_delta = 0.25
@@ -311,11 +315,11 @@ class CompoundPiCmd(Cmd):
                 'network':       network,
                 'port':          service,
                 'bind':          address,
-                'timeout':       one_or_more,
-                'capture_delay': zero_or_more,
-                'capture_count': one_or_more,
+                'timeout':       network_timeout,
+                'capture_delay': capture_delay,
+                'capture_count': capture_count,
                 'video_port':    boolean,
-                'time_delta':    positive_float,
+                'time_delta':    time_delta,
                 'output':        path,
                 'warnings':      boolean,
                 }[name](value)
