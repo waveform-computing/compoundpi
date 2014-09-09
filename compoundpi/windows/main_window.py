@@ -182,7 +182,7 @@ The project homepage and documentation is at
         try:
             dialog.interface = self.settings.value('interface', '')
             dialog.port = self.settings.value('port', 5647)
-            dialog.timeout = self.settings.value('timeout', 5)
+            dialog.timeout = self.settings.value('timeout', 15)
             dialog.expected_count = self.settings.value('expected_count', '0')
             if dialog.exec_():
                 try:

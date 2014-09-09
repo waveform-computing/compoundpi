@@ -141,7 +141,7 @@ class CompoundPiClientApplication(TerminalApplication):
             'for downloads (default: %(default)s)')
         self.parser.add_argument(
             '-t', '--timeout', type=network_timeout,
-            default='5', metavar='SECS',
+            default='15', metavar='SECS',
             help='specifies the timeout (in seconds) for network '
             'transactions (default: %(default)s)')
         self.parser.add_argument(
