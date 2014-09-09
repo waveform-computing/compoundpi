@@ -14,6 +14,7 @@ Table of Contents
    cpi
    cpid
    commands
+   batch
    protocol
    changelog
    license

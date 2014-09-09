@@ -434,7 +434,8 @@ class CompoundPiCmd(Cmd):
         """
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to add')
-        self.client.add(self.parse_address_list(arg))
+        for addr in self.parse_address_list(arg):
+            self.client.add(addr)
 
     def complete_add(self, text, line, start, finish):
         return [
@@ -463,7 +464,8 @@ class CompoundPiCmd(Cmd):
         """
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to remove')
-        self.client.remove(self.parse_address_list(arg))
+        for addr in self.parse_address_list(arg):
+            self.client.remove(addr)
 
     def complete_remove(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -754,7 +756,6 @@ class CompoundPiCmd(Cmd):
                 'fluorescent',
                 'horizon',
                 'incandescent',
-                'off',
                 'shade',
                 'sunlight',
                 'tungsten',

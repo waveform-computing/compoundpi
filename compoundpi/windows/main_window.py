@@ -487,7 +487,7 @@ class ServersModel(QtCore.QAbstractTableModel):
         self.refresh_all()
 
     def add(self, address):
-        self.parent.client.add([address])
+        self.parent.client.add(address)
         i = bisect.bisect_left(self._data, (address, None))
         self.beginInsertRows(QtCore.QModelIndex(), i, i)
         try:
@@ -501,7 +501,7 @@ class ServersModel(QtCore.QAbstractTableModel):
             i = bisect.bisect_left(self._data, (address, None))
             self.beginRemoveRows(QtCore.QModelIndex(), i, i)
             try:
-                self.parent.client.remove([address])
+                self.parent.client.remove(address)
                 del self._data[i]
             finally:
                 self.endRemoveRows()

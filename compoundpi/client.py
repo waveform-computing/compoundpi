@@ -16,7 +16,7 @@
 # You should have received a copy of the GNU General Public License along with
 # compoundpi.  If not, see <http://www.gnu.org/licenses/>.
 
-"Implements the client terminal interface"
+"Implements the client network interface"
 
 from __future__ import (
     unicode_literals,
@@ -55,7 +55,7 @@ from .exc import (
     CompoundPiMissingResponse,
     CompoundPiMultiResponse,
     CompoundPiNoServers,
-    CompoundPiRedefinedServers,
+    CompoundPiRedefinedServer,
     CompoundPiSendTimeout,
     CompoundPiServerError,
     CompoundPiStaleResponse,
@@ -68,13 +68,24 @@ from .exc import (
 
 
 class Resolution(namedtuple('Resolution', ('width', 'height'))):
+    """
+    Represents an image resolution.
+
+    .. attribute:: width
+
+        The width of the resolution as an integer value.
+
+    .. attribute:: height
+
+        The height of the resolution as an integer value.
+    """
     __slots__ = ()
 
     def __str__(self):
         return '%dx%d' % (self.width, self.height)
 
 
-CompoundPiStatus = namedtuple('CompoundPiStatus', (
+class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     'resolution',
     'framerate',
     'awb_mode',
@@ -92,17 +103,189 @@ CompoundPiStatus = namedtuple('CompoundPiStatus', (
     'vflip',
     'timestamp',
     'images',
-    ))
+    ))):
+    """
+    This class is a namedtuple derivative used to store the status of a
+    Compound Pi server. It is recommended you access the information stored by
+    this class by attribute name rather than position (for example:
+    ``status.resolution`` rather than ``status[0]``).
+
+    .. attribute:: resolution
+
+        Returns the current resolution of the camera as a :class:`Resolution`
+        tuple.
+
+    .. attribute:: framerate
+
+        Returns the current framerate of the camera as a
+        :class:`~fractions.Fraction`.
+
+    .. attribute:: awb_mode
+
+        Returns the current white balance mode of the camera as a lower case
+        string. See :meth:`CompoundPiClient.awb` for valid values.
+
+    .. attribute:: awb_red
+
+        Returns the current red gain of the camera's white balance as a
+        floating point value. If :attr:`awb_mode` is ``'off'`` this is a fixed
+        value. Otherwise, it is the current gain being used by the configured
+        auto white balance mode.
+
+    .. attribute:: awb_blue
+
+        Returns the current blue gain of the camera's white balance as a
+        floating point value. If :attr:`awb_mode` is ``'off'`` this is a fixed
+        value. Otherwise, it is the current gain being used by the configured
+        auto white balance mode.
+
+    .. attribute:: exposure_mode
+
+        Returns the current exposure mode of the camera as a lower case string.
+        See :meth:`CompoundPiClient.exposure` for valid values.
+
+    .. attribute:: exposure_speed
+
+        Returns the current exposure speed of the camera as a floating point
+        value measured in milliseconds. If :attr:`exposure_mode` is ``'off'``
+        this is a fixed value. Otherwise it is the current speed calculated
+        by the camera's AGC algorithm.
+
+    .. attribute:: exposure_compensation
+
+        Returns the camera's exposure compensation value as an integer value
+        measured in 1/6ths of a stop. Hence, 24 indicates the camera's
+        compensation is +4 stops, while -12 indicates -2 stops.
+
+    .. attribute:: iso
+
+        Returns the camera's ISO setting as an integer value. This will be
+        one of 0 (indicating automatic), 100, 200, 320, 400, 500, 640, or 800.
+
+    .. attribute:: metering_mode
+
+        Returns the camera's metering mode as a lower case string. See
+        :meth:`CompoundPiClient.metering` for valid values.
+
+    .. attribute:: brightness
+
+        Returns the camera's brightness level as an integer value between 0
+        and 100.
+
+    .. attribute:: contrast
+
+        Returns the camera's contrast level as an integer value between -100
+        and 100.
+
+    .. attribute:: saturation
+
+        Returns the camera's saturation level as an integer value between -100
+        and 100.
+
+    .. attribute:: hflip
+
+        Returns a boolean value indicating whether the camera's orientation is
+        horizontally flipped.
+
+    .. attribute:: vflip
+
+        Returns a boolean value indicating whether the camera's orientation is
+        vertically flipped.
+
+    .. attribute:: timestamp
+
+        Returns a :class:`~datetime.datetime` instance representing the time at
+        which the server received the :ref:`protocol_status` message. Due to
+        network latencies there is little point comparing this to the client's
+        current timestamp. However, if the :ref:`protocol_status` message was
+        broadcast to all servers, it can be useful to calculate the maximum
+        difference in the server's timestamps to determine whether any servers
+        have lost time sync.
+
+    .. attribute:: images
+
+        Returns an integer number indicating the number of images currently
+        stored in the server's memory.
+    """
 
 
-CompoundPiListItem = namedtuple('CompoundPiListItem', (
+class CompoundPiImage(namedtuple('CompoundPiImage', (
     'index',
     'timestamp',
     'size',
-    ))
+    ))):
+    """
+    This class is a namedtuple derivative used to store information about an
+    image stored in the memory of a Compound Pi server.  It is recommended you
+    access the information stored by this class by attribute name rather than
+    position (for example: ``image.size`` rather than ``image[2]``).
+
+    .. attribute:: index
+
+        Specifies the index of the image on the server. This is the index that
+        should be passed to :meth:`CompoundPiClient.download` in order to
+        retrieve this image.
+
+    .. attribute:: timestamp
+
+        Specifies the timestamp on the server at which the image was captured
+        as a :class:`~datetime.datetime` instance.
+
+    .. attribute:: size
+
+        Specifies the size of the image as an integer number of bytes.
+    """
 
 
 class CompoundPiClient(object):
+    """
+    Implements a network client for Compound Pi servers.
+
+    Upon construction, this class initializes the client to operate on the
+    network 192.168.0.0/16. Because the client utilizes UDP broadcast packets,
+    it is crucial that the network configuration (including the network mask)
+    is set correctly. If the default network is wrong (which is most likely the
+    case), you must correct it before issuing any commands. This can be done by
+    setting the :attr:`network` attribute.
+
+    The class assumes the Compound Pi servers are listening on UDP port 5647 by
+    default. This can be altered via the :attr:`port` attribute. Finally, the
+    class listens on port 5647 on all available interfaces for responses. If
+    this is incorrect (or if you wish to limit the interfaces that the client
+    listens on), adjust the :attr:`bind` attribute.
+
+    The optional *progress* parameter to the constructor provides a set of
+    routines that the client will call when a long operation (typically a
+    network operation) is in progress. If specified, it must be a 3-tuple
+    consisting of ``(start, update, finish)`` routines. At the start of a long
+    operation the start routine will be called with a parameter indicating the
+    number of expected operations to complete. As the operation progress, the
+    update routine will be called with a parameter indicating the current
+    operation (the update routine may be called multiple times with the same
+    number, but it will never decrease within the span of one operation).
+    Finally, the finish routine will be called with no parameters (if the start
+    routine is called, the finish routine is guaranteed to be called).
+
+    Before controlling any Compound Pi servers, the client must either be told
+    the addresses of the servers, or discover them via broadcast. The
+    :meth:`add` and :meth:`remove` methods can be used to define the addresses
+    of servers explicitly. Alternatively, use the :meth:`find` method with an
+    optional count of expected servers to discover their addresses via
+    broadcast (this is most useful when the servers have dynamically allocated
+    addresses, e.g. via DHCP). You can query the server addresses that the
+    client knows about by treating the client instance as a sequence (iterable,
+    and supporting the standard :func:`len` function, and ``in`` operator, but
+    not indexable; the servers have no intrinsic "order").
+
+    Various methods are provided for configuring and controlling the cameras on
+    the Compound Pi servers (:meth:`resolution`, :meth:`framerate`,
+    :meth:`exposure`, :meth:`capture`, etc). Each method optionally accepts a
+    set of addresses to operate on. If omitted, the command is applied to all
+    servers that the client knows about (via a broadcast packet). The one
+    exception to this is the :meth:`download` method for retrieving captured
+    images. For the sake of efficiency this is expected to operate against one
+    server at a time, so the *address* parameter is mandatory.
+    """
 
     request_re = re.compile(
             r'(?P<seqno>\d+) '
@@ -116,6 +299,8 @@ class CompoundPiClient(object):
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
+        self._network = None
+        self._port = None
         self._server = None
         self._server_thread = None
         self._servers = set()
@@ -150,14 +335,84 @@ class CompoundPiClient(object):
             self._server_thread = threading.Thread(target=self._server.serve_forever)
             self._server_thread.daemon = True
             self._server_thread.start()
-    bind = property(_get_bind, _set_bind)
+    bind = property(_get_bind, _set_bind, doc="""
+        Defines the port and interfaces the client will listen to for
+        responses.
+
+        This attribute defaults to ``('0.0.0.0', 5647)`` meaning that the
+        client defaults to listening on port 5647 on all available network
+        interfaces for responses from Compound Pi servers (the special address
+        ``0.0.0.0`` means "all available interfaces"). If you wish to change
+        the port, or limit the interfaces the client listens to, assign a tuple
+        of ``(address, port)`` to this attribute. For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.bind = ('192.168.0.1', 8000)
+
+        Querying this attribute will return a 2-tuple of the current address
+        and port that the client is listening on.
+
+        .. note::
+
+            The port of the client's bound socket doesn't need to match the
+            server's port. Both simply default to 5647 for the sake of
+            simplicity.
+        """)
+
+    def _get_port(self):
+        return self._port
+    def _set_port(self, value):
+        self._port = int(value)
+    port = property(_get_port, _set_port, doc="""
+        Defines the server port that the client will broadcast to.
+
+        This attribute defaults to 5647 meaning that the client will send
+        broadcasts to Compound Pi servers which are assumed to be listening for
+        messages on port 5647. If you have configured :ref:`cpid` differently,
+        simply assign a different value to this attribute. For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.port = 8080
+
+        .. note::
+
+            The port of the client's bound socket doesn't need to match the
+            server's port. Both simply default to 5647 for the sake of
+            simplicity.
+        """)
 
     def _get_network(self):
         return self._network
     def _set_network(self, value):
         self._network = IPv4Network(value)
         self._servers = set()
-    network = property(_get_network, _set_network)
+    network = property(_get_network, _set_network, doc="""
+        Defines the network that all servers belong to.
+
+        This attribute defaults to ``192.168.0.0/16`` meaning that the client
+        assumes all servers belong to the network beginning with ``192.168.``
+        and accept broadcast packets with the address ``192.168.255.255``. If
+        this is incorrect (which is likely the case), assign the correct
+        network configuration as a string (in CIDR or network/mask notation) to
+        this attribute. A common configuration is::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+
+        Note that the network mask *must* be correct for broadcast packets to
+        operate correctly. It is not enough for the network prefix alone to be
+        correct.
+
+        Querying this attribute will return a :class:`~ipaddress.IPv4Network`
+        object which can be converted to a string, or enumerated to discover
+        all potential addresses within the defined network.
+        """)
 
     def _send_command(self, address, seqno, data):
         assert self.request_re.match(data)
@@ -176,7 +431,7 @@ class CompoundPiClient(object):
                 count = len(servers)
             if not servers:
                 servers = self.network
-            result = dict()
+            result = {}
             start = time.time()
             while time.time() - start < self.timeout:
                 if self._progress_update:
@@ -266,8 +521,10 @@ class CompoundPiClient(object):
     def __iter__(self):
         return iter(self._servers)
 
-    def __contains__(self, value):
-        return value in self._servers
+    def __contains__(self, address):
+        if not isinstance(address, IPv4Address):
+            address = IPv4Address(address)
+        return address in self._servers
 
     def _parse_ping(self, responses):
         for address, (result, response) in responses.items():
@@ -281,32 +538,86 @@ class CompoundPiClient(object):
                 del responses[address]
         return set(responses.keys())
 
-    def add(self, addresses):
-        if set(addresses) & self._servers:
-            raise CompoundPiRedefinedServers(set(addresses) & self._servers)
+    def add(self, address):
+        """
+        Called to explicitly add a server address to the client's list. Before
+        the server is added, the client will send a :ref:`protocol_hello` to
+        verify that the server is alive. You can query the servers in the
+        client's list by treating the client as an iterable::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.add('192.168.0.2')
+            assert len(client) == 1
+            assert '192.168.0.2' in client
+
+        Attempting to add an address that is already present in the client's
+        list will raise a :exc:`CompoundPiRedefinedServer` error.
+        """
+        if not isinstance(address, IPv4Address):
+            address = IPv4Address(address)
+        if address in self:
+            raise CompoundPiRedefinedServer(address)
         self._seqno += 1
         data = '%d HELLO %f' % (self._seqno, time.time())
-        for address in addresses:
-            self._send_command(
-                (str(address), self.port), self._seqno, data)
-        # Abuse catch_warnings to mutate warnings in parse_ping into errors
-        # associated with our transaction. We don't do this in find() as the
-        # assumption is that a user explicitly calling add() expects the
-        # addresses passed to work, whereas find() merely locates compatible
-        # servers on the subnet
-        to_add = self._parse_ping(self._responses(addresses))
-        errors = []
-        if set(addresses) - to_add:
+        self._send_command(
+            (str(address), self.port), self._seqno, data)
+        response = self._parse_ping(self._responses({address}))
+        if not address in response:
             raise CompoundPiTransactionFailed([
                 CompoundPiMissingResponse(address)
-                for address in set(addresses) - to_add
                 ])
-        self._servers |= to_add
+        self._servers.add(address)
 
-    def remove(self, addresses):
-        self._servers -= set(addresses)
+    def remove(self, address):
+        """
+        Called to explicitly remove a server address from the client's list.
+        Nothing is sent to a server that is removed from the list. If the
+        server is still active on the client's network after removal it will
+        continue to receive broadcast packets but the client will ignore any
+        responses from the server.
+
+        .. warning::
+
+            Please note that this may cause unexpected issues. For example,
+            such a server (active but unknown to a client) may capture images
+            in response to a broadcast :ref:`protocol_capture` message. For
+            this reason it is recommended that you shut down any servers that
+            you do not intend to communicate with. Future versions of the
+            protocol may include explicit disconnection messages to mitigate
+            this issue.
+
+        Attempting to remove an address that is not present in the client's
+        list will raise a :exc:`KeyError`.
+        """
+        if not isinstance(address, IPv4Address):
+            address = IPv4Address(address)
+        self._servers.remove(address)
 
     def find(self, count=0):
+        """
+        Called to discover servers on the client's network. The :meth:`find`
+        method broadcasts a :ref:`protocol_hello` message to the currently
+        configured network. If called with no expected *count*, the method then
+        waits for the network :attr:`timeout` (default 15 seconds) and adds all
+        servers that replied to the broadcast to the client's list. If called
+        with an expected *count* value, the method will terminate as soon as
+        *count* servers have replied. For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.find(10)
+            assert len(client) == 10
+            print('Found 10 clients:')
+            for addr in client:
+                print(str(addr))
+
+        This method or the :meth:`add` method are usually the first methods
+        called after construction and configuration of the client instance.
+        """
         self._servers = set()
         self._seqno += 1
         data = '%d HELLO %f' % (self._seqno, time.time())
@@ -326,6 +637,26 @@ class CompoundPiClient(object):
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
             r'IMAGES (?P<images>\d{,3})\n')
     def status(self, addresses=None):
+        """
+        Called to determine the status of servers. The :meth:`status` method
+        queries all servers at the specified *addresses* (or all defined
+        servers if *addresses* is omitted) for their camera configurations. It
+        returns a mapping of address to :class:`CompoundPiStatus` named tuples.
+        For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.find(10)
+            print('Configured resolutions:')
+            for address, status in client.status().items():
+                print('%s: %dx%d' % (
+                    address,
+                    status.resolution.width,
+                    status.resolution.height,
+                    ))
+        """
         responses = [
             (address, self.status_re.match(data))
             for (address, data) in self._transact('STATUS', addresses).items()
@@ -361,30 +692,208 @@ class CompoundPiClient(object):
         return result
 
     def resolution(self, width, height, addresses=None):
+        """
+        Called to change the camera resolution on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *width* and *height* parameters are integers defining the new
+        resolution. For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.find(10)
+            client.resolution(1280, 720)
+        """
         self._transact('RESOLUTION %d %d' % (width, height), addresses)
 
     def framerate(self, rate, addresses=None):
+        """
+        Called to change the camera framerate on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *rate* parameter is the new framerate specified as a numeric value
+        (e.g. :func:`int`, :func:`float` or :class:`~fractions.Fraction`).
+        For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.find(10)
+            client.framerate(24)
+        """
         self._transact('FRAMERATE %s' % rate, addresses)
 
     def awb(self, mode, red=0.0, blue=0.0, addresses=None):
+        """
+        Called to change the white balance on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *mode* parameter specifies the new white balance mode as a string.
+        Valid values are:
+
+        * ``'auto'``
+        * ``'cloudy'``
+        * ``'flash'``
+        * ``'fluorescent'``
+        * ``'horizon'``
+        * ``'incandescent'``
+        * ``'off'``
+        * ``'shade'``
+        * ``'sunlight'``
+        * ``'tungsten'``
+
+        If the special value ``'off'`` is given as the *mode*, the *red* and
+        *blue* parameters specify the red and blue gains of the camera can be
+        manually as floating point values between 0.0 and 8.0. Reasonable
+        values for red and blue gains can be discovered easily by setting
+        *mode* to ``'auto'``, waiting a while to let the camera settle, then
+        querying the current gain by calling :meth:`status`.  For example::
+
+            from time import sleep
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.find(10)
+            # Pick an arbitrary camera to determine white balance gains and
+            # set it auto white balance
+            addr = next(iter(client))
+            client.awb('auto', addresses=addr)
+            # Wait a few seconds to let the camera measure the scene
+            sleep(2)
+            # Query the camera's gains and fix all cameras gains accordingly
+            status = client.status(addresses=addr)[addr]
+            client.awb('off', status.awb_red, status.awb_blue)
+        """
         self._transact('AWB %s %f %f' % (mode, red, blue), addresses)
 
     def exposure(self, mode, speed=0, compensation=0, addresses=None):
+        """
+        Called to change the exposure on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *mode* parameter specifies the new exposure mode as a string.  Valid
+        values are:
+
+        * ``'antishake'``
+        * ``'auto'``
+        * ``'backlight'``
+        * ``'beach'``
+        * ``'fireworks'``
+        * ``'fixedfps'``
+        * ``'night'``
+        * ``'nightpreview'``
+        * ``'off'``
+        * ``'snow'``
+        * ``'sports'``
+        * ``'spotlight'``
+        * ``'verylong'``
+
+        If the special value ``'off'`` is given as the *mode*, the *speed*
+        parameter specifies the exposure speed manually as a floating point
+        value measured in milliseconds. Reasonable exposure speeds can be
+        discovered easily by setting *mode* to ``'auto'``, waiting a while to
+        let the camera settle, then querying the current speed by calling
+        :meth:`status`.  For example::
+
+            from time import sleep
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.find(10)
+            # Pick an arbitrary camera to determine exposure speed and set it
+            # to auto gain control
+            addr = next(iter(client))
+            client.exposure('auto', addresses=addr)
+            # Wait a few seconds to let the camera measure the scene
+            sleep(2)
+            # Query the camera's exposure speed and fix all cameras accordingly
+            status = client.status(addresses=addr)[addr]
+            client.exposure('off', status.exposure_speed)
+
+        The *compensation* parameter specifies the exposure compensation
+        applied by the camera. It is an integer value measured in 1/6ths of a
+        stop (hence -24, the minimum value, means -4 stops, while 24, the
+        maximum value, represents +4 stops).
+        """
         self._transact('EXPOSURE %s %f %d' % (mode, speed, compensation), addresses)
 
     def metering(self, mode, addresses=None):
+        """
+        Called to change the metering algorithm on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *mode* parameter specifies the new metering mode as a string.  Valid
+        values are:
+
+        * ``'average'``
+        * ``'backlit'``
+        * ``'matrix'``
+        * ``'spot'``
+        """
         self._transact('METERING %s' % mode, addresses)
 
     def iso(self, value, addresses=None):
+        """
+        Called to change the ISO setting on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *mode* parameter specifies the new ISO settings as an integer value.
+        values are 0 (meaning auto), 100, 200, 320, 400, 500, 640, and 800.
+        """
         self._transact('ISO %d' % value, addresses)
 
     def levels(self, brightness, contrast, saturation, addresses=None):
+        """
+        Called to change the *brightness*, *contrast*, and *saturation* levels
+        on the servers at the specified *addresses* (or all defined servers if
+        *addresses* is omitted). Each level is specified as an integer.
+        *saturation* and *contrast* accept values in the range -100 to 100, and
+        default to 0. *brightness* accepts values in the range 0 to 100 and
+        defaults to 50.
+        """
         self._transact('LEVELS %d %d %d' % (brightness, contrast, saturation), addresses)
 
     def flip(self, horizontal, vertical, addresses=None):
+        """
+        Called to change the orientation of the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *horizontal* and *vertical* parameters are boolean values indicating
+        whether to flip the camera's output along the corresponding axis. The
+        default for both parameters is ``False``.
+        """
         self._transact('FLIP %d %d' % (horizontal, vertical), addresses)
 
     def capture(self, count=1, video_port=False, delay=None, addresses=None):
+        """
+        Called to capture images on the servers at the specified *addresses*
+        (or all defined servers if *addresses* is omitted). The optional
+        *count* parameter is an integer value defining how many sequential
+        images to capture, which defaults to 1. The optional *video_port*
+        parameter defaults to ``False`` which indicates that the camera's slow,
+        but high quality still port should be used for capture. If set to
+        ``True``, the faster, lower quality video port will be used instead.
+        This is particularly useful with *count* greater than 1 for capturing
+        high motion scenes.
+
+        The optional *delay* parameter defaults to ``None`` which indicates
+        that all servers should capture images immediately upon receipt of the
+        :ref:`protocol_capture` message. When using broadcast messages (when
+        *addresses* is omitted) this typically results in near simultaneous
+        captures, especially with fast, low latency networks like ethernet.
+
+        If *delay* is set to a small floating point value measured in seconds,
+        it indicates that the servers should synchronize their captures to a
+        timestamp (which the client calculates the timestamp as *now* + *delay*
+        seconds). This functionality assumes that the servers all have accurate
+        clocks which are reasonably in sync with the client's clock; a typical
+        configuration is to run an NTP server on the client machine, and an NTP
+        client on each of the Compound Pi servers.
+
+        .. note::
+
+            Note that this method merely causes the servers to capture images.
+            The captured images are stored in RAM on the servers for later
+            retrieval with the :meth:`download` method.
+        """
         cmd = 'CAPTURE %d %d'
         params = [count, video_port]
         if delay:
@@ -395,6 +904,27 @@ class CompoundPiClient(object):
     list_line_re = re.compile(
             r'IMAGE (?P<index>\d+) (?P<time>\d+(\.\d+)?) (?P<size>\d+)')
     def list(self, addresses=None):
+        """
+        Called to list images available for download from the servers at the
+        specified *addresses* (or all defined servers if *addresses* is
+        omitted). The method returns a mapping of address to sequences of
+        :class:`CompoundPiImage` which provide the index, capture timestamp,
+        and size of each image available on the server. For example, to
+        enumerate the total size of all images stored on all servers::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            client.find(10)
+            client.capture()
+            size = sum(
+                image.size
+                for addr, images in client.list().items()
+                for image in images
+                )
+            print('%d bytes available for download' % size)
+        """
         responses = {
             address: [
                 self.list_line_re.match(line)
@@ -410,7 +940,7 @@ class CompoundPiClient(object):
                 if match is None:
                     errors.append(CompoundPiInvalidResponse(address))
                 else:
-                    result[address].append(CompoundPiListItem(
+                    result[address].append(CompoundPiImage(
                         int(match.group('index')),
                         datetime.datetime.fromtimestamp(float(match.group('time'))),
                         int(match.group('size')),
@@ -421,12 +951,59 @@ class CompoundPiClient(object):
         return result
 
     def clear(self, addresses=None):
+        """
+        Called to clear captured images from the RAM of the servers at the
+        specified *addresses* (or all defined servers if *addresses* is
+        omitted). Currently the protocol for the :ref:`protocol_clear` message
+        is fairly crude: it simply clears all captured images on the server;
+        there is no method for specifying a subset of images to wipe.
+        """
         self._transact('CLEAR', addresses)
 
     def identify(self, addresses=None):
+        """
+        Called to cause the servers at the specified *addresses* to physically
+        identify themselves (or all defined servers if *addresses* is omitted).
+        Currently, the identification takes the form of the server blinking
+        the camera's LED for 5 seconds.
+        """
         self._transact('BLINK', addresses)
 
     def download(self, address, index, output):
+        """
+        Called to download the image with the specified *index* from the server
+        at *address*, writing the content to the file-like object provided by
+        the *output* parameter.
+
+        The :meth:`download` method differs from all other client methods in
+        that it targets a single server at a time (attempting to simultaneously
+        download images from multiple servers would be extremely inefficient).
+        The available image indices can be determined by calling the
+        :meth:`list` method beforehand. Note that downloading images from
+        servers does *not* wipe the image from the server's RAM. Once all
+        images have been successfully retrieved, you should use the
+        :meth:`clear` method to free up memory on the servers. For example::
+
+            import io
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.network = '192.168.0.0/24'
+            # Capture an image on all servers
+            client.capture()
+            # Download all available images from all servers
+            for addr, images in client.list().items():
+                for image in images:
+                    print('Downloading image %d from %s (%d bytes)' % (
+                        image.index,
+                        addr,
+                        image.size,
+                        ))
+                    with io.open('%s-%d.jpg' % (addr, image.index)) as f:
+                        client.download(addr, image.index, f)
+            # Wipe all images on all servers
+            client.clear()
+        """
         self._server.source = address
         self._server.output = output
         self._server.event.clear()

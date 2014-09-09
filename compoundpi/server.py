@@ -367,10 +367,11 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_exposure(self, mode, speed, compensation):
         compensation = int(compensation)
+        speed = int(float(speed) * 1000)
         logging.info('Changing camera exposure mode to %s', mode)
         self.server.camera.exposure_mode = mode
-        logging.info('Changing camera exposure speed to %.4fms', speed)
-        self.server.camera.shutter_speed = int(speed * 1000)
+        logging.info('Changing camera exposure speed to %.4fms', speed / 1000.0)
+        self.server.camera.shutter_speed = speed
         logging.info('Changing camera exposure compensation to %d', compensation)
         self.server.camera.exposure_compensation = compensation
 
@@ -393,16 +394,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         self.server.camera.contrast = contrast
         logging.info('Changing camera saturation to %d', saturation)
         self.server.camera.saturation = saturation
-
-    def do_contrast(self, value):
-        value = int(value)
-        logging.info('Changing camera contrast to %d', value)
-        self.server.camera.contrast = value
-
-    def do_saturation(self, value):
-        value = int(value)
-        logging.info('Changing camera saturation to %d', value)
-        self.server.camera.saturation = value
 
     def do_flip(self, horizontal, vertical):
         horizontal = bool(int(horizontal))

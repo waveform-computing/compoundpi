@@ -32,7 +32,7 @@ import compoundpi as _setup
 
 # -- General configuration ------------------------------------------------
 
-extensions = ['sphinx.ext.viewcode', 'sphinx.ext.intersphinx']
+extensions = ['sphinx.ext.autodoc', 'sphinx.ext.viewcode', 'sphinx.ext.intersphinx']
 templates_path = ['_templates']
 source_suffix = '.rst'
 #source_encoding = 'utf-8-sig'
@@ -58,7 +58,9 @@ autodoc_member_order = 'groupwise'
 
 # -- Intersphinx configuration --------------------------------------------
 
-intersphinx_mapping = {'python': ('http://docs.python.org/2.7', None)}
+intersphinx_mapping = {
+    'python': ('http://docs.python.org/3.3', None),
+    }
 
 # -- Options for HTML output ----------------------------------------------
 
