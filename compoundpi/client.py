@@ -114,6 +114,7 @@ class CompoundPiClient(object):
     def __init__(self, progress=None):
         self._seqno = 0
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
         self._server = None
         self._server_thread = None
@@ -462,5 +463,5 @@ class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
 
 
 class CompoundPiDownloadServer(socketserver.ThreadingMixIn, socketserver.TCPServer):
-    pass
+    allow_reuse_address = True
 
