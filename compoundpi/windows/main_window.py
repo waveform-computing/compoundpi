@@ -29,6 +29,7 @@ str = type('')
 
 import io
 import os
+import time
 import shutil
 import bisect
 from fractions import Fraction
@@ -43,19 +44,29 @@ from .find_dialog import FindDialog
 from .configure_dialog import ConfigureDialog
 from .capture_dialog import CaptureDialog
 from .add_dialog import AddDialog
+from .progress_dialog import ProgressDialog
 
 
 class MainWindow(QtGui.QMainWindow):
     "The Compound Pi GUI main window"
 
+    progress_start_signal = QtCore.Signal(int)
+    progress_update_signal = QtCore.Signal(int)
+    progress_finish_signal = QtCore.Signal()
+
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
+        self.progress_dialog = None
+        self.progress_time = None
         self.client = CompoundPiClient(progress=(
             self.progress_start,
             self.progress_update,
             self.progress_finish,
             ))
+        self.progress_start_signal.connect(self.progress_start_slot)
+        self.progress_update_signal.connect(self.progress_update_slot)
+        self.progress_finish_signal.connect(self.progress_finish_slot)
         self.images = defaultdict(OrderedDict)
         self.ui = loadUi(get_ui_file('main_window.ui'), self)
         # Read configuration
@@ -445,17 +456,44 @@ The project homepage and documentation is at
         self.ui.toolbar_action.setChecked(self.ui.tool_bar.isVisible())
         self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
 
-    def progress_start(self):
-        QtGui.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
+    # All the messing around with signals and slots below is required as the
+    # progress handlers aren't necessarily called from the main thread
 
-    def progress_update(self):
-        self.progress_index += 1
-        self.ui.progress_label.setText('Communicating' + '.' * (self.progress_index % 8))
-        QtGui.QApplication.instance().processEvents()
+    def progress_start(self, count):
+        # Before we start another progress window, make sure any events to do
+        # with existing progress windows have been processed
+        QtGui.QApplication.instance().sendPostedEvents()
+        self.progress_start_signal.emit(count)
+
+    def progress_update(self, count):
+        self.progress_update_signal.emit(count)
 
     def progress_finish(self):
-        self.ui.progress_label.setText('')
+        self.progress_finish_signal.emit()
+
+    @QtCore.Slot(int)
+    def progress_start_slot(self, count):
+        assert not self.progress_dialog
+        self.progress_dialog = ProgressDialog(self)
+        self.progress_dialog.show()
+        self.progress_dialog.task = self.tr('Progress')
+        self.progress_dialog.limits = (0, count)
+        QtGui.QApplication.instance().setOverrideCursor(QtCore.Qt.WaitCursor)
+
+    @QtCore.Slot(int)
+    def progress_update_slot(self, count):
+        now = time.time()
+        if (self.progress_time is None) or (now - self.progress_time) > 0.1:
+            self.progress_time = now
+            if self.progress_dialog.cancelled:
+                raise KeyboardInterrupt
+            self.progress_dialog.progress = count
+
+    @QtCore.Slot()
+    def progress_finish_slot(self):
         QtGui.QApplication.instance().restoreOverrideCursor()
+        self.progress_dialog.close()
+        self.progress_dialog = None
 
 
 class ServersModel(QtCore.QAbstractTableModel):

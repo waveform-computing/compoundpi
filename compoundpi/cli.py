@@ -46,7 +46,7 @@ except ImportError:
 from . import __version__
 from .client import CompoundPiClient
 from .terminal import TerminalApplication
-from .cmdline import Cmd, CmdSyntaxError, CmdError
+from .cmdline import Cmd, CmdSyntaxError, CmdError, ENCODING
 
 
 def service(s):
@@ -192,7 +192,11 @@ class CompoundPiCmd(Cmd):
         self.pprint(
             'Type "help" for more information, '
             'or "find" to locate Pi servers')
-        self.client = CompoundPiClient()
+        self.client = CompoundPiClient(progress=(
+            self.progress_start,
+            self.progress_update,
+            self.progress_finish,
+            ))
         self.capture_delay = 0.0
         self.capture_count = 1
         self.video_port = False
@@ -200,6 +204,29 @@ class CompoundPiCmd(Cmd):
         self.output = '/tmp'
         self.warnings = False
         warnings.simplefilter('always')
+
+    def progress_start(self, count):
+        self.progress_count = count
+        self.progress_output = ''
+        self.progress_update(0)
+
+    def progress_clear(self):
+        l = len(self.progress_output)
+        self.stdout.write((b'\b' * l) + (b' ' * l) + (b'\b' * l))
+        self.stdout.flush()
+
+    def progress_update(self, count):
+        self.progress_clear()
+        percent_complete = (count * 100) // self.progress_count
+        self.progress_output = '[%-25s] %d%%' % (
+            '#' * (percent_complete // 4), percent_complete)
+        self.stdout.write(self.progress_output.encode(ENCODING))
+        self.stdout.flush()
+
+    def progress_finish(self):
+        self.progress_clear()
+        self.progress_count = 0
+        self.progress_output = None
 
     def showwarning(self, message, category, filename, lineno, file=None,
             line=None):

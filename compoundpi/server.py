@@ -24,6 +24,7 @@ from __future__ import (
     print_function,
     division,
     )
+native_str = str
 str = type('')
 range = xrange
 
@@ -38,6 +39,7 @@ import time
 import random
 import logging
 import threading
+import struct
 import socket
 import SocketServer as socketserver
 import shutil
@@ -433,11 +435,14 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         image = int(image)
         port = int(port)
         timestamp, stream = self.server.images[image]
+        size = stream.seek(0, io.SEEK_END)
         logging.info('Sending image %d', image)
         client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_sock.connect((self.client_address[0], port))
         client_file = client_sock.makefile('wb')
         try:
+            client_file.write(struct.pack(native_str('>L'), size))
+            client_file.flush()
             stream.seek(0)
             shutil.copyfileobj(stream, client_file)
         finally:

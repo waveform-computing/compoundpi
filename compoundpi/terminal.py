@@ -208,7 +208,7 @@ class TerminalApplication(object):
             # file for debugging purposes
             for line in traceback.format_exception(exc_type, exc_value, exc_trace):
                 for msg in line.rstrip().split('\n'):
-                    logging.critical(msg)
+                    logging.critical(msg.replace('%', '%%'))
             return 1
 
     def main(self, args):

@@ -24,6 +24,7 @@ from __future__ import (
     print_function,
     division,
     )
+native_str = str
 str = type('')
 range = xrange
 
@@ -327,11 +328,13 @@ class CompoundPiClient(object):
             self._server_thread = None
         if value is not None:
             self._server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
-            self._server.cmd = self
             self._server.event = threading.Event()
             self._server.source = None
             self._server.output = None
             self._server.exception = None
+            self._server.progress_start = self._progress_start
+            self._server.progress_update = self._progress_update
+            self._server.progress_finish = self._progress_finish
             self._server_thread = threading.Thread(target=self._server.serve_forever)
             self._server_thread.daemon = True
             self._server_thread.start()
@@ -422,20 +425,22 @@ class CompoundPiClient(object):
             self._socket, address, data)
 
     def _responses(self, servers=None, count=0):
-        if self._progress_start:
-            self._progress_start()
-        try:
-            if servers is None:
-                servers = self._servers
+        if servers is None:
+            servers = self._servers
+        if not count:
+            count = len(servers)
+        if not servers:
+            servers = self.network
             if not count:
-                count = len(servers)
-            if not servers:
-                servers = self.network
-            result = {}
-            start = time.time()
+                count = sum(1 for a in self.network)
+        if self._progress_start:
+            self._progress_start(count)
+        result = {}
+        start = time.time()
+        try:
             while time.time() - start < self.timeout:
                 if self._progress_update:
-                    self._progress_update()
+                    self._progress_update(len(result))
                 if select.select([self._socket], [], [], 1)[0]:
                     data, server_address = self._socket.recvfrom(512)
                     match = self.response_re.match(data.decode('utf-8'))
@@ -473,6 +478,8 @@ class CompoundPiClient(object):
                                     )
                             if len(result) == count:
                                 break
+            if self._progress_update:
+                self._progress_update(len(result))
             return result
         finally:
             while self._senders:
@@ -1007,35 +1014,59 @@ class CompoundPiClient(object):
         self._server.source = address
         self._server.output = output
         self._server.event.clear()
+        # As download is a long operation that always targets a single server,
+        # we re-purpose progress notifications from counting server responses
+        # to counting bytes received
+        progress = (
+                self._progress_start,
+                self._progress_update,
+                self._progress_finish,
+                )
+        self._progress_start = self._progress_update = self._progress_finish = None
         try:
             self._transact('SEND %d %d' % (index, self.port), [address])
-            if self._server.event.wait(self.timeout):
-                if self._server.exception:
-                    print('Exception in download thread: %s' % self._server.exception)
-                    raise self._server.exception
-            else:
+            if not self._server.event.wait(self.timeout):
                 raise CompoundPiSendTimeout(address)
+            elif self._server.exception:
+                raise self._server.exception
         finally:
             self._server.source = None
             self._server.output = None
+            self._server.exception = None
+            (
+                self._progress_start,
+                self._progress_update,
+                self._progress_finish,
+                ) = progress
 
 
-class CompoundPiDownloadHandler(socketserver.BaseRequestHandler):
+class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
     def handle(self):
         if self.client_address[0] != str(self.server.source):
             warnings.warn(CompoundPiUnknownAddress(self.client_address[0]))
         else:
+            size, = struct.unpack(
+                native_str('>L'),
+                self.rfile.read(struct.calcsize(native_str('>L'))))
+            if self.server.progress_start:
+                self.server.progress_start(size)
             try:
-                while True:
-                    data = self.request.recv(1024)
+                received = 0
+                while received < size:
+                    data = self.rfile.read(1024)
+                    received += len(data)
                     if not data:
                         break
                     self.server.output.write(data)
+                    if self.server.progress_update:
+                        self.server.progress_update(received)
             except Exception as e:
                 self.server.exception = e
             else:
                 self.server.exception = None
             finally:
+                if self.server.progress_finish:
+                    self.server.progress_finish()
                 self.server.event.set()
 
 
