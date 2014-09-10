@@ -1,7 +1,7 @@
 .. _batch:
 
 ======================
-Building batch clients
+Building Batch Clients
 ======================
 
 While the command line (:ref:`cpi`) and GUI (:ref:`cpigui`) clients lend
