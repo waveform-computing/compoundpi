@@ -23,7 +23,10 @@ from __future__ import (
     division,
     )
 str = type('')
-input = raw_input
+try:
+    input = raw_input
+except NameError:
+    pass
 
 """
 Enhanced version of the standard Python Cmd command line interpreter.
@@ -307,9 +310,10 @@ class Cmd(cmd.Cmd):
         # wide enough).
         # XXX Improve algorithm to reduce column widths when terminal is slim
         for row in data:
-            self.stdout.write(' '.join(
+            s = ' '.join(
                 '%-*s' % (length, s) for (length, s) in zip(lengths, row)
-                ) + '\n')
+                ) + '\n'
+            self.stdout.write(s.encode(ENCODING))
 
     def do_help(self, arg):
         """
