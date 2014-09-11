@@ -483,6 +483,8 @@ The project homepage and documentation is at
     @QtCore.Slot(int)
     def progress_update_slot(self, count):
         now = time.time()
+        # Only bother updating the progress dialog if it's been at least
+        # 0.1 seconds since we last updated it
         if (self.progress_time is None) or (now - self.progress_time) > 0.1:
             self.progress_time = now
             if self.progress_dialog.cancelled:
