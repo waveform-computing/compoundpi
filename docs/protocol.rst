@@ -4,6 +4,15 @@
 Network Protocol
 ================
 
+.. warning::
+
+    As Compound Pi is a project in its infancy, the protocol version is
+    currently the project's version and no attempt will be made to preserve
+    backward (or forward) compatibility in the protocol until version 1.0 is
+    released. In the current version, the client crudely compares the version
+    in the :ref:`protocol_hello` response with its own version and rejects
+    anything that doesn't match precisely.
+
 The Compound Pi network protocol is UDP-based, utilizing broadcast or unicast
 packets for commands, and unicast packets for responses. File transfers (as
 initiated by the :ref:`command_download` command in the client) are TCP-based.
@@ -306,15 +315,6 @@ reason, the sequence number cannot be used to detect repeated HELLO commands.
 Instead the timestamp parameter should be used for this purpose: the timestamp
 can be assumed to be incrementing hence HELLO commands from a particular host
 with a timestamp less than or equal to one already seen can be ignored.
-
-.. warning::
-
-    As Compound Pi is a project in its infancy, the protocol version is
-    currently the project's version and no attempt will be made to preserve
-    backward (or forward) compatibility in the protocol until version 1.0 is
-    released. In the current version, the client crudely compares the version
-    in the response with its own version and rejects anything that doesn't
-    match precisely.
 
 
 .. _protocol_iso:
