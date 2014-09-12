@@ -35,6 +35,7 @@ import pkg_resources
 from . import __version__
 from .qt import QtCore, QtGui
 from .windows.main_window import MainWindow
+from .windows.exception_dialog import ExceptionDialog
 from .exc import (
     CompoundPiBadResponse,
     CompoundPiMultiResponse,
@@ -44,13 +45,8 @@ from .exc import (
 APPLICATION = None
 MAIN_WINDOW = None
 
-def excepthook(type, value, tb):
-    # XXX Need to expand this to display a complete stack trace and add an
-    # e-mail option for bug reports
-    QtGui.QMessageBox.critical(
-        QtGui.QApplication.instance().activeWindow(),
-        QtGui.QApplication.instance().desktop().tr('Error'),
-        str(value))
+def excepthook(exc_type, exc_value, exc_tb):
+    ExceptionDialog(MAIN_WINDOW, (exc_type, exc_value, exc_tb)).exec_()
 
 def main(args=None):
     # Ignore extremely common warnings - they're only useful for protocol
@@ -61,6 +57,7 @@ def main(args=None):
     if args is None:
         args = sys.argv
     atexit.register(pkg_resources.cleanup_resources)
+    sys.excepthook = excepthook
     APPLICATION = QtGui.QApplication(args)
     APPLICATION.setApplicationName('cpigui')
     APPLICATION.setApplicationVersion(__version__)
