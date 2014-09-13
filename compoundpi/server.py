@@ -65,7 +65,7 @@ def service(s):
     try:
         return int(s)
     except ValueError:
-        return socket.servbyname(s)
+        return socket.getservbyname(s)
 
 def address(s):
     return socket.getaddrinfo(s, 0, 0, socket.SOCK_DGRAM)[0][-1][0]
@@ -330,14 +330,13 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 width=self.server.camera.resolution[0],
                 height=self.server.camera.resolution[1],
                 framerate=self.server.camera.framerate,
-                shutter_speed=self.server.camera.shutter_speed,
                 awb_mode=self.server.camera.awb_mode,
                 awb_red=self.server.camera.awb_gains[0],
                 awb_blue=self.server.camera.awb_gains[1],
                 exp_mode=self.server.camera.exposure_mode,
                 exp_speed=self.server.camera.exposure_speed / 1000.0,
                 exp_compensation=self.server.camera.exposure_compensation,
-                iso=self.server.camera.ISO,
+                iso=self.server.camera.iso,
                 meter_mode=self.server.camera.meter_mode,
                 brightness=self.server.camera.brightness,
                 contrast=self.server.camera.contrast,

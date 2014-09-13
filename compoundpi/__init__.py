@@ -42,6 +42,7 @@ __extra_requires__ = {
     'client': ['netifaces', 'pyqt'],
     'server': ['picamera', 'rpi.gpio', 'python-daemon'],
     'doc':    ['sphinx'],
+    'test':   ['pytest', 'mock', 'coverage'],
     }
 
 if sys.version_info[:2] < (3, 3):

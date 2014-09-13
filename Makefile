@@ -96,7 +96,7 @@ deb: $(DIST_DEB) $(DIST_DSC)
 dist: $(DIST_EGG) $(DIST_DEB) $(DIST_DSC) $(DIST_TAR) $(DIST_ZIP)
 
 develop: tags
-	$(PIP) install -e .
+	$(PIP) install -e .[doc,test]
 
 test:
 	$(COVERAGE) run -m $(PYTEST) tests -v
