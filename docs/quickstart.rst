@@ -251,7 +251,7 @@ The :ref:`command_identify` command is the main debugging tool provided by
 Compound Pi.  If specified without any further parameters it will cause all
 discovered Pi servers to blink their camera LED for 5 seconds. Thus, if you run
 this command immediately after :ref:`command_find` you can quickly locate any
-Pi servers that were no discovered (typically this is due to misconfiguration
+Pi servers that were not discovered (typically this is due to misconfiguration
 of the network).
 
 If :ref:`command_identify` is specified with one or more addresses, it will
