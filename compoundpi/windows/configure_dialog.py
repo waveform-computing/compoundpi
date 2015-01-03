@@ -52,7 +52,7 @@ class ConfigureDialog(QtGui.QDialog):
             'sunlight',
             'tungsten',
             ]))
-        self.ui.exposure_combo.setModel(ListModel([
+        self.ui.agc_combo.setModel(ListModel([
             'antishake',
             'auto',
             'backlight',
@@ -72,21 +72,29 @@ class ConfigureDialog(QtGui.QDialog):
             'matrix',
             'spot',
             ]))
+        # Construct radio groups
+        self.agc_group = QtGui.QButtonGroup(self)
+        self.agc_group.addButton(self.ui.agc_auto_radio)
+        self.agc_group.addButton(self.ui.agc_manual_radio)
+        self.awb_group = QtGui.QButtonGroup(self)
+        self.awb_group.addButton(self.ui.awb_auto_radio)
+        self.awb_group.addButton(self.ui.awb_manual_radio)
+        self.exposure_group = QtGui.QButtonGroup(self)
+        self.exposure_group.addButton(self.ui.exposure_auto_radio)
+        self.exposure_group.addButton(self.ui.exposure_manual_radio)
         # Connect up signals
         self.ui.button_box.clicked.connect(self.button_box_clicked)
         self.ui.resolution_combo.editTextChanged.connect(self.edit_changed)
         self.ui.framerate_combo.editTextChanged.connect(self.edit_changed)
         self.ui.iso_combo.editTextChanged.connect(self.edit_changed)
-        self.ui.awb_auto_radio.clicked.connect(self.awb_auto_radio_clicked)
+        self.ui.agc_auto_radio.toggled.connect(self.agc_radio_changed)
+        self.ui.agc_manual_radio.toggled.connect(self.agc_radio_changed)
+        self.ui.agc_combo.currentIndexChanged.connect(self.combo_changed)
         self.ui.awb_auto_radio.toggled.connect(self.awb_radio_changed)
-        self.ui.awb_manual_radio.clicked.connect(self.awb_manual_radio_clicked)
         self.ui.awb_manual_radio.toggled.connect(self.awb_radio_changed)
         self.ui.awb_combo.currentIndexChanged.connect(self.combo_changed)
-        self.ui.exposure_auto_radio.clicked.connect(self.exposure_auto_radio_clicked)
         self.ui.exposure_auto_radio.toggled.connect(self.exposure_radio_changed)
-        self.ui.exposure_manual_radio.toggled.connect(self.exposure_manual_radio_clicked)
         self.ui.exposure_manual_radio.toggled.connect(self.exposure_radio_changed)
-        self.ui.exposure_combo.currentIndexChanged.connect(self.combo_changed)
         self.ui.metering_combo.currentIndexChanged.connect(self.combo_changed)
         self.ui.hflip_checkbox.stateChanged.connect(self.checkbox_changed)
         self.ui.vflip_checkbox.stateChanged.connect(self.checkbox_changed)
@@ -167,10 +175,45 @@ class ConfigureDialog(QtGui.QDialog):
         self.ui.awb_blue_spinbox.setValue(value)
     awb_blue = property(_get_awb_blue, _set_awb_blue)
 
+    def _get_agc_mode(self):
+        if self.ui.agc_auto_radio.isChecked():
+            return self.ui.agc_combo.model().get(
+                    self.ui.agc_combo.currentIndex())
+        elif self.ui.agc_manual_radio.isChecked():
+            return 'off'
+        else:
+            return None
+    def _set_agc_mode(self, value):
+        if value is None:
+            self.ui.agc_auto_radio.setChecked(False)
+            self.ui.agc_manual_radio.setChecked(False)
+        elif value == 'off':
+            self.ui.agc_manual_radio.setChecked(True)
+        else:
+            self.ui.agc_auto_radio.setChecked(True)
+            self.ui.agc_combo.setCurrentIndex(
+                    self.ui.agc_combo.model().find(value))
+    agc_mode = property(_get_agc_mode, _set_agc_mode)
+
+    def _get_agc_analog(self):
+        return self.ui.agc_analog_spinbox.value()
+    def _set_agc_analog(self, value):
+        if value is None:
+            value = 1.0
+        self.ui.agc_analog_spinbox.setValue(value)
+    agc_analog = property(_get_agc_analog, _set_agc_analog)
+
+    def _get_agc_digital(self):
+        return self.ui.agc_digital_spinbox.value()
+    def _set_agc_digital(self, value):
+        if value is None:
+            value = 1.0
+        self.ui.agc_digital_spinbox.setValue(value)
+    agc_digital = property(_get_agc_digital, _set_agc_digital)
+
     def _get_exposure_mode(self):
         if self.ui.exposure_auto_radio.isChecked():
-            return self.ui.exposure_combo.model().get(
-                    self.ui.exposure_combo.currentIndex())
+            return 'auto'
         elif self.ui.exposure_manual_radio.isChecked():
             return 'off'
         else:
@@ -183,8 +226,6 @@ class ConfigureDialog(QtGui.QDialog):
             self.ui.exposure_manual_radio.setChecked(True)
         else:
             self.ui.exposure_auto_radio.setChecked(True)
-            self.ui.exposure_combo.setCurrentIndex(
-                    self.ui.exposure_combo.model().find(value))
     exposure_mode = property(_get_exposure_mode, _set_exposure_mode)
 
     def _get_exposure_speed(self):
@@ -279,25 +320,17 @@ class ConfigureDialog(QtGui.QDialog):
     def checkbox_changed(self, state):
         self.update_ok()
 
-    def awb_auto_radio_clicked(self, checked):
-        self.ui.awb_manual_radio.setChecked(not checked)
-
-    def awb_manual_radio_clicked(self, checked):
-        self.ui.awb_auto_radio.setChecked(not checked)
+    def agc_radio_changed(self, checked):
+        self.ui.agc_combo.setEnabled(self.ui.agc_auto_radio.isChecked())
+        #self.ui.agc_analog_spinbox.setEnabled(self.ui.agc_manual_radio.isChecked())
+        #self.ui.agc_digital_spinbox.setEnabled(self.ui.agc_manual_radio.isChecked())
 
     def awb_radio_changed(self, checked):
         self.ui.awb_combo.setEnabled(self.ui.awb_auto_radio.isChecked())
         self.ui.awb_red_spinbox.setEnabled(self.ui.awb_manual_radio.isChecked())
         self.ui.awb_blue_spinbox.setEnabled(self.ui.awb_manual_radio.isChecked())
 
-    def exposure_auto_radio_clicked(self, checked):
-        self.ui.exposure_manual_radio.setChecked(not checked)
-
-    def exposure_manual_radio_clicked(self, checked):
-        self.ui.exposure_auto_radio.setChecked(not checked)
-
     def exposure_radio_changed(self, checked):
-        self.ui.exposure_combo.setEnabled(self.ui.exposure_auto_radio.isChecked())
         self.ui.exposure_speed_spinbox.setEnabled(self.ui.exposure_manual_radio.isChecked())
 
     def update_ok(self):
@@ -305,6 +338,7 @@ class ConfigureDialog(QtGui.QDialog):
                 bool(
                     self.resolution and
                     self.framerate and
+                    self.agc_mode and
                     self.awb_mode and
                     self.exposure_mode and
                     self.metering_mode and
@@ -315,6 +349,7 @@ class ConfigureDialog(QtGui.QDialog):
         if self.ui.button_box.standardButton(button) == QtGui.QDialogButtonBox.RestoreDefaults:
             self.resolution = (1280, 720)
             self.framerate = 30
+            self.agc_mode = 'auto'
             self.awb_mode = 'auto'
             self.exposure_mode = 'auto'
             self.exposure_compensation = 0

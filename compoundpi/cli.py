@@ -518,6 +518,7 @@ class CompoundPiCmd(Cmd):
                 (
                     'Address',
                     'Mode',
+                    'AGC',
                     'AWB',
                     'Exp',
                     'Meter',
@@ -532,6 +533,11 @@ class CompoundPiCmd(Cmd):
                         status.resolution.width,
                         status.resolution.height,
                         status.framerate,
+                        ),
+                    '%s (%.1f,%.1f)' % (
+                        status.agc_mode,
+                        status.agc_analog,
+                        status.agc_digital,
                         ),
                     '%s (%.1f,%.1f)' % (
                         status.awb_mode,
@@ -566,6 +572,11 @@ class CompoundPiCmd(Cmd):
                 for status in responses.values()
                 )) > 1:
             logging.warning('Warning: multiple framerates configured')
+        if len(set(
+                status.agc_mode
+                for status in responses.values()
+                )) > 1:
+            logging.warning('Warning: multiple gain-control modes configured')
         if len(set(
                 status.awb_mode
                 for status in responses.values()
@@ -726,6 +737,69 @@ class CompoundPiCmd(Cmd):
                 if framerate.startswith(text)
                 ]
 
+    def do_agc(self, arg):
+        """
+        Sets the auto-gain-control (AGC) mode on the defined servers.
+
+        Syntax: agc <mode> [addresses]
+
+        The 'agc' command is used to set the AGC mode of the camera on all or
+        some of the defined servers. The mode can be one of the following:
+
+        antishake, auto, backlight, beach, fireworks, fixedfps, night,
+        nightpreview, off, snow, sports, spotlight, verylong
+
+        If 'off' is specified, the current sensor gains of the camera will
+        be fixed at their present values (unfortunately there is no way at
+        the moment to manually specify the gain values).
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status, awb, exposure, metering.
+
+        cpi> agc auto
+        cpi> agc backlight 192.168.0.1
+        cpi> agc antishake 192.168.0.1-192.168.0.10
+        cpi> agc off
+        cpi> agc off 192.168.0.1
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a mode')
+        arg = arg.split(' ', 1)
+        self.client.agc(
+                arg[0].lower(),
+                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_agc(self, text, line, start, finish):
+        cmd_re = re.compile(r'agc(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('mode') < finish <= match.end('mode'):
+            modes = [
+                'antishake',
+                'auto',
+                'backlight',
+                'beach',
+                'fireworks',
+                'fixedfps',
+                'night',
+                'nightpreview',
+                'off',
+                'snow',
+                'sports',
+                'spotlight',
+                'verylong',
+                ]
+            return [
+                mode
+                for mode in modes
+                if mode.startswith(text)
+                ]
+
     def do_awb(self, arg):
         """
         Sets the auto-white-balance (AWB) mode on the defined servers.
@@ -797,17 +871,12 @@ class CompoundPiCmd(Cmd):
         """
         Sets the exposure mode on the defined servers.
 
-        Syntax: exposure (<mode>|<speed>) [addresses]
+        Syntax: exposure (auto|<speed>) [addresses]
 
         The 'exposure' command is used to set the exposure mode of the camera
-        on all or some of the defined servers. The mode can be one of the
-        following:
-
-        antishake, auto, backlight, beach, fireworks, fixedfps, night,
-        nightpreview, snow, sports, spotlight, verylong
-
-        Alternatively you can specify an exposure speed as a floating-point
-        number measured in ms.
+        on all or some of the defined servers. The mode can be 'auto' or a
+        speed measured in ms. Please note that exposure speed is limited by
+        framerate.
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
@@ -816,8 +885,8 @@ class CompoundPiCmd(Cmd):
         See also: status, awb, metering.
 
         cpi> exposure auto
-        cpi> exposure night 192.168.0.1
-        cpi> exposure backlight 192.168.0.1-192.168.0.10
+        cpi> exposure 30000 192.168.0.1
+        cpi> exposure auto 192.168.0.1-192.168.0.10
         """
         if not arg:
             raise CmdSyntaxError('You must specify a mode')
@@ -979,12 +1048,17 @@ class CompoundPiCmd(Cmd):
         """
         Sets the brightness, contrast, and saturation on the defined servers.
 
-        Syntax: levels <brightness> <contrast> <saturation> [addresses]
+        Syntax: levels <brightness> <contrast> <saturation> <ev> [addresses]
 
         The 'levels' command is used to simultaneously set the brightness,
-        contrast, and saturation levels on all or some of the defined servers.
-        Each level is specified as an integer number between 0 and 100. The
-        default for each level is 50.
+        contrast, saturation, and exposure compensation (EV) levels on all or
+        some of the defined servers. Brightness, contrast, and saturation are
+        each specified as an integer number between 0 and 100. The default for
+        each level is 50.
+
+        EV is specified as an integer number between -24 and 24 where
+        increments of 6 represent an exposure stop (so EV 12 will overexpose
+        by 2 stops).
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
@@ -992,13 +1066,13 @@ class CompoundPiCmd(Cmd):
 
         See also: status.
 
-        cpi> levels 50 50 50
-        cpi> levels 70 50 50 192.168.0.1
-        cpi> levels 40 60 70 192.168.0.1-192.168.0.10
+        cpi> levels 50 50 50 0
+        cpi> levels 70 50 50 6 192.168.0.1
+        cpi> levels 40 60 70 -6 192.168.0.1-192.168.0.10
         """
         if not arg:
             raise CmdSyntaxError('You must specify any levels')
-        arg = arg.split(' ', 3)
+        arg = arg.split(' ', 4)
         values = {}
         for index, name in enumerate(('brightness', 'contrast', 'saturation')):
             try:
@@ -1013,12 +1087,18 @@ class CompoundPiCmd(Cmd):
                 values[name] = (value * 2) - 100
             else:
                 values[name] = value
-        self.client.flip(
+        try:
+            values['ev'] = int(arg[3])
+            if not (-24 <= values['ev'] <= 24):
+                raise ValueError('Out of range')
+        except ValueError:
+            raise CmdSyntaxError('Invalid EV "%s"' % arg[3])
+        self.client.levels(
             values['brightness'], values['contrast'], values['saturation'],
-            self.parse_arg(arg[3] if len(arg) > 3 else None))
+            values['ev'], self.parse_arg(arg[4] if len(arg) > 4 else None))
 
     def complete_levels(self, text, line, start, finish):
-        cmd_re = re.compile(r'levels(?P<values>( +[^ ]+){,3}(?P<addr> +.*)?)?')
+        cmd_re = re.compile(r'levels(?P<values>( +[^ ]+){,4}(?P<addr> +.*)?)?')
         match = cmd_re.match(line)
         assert match
         if match.start('addr') < finish <= match.end('addr'):

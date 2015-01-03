@@ -270,17 +270,20 @@ The project homepage and documentation is at
             for attr in (
                 'resolution',
                 'framerate',
+                'agc_mode',
+                'agc_analog',
+                'agc_digital',
                 'awb_mode',
                 'awb_red',
                 'awb_blue',
                 'exposure_mode',
                 'exposure_speed',
-                'exposure_compensation',
                 'iso',
                 'metering_mode',
                 'brightness',
                 'contrast',
                 'saturation',
+                'exposure_compensation',
                 'hflip',
                 'vflip',
                 )}
@@ -301,6 +304,10 @@ The project homepage and documentation is at
                     self.client.framerate(
                             dialog.framerate,
                             addresses=self.selected_addresses)
+                if dialog.agc_mode != settings['agc_mode']:
+                    self.client.agc(
+                            dialog.agc_mode,
+                            addresses=self.selected_addresses)
                 if (
                         dialog.awb_mode != settings['awb_mode'] or
                         dialog.awb_red != settings['awb_red'] or
@@ -313,13 +320,11 @@ The project homepage and documentation is at
                             addresses=self.selected_addresses)
                 if (
                         dialog.exposure_mode != settings['exposure_mode'] or
-                        dialog.exposure_speed != settings['exposure_speed'] or
-                        dialog.exposure_compensation != settings['exposure_compensation']
+                        dialog.exposure_speed != settings['exposure_speed']
                         ):
                     self.client.exposure(
                             dialog.exposure_mode,
                             dialog.exposure_speed,
-                            dialog.exposure_compensation,
                             addresses=self.selected_addresses)
                 if dialog.metering_mode != settings['metering_mode']:
                     self.client.metering(
@@ -332,10 +337,12 @@ The project homepage and documentation is at
                 if (
                         dialog.brightness != settings['brightness'] or
                         dialog.contrast != settings['contrast'] or
-                        dialog.saturation != settings['saturation']
+                        dialog.saturation != settings['saturation'] or
+                        dialog.exposure_compensation != settings['exposure_compensation']
                         ):
                     self.client.levels(
-                            dialog.brightness, dialog.contrast, dialog.saturation,
+                            dialog.brightness, dialog.contrast,
+                            dialog.saturation, dialog.exposure_compensation,
                             addresses=self.selected_addresses)
                 if (
                         dialog.hflip != settings['hflip'] or

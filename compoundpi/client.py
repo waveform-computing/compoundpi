@@ -92,6 +92,9 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     'awb_mode',
     'awb_red',
     'awb_blue',
+    'agc_mode',
+    'agc_analog',
+    'agc_digital',
     'exposure_mode',
     'exposure_speed',
     'exposure_compensation',
@@ -140,6 +143,25 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
         value. Otherwise, it is the current gain being used by the configured
         auto white balance mode.
 
+    .. attribute:: agc_mode
+
+        Returns the current auto-gain mode of the camera as a lower case
+        string.  See :meth:`CompoundPiClient.agc` for valid values.
+
+    .. attribute:: agc_analog
+
+        Returns the current analog gain applied by the camera. If
+        :attr:`agc_mode` is ``'off'`` this is a fixed (but uneditable) value.
+        Otherwise, it is a value which varies according to the selected AGC
+        algorithm.
+
+    .. attribute:: agc_digital
+
+        Returns the current digital gain used by the camera. If
+        :attr:`agc_mode` is ``'off'`` this is a fixed (but uneditable) value.
+        Otherwise, it is a value which varies according to the selected AGC
+        algorithm.
+
     .. attribute:: exposure_mode
 
         Returns the current exposure mode of the camera as a lower case string.
@@ -148,9 +170,7 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     .. attribute:: exposure_speed
 
         Returns the current exposure speed of the camera as a floating point
-        value measured in milliseconds. If :attr:`exposure_mode` is ``'off'``
-        this is a fixed value. Otherwise it is the current speed calculated
-        by the camera's AGC algorithm.
+        value measured in milliseconds.
 
     .. attribute:: exposure_compensation
 
@@ -636,6 +656,7 @@ class CompoundPiClient(object):
             r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
             r'AWB (?P<awb_mode>[a-z]+) (?P<awb_red>\d+(/\d+)?) (?P<awb_blue>\d+(/\d+)?)\n'
+            r'AGC (?P<agc_mode>[a-z]+) (?P<agc_analog>\d+(/\d+)?) (?P<agc_digital>\d+(/\d+)?)\n'
             r'EXPOSURE (?P<exp_mode>[a-z]+) (?P<exp_speed>\d+(\.\d+)?) (?P<exp_compensation>\d+)\n'
             r'ISO (?P<iso>\d+)\n'
             r'METERING (?P<metering_mode>[a-z]+)\n'
@@ -680,6 +701,9 @@ class CompoundPiClient(object):
                     awb_mode=match.group('awb_mode'),
                     awb_red=Fraction(match.group('awb_red')),
                     awb_blue=Fraction(match.group('awb_blue')),
+                    agc_mode=match.group('agc_mode'),
+                    agc_analog=Fraction(match.group('agc_analog')),
+                    agc_digital=Fraction(match.group('agc_digital')),
                     exposure_mode=match.group('exp_mode'),
                     exposure_speed=float(match.group('exp_speed')),
                     exposure_compensation=int(match.group('exp_compensation')),
@@ -750,11 +774,11 @@ class CompoundPiClient(object):
         * ``'tungsten'``
 
         If the special value ``'off'`` is given as the *mode*, the *red* and
-        *blue* parameters specify the red and blue gains of the camera can be
-        manually as floating point values between 0.0 and 8.0. Reasonable
-        values for red and blue gains can be discovered easily by setting
-        *mode* to ``'auto'``, waiting a while to let the camera settle, then
-        querying the current gain by calling :meth:`status`.  For example::
+        *blue* parameters specify the red and blue gains of the camera manually
+        as floating point values between 0.0 and 8.0. Reasonable values for red
+        and blue gains can be discovered easily by setting *mode* to
+        ``'auto'``, waiting a while to let the camera settle, then querying the
+        current gain by calling :meth:`status`.  For example::
 
             from time import sleep
             from compoundpi.client import CompoundPiClient
@@ -774,12 +798,12 @@ class CompoundPiClient(object):
         """
         self._transact('AWB %s %f %f' % (mode, red, blue), addresses)
 
-    def exposure(self, mode, speed=0, compensation=0, addresses=None):
+    def agc(self, mode):
         """
-        Called to change the exposure on the servers at the specified
-        *addresses* (or all defined servers if *addresses* is omitted). The
-        *mode* parameter specifies the new exposure mode as a string.  Valid
-        values are:
+        Called to change the automatic gain control on the servers at the
+        specified *addresses* (or all defined servers if *addresses* is
+        omitted).  The *mode* parameter specifies the new exposure mode as a
+        string. Valid values are:
 
         * ``'antishake'``
         * ``'auto'``
@@ -795,12 +819,32 @@ class CompoundPiClient(object):
         * ``'spotlight'``
         * ``'verylong'``
 
-        If the special value ``'off'`` is given as the *mode*, the *speed*
-        parameter specifies the exposure speed manually as a floating point
-        value measured in milliseconds. Reasonable exposure speeds can be
-        discovered easily by setting *mode* to ``'auto'``, waiting a while to
-        let the camera settle, then querying the current speed by calling
-        :meth:`status`.  For example::
+        .. note::
+
+            When *mode* is set to ``'off'`` the analog and digital gains
+            reported by :meth:`status` will become fixed. Any other mode causes
+            them to vary according to the selected algorithm. Unfortunately, at
+            present, the camera firmware provides no means for forcing the
+            gains to a particular value (in contrast to AWB and exposure
+            speed).
+        """
+        self._transact('AGC %s' % mode, addresses)
+
+    def exposure(self, mode, speed=0, addresses=None):
+        """
+        Called to change the exposure on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        *mode* parameter specifies the new exposure mode as a string.  Valid
+        values are:
+
+        * ``'auto'``
+        * ``'off'``
+
+        The *speed* parameter specifies the exposure speed manually as a
+        floating point value measured in milliseconds. Reasonable exposure
+        speeds can be discovered easily by setting *mode* to ``'auto'``,
+        waiting a while to let the camera settle, then querying the current
+        speed by calling :meth:`status`.  For example::
 
             from time import sleep
             from compoundpi.client import CompoundPiClient
@@ -809,19 +853,15 @@ class CompoundPiClient(object):
             client.network = '192.168.0.0/24'
             client.find(10)
             # Pick an arbitrary camera to determine exposure speed and set it
-            # to auto gain control
+            # to auto
             addr = next(iter(client))
             client.exposure('auto', addresses=addr)
             # Wait a few seconds to let the camera measure the scene
             sleep(2)
             # Query the camera's exposure speed and fix all cameras accordingly
             status = client.status(addresses=addr)[addr]
-            client.exposure('off', status.exposure_speed)
+            client.exposure('off', speed=status.exposure_speed)
 
-        The *compensation* parameter specifies the exposure compensation
-        applied by the camera. It is an integer value measured in 1/6ths of a
-        stop (hence -24, the minimum value, means -4 stops, while 24, the
-        maximum value, represents +4 stops).
         """
         self._transact('EXPOSURE %s %f %d' % (mode, speed, compensation), addresses)
 
@@ -848,7 +888,7 @@ class CompoundPiClient(object):
         """
         self._transact('ISO %d' % value, addresses)
 
-    def levels(self, brightness, contrast, saturation, addresses=None):
+    def levels(self, brightness, contrast, saturation, ev, addresses=None):
         """
         Called to change the *brightness*, *contrast*, and *saturation* levels
         on the servers at the specified *addresses* (or all defined servers if
@@ -856,6 +896,11 @@ class CompoundPiClient(object):
         *saturation* and *contrast* accept values in the range -100 to 100, and
         default to 0. *brightness* accepts values in the range 0 to 100 and
         defaults to 50.
+
+        The *ev* parameter specifies the exposure compensation applied by the
+        camera. It is an integer value measured in 1/6ths of a stop (hence -24,
+        the minimum value, means -4 stops, while 24, the maximum value,
+        represents +4 stops).
         """
         self._transact('LEVELS %d %d %d' % (brightness, contrast, saturation), addresses)
 
@@ -889,7 +934,7 @@ class CompoundPiClient(object):
 
         If *delay* is set to a small floating point value measured in seconds,
         it indicates that the servers should synchronize their captures to a
-        timestamp (which the client calculates the timestamp as *now* + *delay*
+        timestamp (the client calculates the timestamp as *now* + *delay*
         seconds). This functionality assumes that the servers all have accurate
         clocks which are reasonably in sync with the client's clock; a typical
         configuration is to run an NTP server on the client machine, and an NTP

@@ -92,7 +92,7 @@ efficient)::
     client.exposure('auto')
     client.iso(100)
     client.metering('spot')
-    client.levels(50, 0, 0)
+    client.levels(50, 0, 0, 0)
     print('Capturing 5 images on all servers after 0.25 second delay')
     client.clear()
     client.capture(5, True, 0.25)

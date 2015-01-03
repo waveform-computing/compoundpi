@@ -228,6 +228,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             try:
                 handler = {
                     'ACK':          self.do_ack,
+                    'AGC':          self.do_agc,
                     'AWB':          self.do_awb,
                     'BLINK':        self.do_blink,
                     'CAPTURE':      self.do_capture,
@@ -320,6 +321,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             'RESOLUTION {width} {height}\n'
             'FRAMERATE {framerate}\n'
             'AWB {awb_mode} {awb_red} {awb_blue}\n'
+            'AGC {agc_mode} {agc_analog} {agc_digital}\n'
             'EXPOSURE {exp_mode} {exp_speed} {exp_compensation}\n'
             'ISO {iso}\n'
             'METERING {meter_mode}\n'
@@ -333,7 +335,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 awb_mode=self.server.camera.awb_mode,
                 awb_red=self.server.camera.awb_gains[0],
                 awb_blue=self.server.camera.awb_gains[1],
-                exp_mode=self.server.camera.exposure_mode,
+                agc_mode=self.server.camera.exposure_mode,
+                agc_analog=self.server.camera.analog_gain,
+                agc_digital=self.server.camera.digital_gain,
+                exp_mode='auto' if not self.server.camera.shutter_speed else 'off',
                 exp_speed=self.server.camera.exposure_speed / 1000.0,
                 exp_compensation=self.server.camera.exposure_compensation,
                 iso=self.server.camera.iso,
@@ -358,6 +363,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         self.server.camera.framerate = rate
 
     def do_awb(self, mode, red=0.0, blue=0.0):
+        mode = mode.lower()
         red = float(red)
         blue = float(blue)
         logging.info('Changing camera AWB mode to %s', mode)
@@ -366,17 +372,26 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             logging.info('Changing camera AWB gains to %.2f, %.2f', red, blue)
             self.server.camera.awb_gains = (red, blue)
 
+    def do_agc(self, mode):
+        mode = mode.lower()
+        logging.info('Changing camera AGC mode to %s', mode)
+        self.server.camera.exposure_mode = mode
+
     def do_exposure(self, mode, speed, compensation):
+        mode = mode.lower()
         compensation = int(compensation)
         speed = int(float(speed) * 1000)
-        logging.info('Changing camera exposure mode to %s', mode)
-        self.server.camera.exposure_mode = mode
-        logging.info('Changing camera exposure speed to %.4fms', speed / 1000.0)
-        self.server.camera.shutter_speed = speed
+        logging.info('Changing camera shutter speed mode to %s', mode)
+        if mode == 'auto':
+            self.server.camera.shutter_speed = 0
+        else:
+            logging.info('Changing camera exposure speed to %.4fms', speed / 1000.0)
+            self.server.camera.shutter_speed = speed
         logging.info('Changing camera exposure compensation to %d', compensation)
         self.server.camera.exposure_compensation = compensation
 
     def do_metering(self, mode):
+        mode = mode.lower()
         logging.info('Changing camera metering mode to %s', mode)
         self.server.camera.meter_mode = mode
 

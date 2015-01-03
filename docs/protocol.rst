@@ -170,6 +170,21 @@ responses with the same sequence number as the ACK command. No other response
 should be sent.
 
 
+.. _protocol_agc:
+
+AGC
+===
+
+**Syntax:** AGC *mode*
+
+The :ref:`protocol_agc` command changes the camera's auto-gain-control mode
+which is provided as a lower case string. If the string is ``'off'`` then
+the current sensor analog and digital gains will be fixed at their present
+values.
+
+An OK response is expected with no data.
+
+
 .. _protocol_awb:
 
 AWB
@@ -256,12 +271,12 @@ An OK response is expected with no data.
 EXPOSURE
 ========
 
-**Syntax:** EXPOSURE *mode* *speed* *compensation*
+**Syntax:** EXPOSURE *mode* *[speed]*
 
 The :ref:`protocol_exposure` command changes the camera's exposure mode, speed,
-and compensation value. The mode is provided as a lower case string. The speed
-is a floating point number measured in milliseconds. The compensation value is
-an integer number between -24 and 24.
+and compensation value. The mode is provided as a lower case string. If the
+string is ``'off'``, the speed may additionally be specified as a floating
+point number measured in milliseconds.
 
 An OK response is expected with no data.
 
@@ -336,11 +351,13 @@ An OK response is expected with no data.
 LEVELS
 ======
 
-**Syntax:** LEVELS *brightness contrast saturation*
+**Syntax:** LEVELS *brightness contrast saturation exposure_comp*
 
 The :ref:`protocol_levels` command changes the camera's brightness, contrast,
-and saturation levels. The new levels are given as integer numbers between
-0 and 50 for brightness, or -100 to 100 for contrast and saturation.
+saturation, and exposure compensation levels. The new levels are given as
+integer numbers between 0 and 50 for brightness, -100 to 100 for contrast
+and saturation, and -24 to 24 for exposure compensation (where increments of
+6 represent 1 exposure stop).
 
 An OK response is expected with no data.
 
