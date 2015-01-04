@@ -27,6 +27,7 @@ str = type('')
 import sys
 import atexit
 import warnings
+import logging
 
 import pkg_resources
 
@@ -63,6 +64,7 @@ def main(args=None):
     APPLICATION.setOrganizationDomain('waveform.org.uk')
     MAIN_WINDOW = MainWindow()
     MAIN_WINDOW.show()
+    #logging.getLogger().setLevel(logging.DEBUG)
     return APPLICATION.exec_()
 
 if __name__ == '__main__':

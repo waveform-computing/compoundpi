@@ -236,13 +236,13 @@ class ConfigureDialog(QtGui.QDialog):
         self.ui.exposure_speed_spinbox.setValue(value)
     exposure_speed = property(_get_exposure_speed, _set_exposure_speed)
 
-    def _get_exposure_compensation(self):
-        return self.ui.exposure_comp_slider.value()
-    def _set_exposure_compensation(self, value):
+    def _get_ev(self):
+        return self.ui.ev_slider.value()
+    def _set_ev(self, value):
         if value is None:
             value = 0
-        self.ui.exposure_comp_slider.setValue(value)
-    exposure_compensation = property(_get_exposure_compensation, _set_exposure_compensation)
+        self.ui.ev_slider.setValue(value)
+    ev = property(_get_ev, _set_ev)
 
     def _get_iso(self):
         return self.ui.iso_combo.model().get(self.ui.iso_combo.currentIndex())

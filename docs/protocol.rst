@@ -214,6 +214,19 @@ blinking the camera's LED for 5 seconds.
 An OK response is expected with no data.
 
 
+.. _protocol_brightness:
+
+BRIGHTNESS
+==========
+
+**Syntax:** BRIGHTNESS *value*
+
+The :ref:`protocol_brightness` command changes the camera's brightness. The new
+level is given as an integer number between 0 and 100 (default 50).
+
+An OK response is expected with no data.
+
+
 .. _protocol_capture:
 
 CAPTURE
@@ -262,6 +275,33 @@ The :ref:`protocol_clear` command deletes all images from the server's local
 storage.  As noted above in :ref:`protocol_capture`, implementations are free
 to use any storage medium, but the current implementation simply uses a list in
 RAM.
+
+An OK response is expected with no data.
+
+
+.. _protocol_contrast:
+
+CONTRAST
+========
+
+**Syntax:** CONTRAST *value*
+
+The :ref:`protocol_contrast` command changes the camera's contrast. The new
+level is given as an integer number between -100 and 100 (default 0).
+
+An OK response is expected with no data.
+
+
+.. _protocol_ev:
+
+EV
+==
+
+**Syntax:** EV *value*
+
+The :ref:`protocol_saturation` command changes the camera's exposure
+compensation (EV). The new level is given as an integer number between -24 and
+24 where increments of 6 represent one exposure stop.
 
 An OK response is expected with no data.
 
@@ -346,22 +386,6 @@ level.
 An OK response is expected with no data.
 
 
-.. _protocol_levels:
-
-LEVELS
-======
-
-**Syntax:** LEVELS *brightness contrast saturation exposure_comp*
-
-The :ref:`protocol_levels` command changes the camera's brightness, contrast,
-saturation, and exposure compensation levels. The new levels are given as
-integer numbers between 0 and 50 for brightness, -100 to 100 for contrast
-and saturation, and -24 to 24 for exposure compensation (where increments of
-6 represent 1 exposure stop).
-
-An OK response is expected with no data.
-
-
 .. _protocol_list:
 
 LIST
@@ -419,6 +443,19 @@ width and height of the new resolution.
 An OK response is expected with no data.
 
 
+.. _protocol_saturation:
+
+SATURATION
+==========
+
+**Syntax:** SATURATION *value*
+
+The :ref:`protocol_saturation` command changes the camera's saturation. The new
+level is given as an integer number between -100 and 100 (default 0).
+
+An OK response is expected with no data.
+
+
 .. _protocol_send:
 
 SEND
@@ -456,12 +493,16 @@ information about its current configuration. Specifically, the response must
 contain the following lines in its data portion, in the order given below::
 
     RESOLUTION <width> <height>
-    FRAMERATE <num>[/denom]
+    FRAMERATE <rate>
     AWB <awb_mode> <awb_red> <awb_blue>
-    EXPOSURE <exp_mode> <exp_speed> <exp_comp>
+    AGC <agc_mode> <agc_analog> <agc_digital>
+    EXPOSURE <exp_mode> <exp_speed>
     ISO <iso>
     METERING <metering_mode>
-    LEVELS <brightness> <contrast> <saturation>
+    BRIGHTNESS <brightness>
+    CONTRAST <contrast>
+    SATURATION <saturation>
+    EV <ev>
     FLIP <hflip> <vflip>
     TIMESTAMP <time>
     IMAGES <images>
@@ -471,9 +512,9 @@ Where:
 *<width> <height>*
     Gives the camera's currently configured capture resolution
 
-*<num>[/denom]*
+*<rate>*
     Gives the camera's currently configured framerate as an integer number or
-    fractional value
+    fractional value (num/denom)
 
 *<awb_mode>*
     Gives the camera's current auto-white-balance mode as a lower case string
@@ -484,16 +525,21 @@ Where:
 *<awb_blue>*
     Gives the camera's blue-gain as an integer number or fractional value
 
+*<agc_mode>*
+    Gives the camera's current auto-gain-control mode as a lower case string
+
+*<agc_analog>*
+    Gives the camera's current analog gain as a floating point value
+
+*<agc_digital>*
+    Gives the camera's current digital gain as a floating point value
+
 *<exp_mode>*
     Gives the camera's current exposure mode as a lower case string
 
 *<exp_speed>*
     Gives the camera's current exposure speed as a floating point number
     measured in milliseconds.
-
-*<exp_comp>*
-    Gives the camera's current exposure compensation value as an integer
-    number between -24 and 24 (each increment represents 1/6th of a stop)
 
 *<iso>*
     Gives the camera's current ISO setting as an integer number between 0 and
@@ -514,6 +560,10 @@ Where:
     Gives the camera's current saturation setting as an integer between -100 and
     100 (0 is the default)
 
+*<ev>*
+    Gives the camera's current exposure compensation value as an integer
+    number between -24 and 24 (each increment represents 1/6th of a stop)
+
 *<hflip>* and *<vflip>*
     Gives the camera's orientation as 1 or 0 (indicating the flip is or is not
     active respectively)
@@ -531,10 +581,14 @@ For example, the data portion of the OK response may look like the following::
     RESOLUTION 1280 720
     FRAMERATE 30
     AWB auto 321/256 3/2
-    EXPOSURE auto 33.158 0
+    AGC auto 8.0 1.5
+    EXPOSURE auto 33.158
     ISO 0
     METERING average
-    LEVELS 50 0 0
+    BRIGHTNESS 50
+    CONTRAST 0
+    SATURATION 0
+    EV 0
     FLIP 0 0
     TIMESTAMP 1400803173.991651
     IMAGES 1

@@ -6,7 +6,7 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>402</width>
+    <width>404</width>
     <height>557</height>
    </rect>
   </property>
@@ -125,17 +125,17 @@ p, li { white-space: pre-wrap; }
      <item row="5" column="1">
       <layout class="QFormLayout" name="formLayout">
        <item row="2" column="0">
-        <widget class="QLabel" name="label_4">
+        <widget class="QLabel" name="ev_label">
          <property name="text">
           <string>Compensation</string>
          </property>
          <property name="buddy">
-          <cstring>exposure_comp_slider</cstring>
+          <cstring>ev_slider</cstring>
          </property>
         </widget>
        </item>
        <item row="2" column="1">
-        <widget class="QSlider" name="exposure_comp_slider">
+        <widget class="QSlider" name="ev_slider">
          <property name="toolTip">
           <string>&lt;!DOCTYPE HTML PUBLIC &quot;-//W3C//DTD HTML 4.0//EN&quot; &quot;http://www.w3.org/TR/REC-html40/strict.dtd&quot;&gt;
 &lt;html&gt;&lt;head&gt;&lt;meta name=&quot;qrichtext&quot; content=&quot;1&quot; /&gt;&lt;style type=&quot;text/css&quot;&gt;
@@ -591,7 +591,7 @@ p, li { white-space: pre-wrap; }
   <tabstop>exposure_auto_radio</tabstop>
   <tabstop>exposure_manual_radio</tabstop>
   <tabstop>exposure_speed_spinbox</tabstop>
-  <tabstop>exposure_comp_slider</tabstop>
+  <tabstop>ev_slider</tabstop>
   <tabstop>awb_auto_radio</tabstop>
   <tabstop>awb_combo</tabstop>
   <tabstop>awb_manual_radio</tabstop>

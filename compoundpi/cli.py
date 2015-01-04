@@ -588,11 +588,6 @@ class CompoundPiCmd(Cmd):
                 )) > 1:
             logging.warning('Warning: multiple exposure modes configured')
         if len(set(
-                status.exposure_compensation
-                for status in responses.values()
-                )) > 1:
-            logging.warning('Warning: multiple exposure compensations configured')
-        if len(set(
                 status.metering_mode
                 for status in responses.values()
                 )) > 1:
@@ -912,18 +907,7 @@ class CompoundPiCmd(Cmd):
             return self.complete_server(text, line, start, finish)
         elif match.start('mode') < finish <= match.end('mode'):
             modes = [
-                'antishake',
                 'auto',
-                'backlight',
-                'beach',
-                'fireworks',
-                'fixedfps',
-                'night',
-                'nightpreview',
-                'snow',
-                'sports',
-                'spotlight',
-                'verylong',
                 ]
             speeds = [
                 '16.666',
@@ -1012,10 +996,10 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError('You must specify an ISO value')
         arg = arg.split(' ', 1)
         if arg[0].lower() == 'auto':
-            iso = 0
+            value = 0
         else:
             try:
-                iso = int(arg[0])
+                value = int(arg[0])
             except ValueError:
                 raise CmdSyntaxError('Invalid ISO value "%s"' % arg[0])
         self.client.iso(
@@ -1044,67 +1028,170 @@ class CompoundPiCmd(Cmd):
                 if value.startswith(text)
                 ]
 
-    def do_levels(self, arg):
+    def do_brightness(self, arg):
         """
-        Sets the brightness, contrast, and saturation on the defined servers.
+        Sets the brightness on the defined servers.
 
-        Syntax: levels <brightness> <contrast> <saturation> <ev> [addresses]
+        Syntax: brightness <value> [addresses]
 
-        The 'levels' command is used to simultaneously set the brightness,
-        contrast, saturation, and exposure compensation (EV) levels on all or
-        some of the defined servers. Brightness, contrast, and saturation are
-        each specified as an integer number between 0 and 100. The default for
-        each level is 50.
-
-        EV is specified as an integer number between -24 and 24 where
-        increments of 6 represent an exposure stop (so EV 12 will overexpose
-        by 2 stops).
+        The 'brightness' command is used to adjust the brightness level on all
+        or some of the defined servers. Brightness is specified as an integer
+        number between 0 and 100 (default 50).
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
         ranges, comma-separated lists, or any combination of the two.
 
-        See also: status.
+        See also: contrast, saturation, ev.
 
-        cpi> levels 50 50 50 0
-        cpi> levels 70 50 50 6 192.168.0.1
-        cpi> levels 40 60 70 -6 192.168.0.1-192.168.0.10
+        cpi> brightness 50
+        cpi> brightness 75 192.168.0.1
         """
         if not arg:
-            raise CmdSyntaxError('You must specify any levels')
-        arg = arg.split(' ', 4)
-        values = {}
-        for index, name in enumerate(('brightness', 'contrast', 'saturation')):
-            try:
-                value = int(arg[index])
-                if not (0 <= value <= 100):
-                    raise ValueError('Out of range')
-            except ValueError:
-                raise CmdSyntaxError('Invalid %s "%s"' % (name, arg[index]))
-            if index > 0:
-                # Contrast and saturation are actually from -100..100, but
-                # we're keeping the interface simple...
-                values[name] = (value * 2) - 100
-            else:
-                values[name] = value
+            raise CmdSyntaxError('You must specify an brightness value')
+        arg = arg.split(' ', 1)
         try:
-            values['ev'] = int(arg[3])
-            if not (-24 <= values['ev'] <= 24):
+            value = int(arg[0])
+            if not (0 <= value <= 100):
                 raise ValueError('Out of range')
         except ValueError:
-            raise CmdSyntaxError('Invalid EV "%s"' % arg[3])
-        self.client.levels(
-            values['brightness'], values['contrast'], values['saturation'],
-            values['ev'], self.parse_arg(arg[4] if len(arg) > 4 else None))
+            raise CmdSyntaxError('Invalid brightness value "%s"' % arg[0])
+        self.client.brightness(
+            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
 
-    def complete_levels(self, text, line, start, finish):
-        cmd_re = re.compile(r'levels(?P<values>( +[^ ]+){,4}(?P<addr> +.*)?)?')
+    def complete_brightness(self, text, line, start, finish):
+        cmd_re = re.compile(r'brightness(?P<value> +[^ ]+(?P<addr> +.*)?)?')
         match = cmd_re.match(line)
         assert match
         if match.start('addr') < finish <= match.end('addr'):
             return self.complete_server(text, line, start, finish)
-        elif match.start('values') < finish <= match.end('values'):
-            # No completions for levels
+        elif match.start('value') < finish <= match.end('value'):
+            # No completions for value
+            return []
+
+    def do_contrast(self, arg):
+        """
+        Sets the contrast on the defined servers.
+
+        Syntax: contrast <value> [addresses]
+
+        The 'contrast' command is used to adjust the contrast level on all
+        or some of the defined servers. Contrast is specified as an integer
+        number between -100 and 100 (default 0).
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: brightness, saturation, ev.
+
+        cpi> contrast 0
+        cpi> contrast -50 192.168.0.1
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify an contrast value')
+        arg = arg.split(' ', 1)
+        try:
+            value = int(arg[0])
+            if not (-100 <= value <= 100):
+                raise ValueError('Out of range')
+        except ValueError:
+            raise CmdSyntaxError('Invalid contrast value "%s"' % arg[0])
+        self.client.contrast(
+            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_contrast(self, text, line, start, finish):
+        cmd_re = re.compile(r'contrast(?P<value> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('value') < finish <= match.end('value'):
+            # No completions for value
+            return []
+
+    def do_saturation(self, arg):
+        """
+        Sets the saturation on the defined servers.
+
+        Syntax: saturation <value> [addresses]
+
+        The 'saturation' command is used to adjust the saturation level on all
+        or some of the defined servers. Saturation is specified as an integer
+        number between -100 and 100 (default 0).
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: brightness, contrast, ev.
+
+        cpi> saturation 0
+        cpi> saturation -50 192.168.0.1
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify an saturation value')
+        arg = arg.split(' ', 1)
+        try:
+            value = int(arg[0])
+            if not (-100 <= value <= 100):
+                raise ValueError('Out of range')
+        except ValueError:
+            raise CmdSyntaxError('Invalid saturation value "%s"' % arg[0])
+        self.client.saturation(
+            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_saturation(self, text, line, start, finish):
+        cmd_re = re.compile(r'saturation(?P<value> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('value') < finish <= match.end('value'):
+            # No completions for value
+            return []
+
+    def do_ev(self, arg):
+        """
+        Sets the exposure compensation (EV) on the defined servers.
+
+        Syntax: ev <value> [addresses]
+
+        The 'ev' command is used to adjust the exposure compensation (EV) level
+        on all or some of the defined servers. Exposure compensation is
+        specified as an integer number between -24 and 24 where each increment
+        represents 1/6th of a stop. Hence, 12 indicates that camera should
+        overexpose by 2 stops. The default EV is 0.
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: brightness, contrast, saturation.
+
+        cpi> ev 0
+        cpi> ev 6 192.168.0.1
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify an EV value')
+        arg = arg.split(' ', 1)
+        try:
+            value = int(arg[0])
+            if not (-24 <= value <= 24):
+                raise ValueError('Out of range')
+        except ValueError:
+            raise CmdSyntaxError('Invalid EV value "%s"' % arg[0])
+        self.client.ev(
+            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_ev(self, text, line, start, finish):
+        cmd_re = re.compile(r'ev(?P<value> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('value') < finish <= match.end('value'):
+            # No completions for value
             return []
 
     def do_flip(self, arg):

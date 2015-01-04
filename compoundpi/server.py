@@ -238,7 +238,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                     'FRAMERATE':    self.do_framerate,
                     'HELLO':        self.do_hello,
                     'ISO':          self.do_iso,
-                    'LEVELS':       self.do_levels,
+                    'BRIGHTNESS':   self.do_brightness,
+                    'CONTRAST':     self.do_contrast,
+                    'SATURATION':   self.do_saturation,
+                    'EV':           self.do_ev,
                     'LIST':         self.do_list,
                     'METERING':     self.do_metering,
                     'RESOLUTION':   self.do_resolution,
@@ -322,10 +325,13 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             'FRAMERATE {framerate}\n'
             'AWB {awb_mode} {awb_red} {awb_blue}\n'
             'AGC {agc_mode} {agc_analog} {agc_digital}\n'
-            'EXPOSURE {exp_mode} {exp_speed} {exp_compensation}\n'
+            'EXPOSURE {exp_mode} {exp_speed}\n'
             'ISO {iso}\n'
             'METERING {meter_mode}\n'
-            'LEVELS {brightness} {contrast} {saturation}\n'
+            'BRIGHTNESS {brightness}\n'
+            'CONTRAST {contrast}\n'
+            'SATURATION {saturation}\n'
+            'EV {ev}\n'
             'FLIP {hflip} {vflip}\n'
             'TIMESTAMP {timestamp}\n'
             'IMAGES {images}\n'.format(
@@ -340,7 +346,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 agc_digital=self.server.camera.digital_gain,
                 exp_mode='auto' if not self.server.camera.shutter_speed else 'off',
                 exp_speed=self.server.camera.exposure_speed / 1000.0,
-                exp_compensation=self.server.camera.exposure_compensation,
+                ev=self.server.camera.exposure_compensation,
                 iso=self.server.camera.iso,
                 meter_mode=self.server.camera.meter_mode,
                 brightness=self.server.camera.brightness,
@@ -377,18 +383,15 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         logging.info('Changing camera AGC mode to %s', mode)
         self.server.camera.exposure_mode = mode
 
-    def do_exposure(self, mode, speed, compensation):
+    def do_exposure(self, mode, speed):
         mode = mode.lower()
-        compensation = int(compensation)
         speed = int(float(speed) * 1000)
-        logging.info('Changing camera shutter speed mode to %s', mode)
+        logging.info('Changing camera exposure speed mode to %s', mode)
         if mode == 'auto':
             self.server.camera.shutter_speed = 0
         else:
             logging.info('Changing camera exposure speed to %.4fms', speed / 1000.0)
             self.server.camera.shutter_speed = speed
-        logging.info('Changing camera exposure compensation to %d', compensation)
-        self.server.camera.exposure_compensation = compensation
 
     def do_metering(self, mode):
         mode = mode.lower()
@@ -400,16 +403,25 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         logging.info('Changing camera ISO to %d', iso)
         self.server.camera.iso = iso
 
-    def do_levels(self, brightness, contrast, saturation):
+    def do_brightness(self, brightness):
         brightness = int(brightness)
-        contrast = int(contrast)
-        saturation = int(saturation)
         logging.info('Changing camera brightness to %d', brightness)
         self.server.camera.brightness = brightness
+
+    def do_contrast(self, contrast):
+        contrast = int(contrast)
         logging.info('Changing camera contrast to %d', contrast)
         self.server.camera.contrast = contrast
+
+    def do_saturation(self, saturation):
+        saturation = int(saturation)
         logging.info('Changing camera saturation to %d', saturation)
         self.server.camera.saturation = saturation
+
+    def do_ev(self, ev):
+        ev = int(ev)
+        logging.info('Changing camera EV to %d', ev)
+        self.server.camera.exposure_compensation = ev
 
     def do_flip(self, horizontal, vertical):
         horizontal = bool(int(horizontal))

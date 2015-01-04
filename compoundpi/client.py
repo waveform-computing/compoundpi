@@ -35,6 +35,7 @@ import datetime
 import time
 import random
 import threading
+import logging
 import select
 import struct
 import socket
@@ -97,12 +98,12 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     'agc_digital',
     'exposure_mode',
     'exposure_speed',
-    'exposure_compensation',
     'iso',
     'metering_mode',
     'brightness',
     'contrast',
     'saturation',
+    'ev',
     'hflip',
     'vflip',
     'timestamp',
@@ -172,12 +173,6 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
         Returns the current exposure speed of the camera as a floating point
         value measured in milliseconds.
 
-    .. attribute:: exposure_compensation
-
-        Returns the camera's exposure compensation value as an integer value
-        measured in 1/6ths of a stop. Hence, 24 indicates the camera's
-        compensation is +4 stops, while -12 indicates -2 stops.
-
     .. attribute:: iso
 
         Returns the camera's ISO setting as an integer value. This will be
@@ -202,6 +197,12 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
 
         Returns the camera's saturation level as an integer value between -100
         and 100.
+
+    .. attribute:: ev
+
+        Returns the camera's exposure compensation value as an integer value
+        measured in 1/6ths of a stop. Hence, 24 indicates the camera's
+        compensation is +4 stops, while -12 indicates -2 stops.
 
     .. attribute:: hflip
 
@@ -439,6 +440,7 @@ class CompoundPiClient(object):
 
     def _send_command(self, address, seqno, data):
         assert self.request_re.match(data)
+        logging.debug('%s Tx %s', address, data)
         if isinstance(data, str):
             data = data.encode('utf-8')
         self._senders[(address, seqno)] = NetworkRepeater(
@@ -463,7 +465,9 @@ class CompoundPiClient(object):
                     self._progress_update(len(result))
                 if select.select([self._socket], [], [], 1)[0]:
                     data, server_address = self._socket.recvfrom(512)
-                    match = self.response_re.match(data.decode('utf-8'))
+                    data = data.decode('utf-8')
+                    logging.debug('%s Rx %s', server_address, data)
+                    match = self.response_re.match(data)
                     address, port = server_address
                     address = IPv4Address(address)
                     if port != self.port:
@@ -657,10 +661,13 @@ class CompoundPiClient(object):
             r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
             r'AWB (?P<awb_mode>[a-z]+) (?P<awb_red>\d+(/\d+)?) (?P<awb_blue>\d+(/\d+)?)\n'
             r'AGC (?P<agc_mode>[a-z]+) (?P<agc_analog>\d+(/\d+)?) (?P<agc_digital>\d+(/\d+)?)\n'
-            r'EXPOSURE (?P<exp_mode>[a-z]+) (?P<exp_speed>\d+(\.\d+)?) (?P<exp_compensation>\d+)\n'
+            r'EXPOSURE (?P<exp_mode>[a-z]+) (?P<exp_speed>\d+(\.\d+)?)\n'
             r'ISO (?P<iso>\d+)\n'
             r'METERING (?P<metering_mode>[a-z]+)\n'
-            r'LEVELS (?P<brightness>\d+) (?P<contrast>\d+) (?P<saturation>\d+)\n'
+            r'BRIGHTNESS (?P<brightness>\d+)\n'
+            r'CONTRAST (?P<contrast>-?\d+)\n'
+            r'SATURATION (?P<saturation>-?\d+)\n'
+            r'EV (?P<ev>-?\d+)\n'
             r'FLIP (?P<hflip>0|1) (?P<vflip>0|1)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
             r'IMAGES (?P<images>\d{,3})\n')
@@ -706,7 +713,7 @@ class CompoundPiClient(object):
                     agc_digital=Fraction(match.group('agc_digital')),
                     exposure_mode=match.group('exp_mode'),
                     exposure_speed=float(match.group('exp_speed')),
-                    exposure_compensation=int(match.group('exp_compensation')),
+                    ev=int(match.group('ev')),
                     iso=int(match.group('iso')),
                     metering_mode=match.group('metering_mode'),
                     brightness=int(match.group('brightness')),
@@ -798,7 +805,7 @@ class CompoundPiClient(object):
         """
         self._transact('AWB %s %f %f' % (mode, red, blue), addresses)
 
-    def agc(self, mode):
+    def agc(self, mode, addresses=None):
         """
         Called to change the automatic gain control on the servers at the
         specified *addresses* (or all defined servers if *addresses* is
@@ -863,7 +870,7 @@ class CompoundPiClient(object):
             client.exposure('off', speed=status.exposure_speed)
 
         """
-        self._transact('EXPOSURE %s %f %d' % (mode, speed, compensation), addresses)
+        self._transact('EXPOSURE %s %f' % (mode, speed), addresses)
 
     def metering(self, mode, addresses=None):
         """
@@ -888,21 +895,38 @@ class CompoundPiClient(object):
         """
         self._transact('ISO %d' % value, addresses)
 
-    def levels(self, brightness, contrast, saturation, ev, addresses=None):
+    def brightness(self, value, addresses=None):
         """
-        Called to change the *brightness*, *contrast*, and *saturation* levels
-        on the servers at the specified *addresses* (or all defined servers if
-        *addresses* is omitted). Each level is specified as an integer.
-        *saturation* and *contrast* accept values in the range -100 to 100, and
-        default to 0. *brightness* accepts values in the range 0 to 100 and
-        defaults to 50.
+        Called to change the brightness level on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        new level is specified an integer between 0 and 100.
+        """
+        self._transact('BRIGHTNESS %d' % value, addresses)
 
-        The *ev* parameter specifies the exposure compensation applied by the
-        camera. It is an integer value measured in 1/6ths of a stop (hence -24,
-        the minimum value, means -4 stops, while 24, the maximum value,
-        represents +4 stops).
+    def contrast(self, value, addresses=None):
         """
-        self._transact('LEVELS %d %d %d' % (brightness, contrast, saturation), addresses)
+        Called to change the contrast level on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        new level is specified an integer between -100 and 100.
+        """
+        self._transact('CONTRAST %d' % value, addresses)
+
+    def saturation(self, value, addresses=None):
+        """
+        Called to change the saturation level on the servers at the specified
+        *addresses* (or all defined servers if *addresses* is omitted). The
+        new level is specified an integer between -100 and 100.
+        """
+        self._transact('SATURATION %d' % value, addresses)
+
+    def ev(self, value, addresses=None):
+        """
+        Called to change the exposure compensation (EV) level on the servers at
+        the specified *addresses* (or all defined servers if *addresses* is
+        omitted). The new level is specified an integer between -24 and 24
+        where each increment represents 1/6th of a stop.
+        """
+        self._transact('EV %d' % value, addresses)
 
     def flip(self, horizontal, vertical, addresses=None):
         """

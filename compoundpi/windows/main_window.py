@@ -283,7 +283,7 @@ The project homepage and documentation is at
                 'brightness',
                 'contrast',
                 'saturation',
-                'exposure_compensation',
+                'ev',
                 'hflip',
                 'vflip',
                 )}
@@ -308,18 +308,18 @@ The project homepage and documentation is at
                     self.client.agc(
                             dialog.agc_mode,
                             addresses=self.selected_addresses)
-                if (
-                        dialog.awb_mode != settings['awb_mode'] or
-                        dialog.awb_red != settings['awb_red'] or
-                        dialog.awb_blue != settings['awb_blue']
-                        ):
+                if (dialog.awb_mode != settings['awb_mode']) or (
+                        dialog.awb_mode == 'off' and (
+                            dialog.awb_red != settings['awb_red'] or
+                            dialog.awb_blue != settings['awb_blue']
+                            )):
                     self.client.awb(
                             dialog.awb_mode,
                             dialog.awb_red,
                             dialog.awb_blue,
                             addresses=self.selected_addresses)
-                if (
-                        dialog.exposure_mode != settings['exposure_mode'] or
+                if (dialog.exposure_mode != settings['exposure_mode']) or (
+                        dialog.exposure_mode == 'off' and
                         dialog.exposure_speed != settings['exposure_speed']
                         ):
                     self.client.exposure(
@@ -334,15 +334,21 @@ The project homepage and documentation is at
                     self.client.iso(
                             dialog.iso,
                             addresses=self.selected_addresses)
-                if (
-                        dialog.brightness != settings['brightness'] or
-                        dialog.contrast != settings['contrast'] or
-                        dialog.saturation != settings['saturation'] or
-                        dialog.exposure_compensation != settings['exposure_compensation']
-                        ):
-                    self.client.levels(
-                            dialog.brightness, dialog.contrast,
-                            dialog.saturation, dialog.exposure_compensation,
+                if dialog.brightness != settings['brightness']:
+                    self.client.brightness(
+                            dialog.brightness,
+                            addresses=self.selected_addresses)
+                if dialog.contrast != settings['contrast']:
+                    self.client.contrast(
+                            dialog.contrast,
+                            addresses=self.selected_addresses)
+                if dialog.saturation != settings['saturation']:
+                    self.client.saturation(
+                            dialog.saturation,
+                            addresses=self.selected_addresses)
+                if dialog.ev != settings['ev']:
+                    self.client.ev(
+                            dialog.ev,
                             addresses=self.selected_addresses)
                 if (
                         dialog.hflip != settings['hflip'] or
@@ -566,7 +572,7 @@ class ServersModel(QtCore.QAbstractTableModel):
             parent = QtCore.QModelIndex()
         if parent.isValid():
             return 0
-        return 8
+        return 9
 
     def data(self, index, role):
         if index.isValid() and role == QtCore.Qt.DisplayRole:
@@ -577,6 +583,11 @@ class ServersModel(QtCore.QAbstractTableModel):
                     status.resolution[0],
                     status.resolution[1],
                     status.framerate,
+                    ),
+                '%s (%.1f,%.1f)' % (
+                    status.agc_mode,
+                    status.agc_analog,
+                    status.agc_digital,
                     ),
                 '%s (%.1f,%.1f)' % (
                     status.awb_mode,
@@ -603,6 +614,7 @@ class ServersModel(QtCore.QAbstractTableModel):
             return [
                 'Address',
                 'Mode',
+                'AGC',
                 'AWB',
                 'Exposure',
                 'Metering',
