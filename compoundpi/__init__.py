@@ -29,7 +29,7 @@ str = type('')
 import sys
 
 __project__      = 'compoundpi'
-__version__      = '0.3'
+__version__      = '0.4'
 __keywords__     = ['raspberrypi', 'camera', 'multi']
 __author__       = 'Dave Hughes'
 __author_email__ = 'dave@waveform.org.uk'

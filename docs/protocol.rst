@@ -307,7 +307,7 @@ command in order to locate Compound Pi servers. The server must send the
 following string in the data portion of the OK response indicating the version
 of the protocol that the server understands::
 
-    VERSION 0.3
+    VERSION 0.4
 
 The server must use the sequence number of the command as the new starting
 sequence number (i.e. HELLO resets the sequence number on the server). For this
