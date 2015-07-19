@@ -63,6 +63,50 @@ See also: :ref:`command_find`, :ref:`command_remove`, :ref:`command_servers`.
   cpi> add 192.168.0.1,192.168.0.5-192.168.0.10
 
 
+.. _command_agc:
+
+agc
+===
+
+**Syntax:** agc *mode* *[addresses]*
+
+The :ref:`command_agc` command is used to set the AGC mode of the camera on all
+or some of the defined servers. The mode can be one of the following:
+
+* antishake
+* auto
+* backlight
+* beach
+* fireworks
+* fixedfps
+* night
+* nightpreview
+* off
+* snow
+* sports
+* spotlight
+* verylong
+
+If 'off' is specified, the current sensor gains of the camera will be fixed at
+their present values (unfortunately there is no way at the moment to manually
+specify the gain values).
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`, :ref:`command_awb`, :ref:`command_exposure`,
+:ref:`command_metering`.
+
+::
+
+    cpi> agc auto
+    cpi> agc backlight 192.168.0.1
+    cpi> agc antishake 192.168.0.1-192.168.0.10
+    cpi> agc off
+    cpi> agc off 192.168.0.1
+
+
 .. _command_awb:
 
 awb
@@ -102,6 +146,30 @@ See also: :ref:`command_status`, :ref:`command_exposure`,
     cpi> awb fluorescent 192.168.0.1
     cpi> awb 1.7 1.0 192.168.0.10
     cpi> awb sunlight 192.168.0.1-192.168.0.10
+
+
+.. _command_brightness:
+
+brightness
+==========
+
+**Syntax:** brightness *value* *[addresses]*
+
+The :ref:`command_brightness` command is used to adjust the brightness level on
+all or some of the defined servers. Brightness is specified as an integer
+number between 0 and 100 (default 50).
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_contrast`, :ref:`command_saturation`,
+:ref:`command_ev`.
+
+::
+
+    cpi> brightness 50
+    cpi> brightness 75 192.168.0.1
 
 
 .. _command_capture:
@@ -171,6 +239,30 @@ See also: :ref:`command_set`.
   cpi> config
 
 
+.. _command_contrast:
+
+contrast
+========
+
+**Syntax:** contrast *value* *[addresses]*
+
+The :ref:`command_contrast` command is used to adjust the contrast level on all
+or some of the defined servers. Contrast is specified as an integer number
+between -100 and 100 (default 0).
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_brightness`, :ref:`command_saturation`,
+:ref:`command_ev`.
+
+::
+
+    cpi> contrast 0
+    cpi> contrast -50 192.168.0.1
+
+
 .. _command_download:
 
 download
@@ -191,6 +283,31 @@ See also: :ref:`command_capture`, :ref:`command_clear`.
   cpi> download 192.168.0.1
 
 
+.. _command_ev:
+
+ev
+==
+
+**Syntax:** ev *value* *[addresses]*
+
+The :ref:`command_ev` command is used to adjust the exposure compensation (EV)
+level on all or some of the defined servers. Exposure compensation is specified
+as an integer number between -24 and 24 where each increment represents 1/6th
+of a stop. Hence, 12 indicates that camera should overexpose by 2 stops. The
+default EV is 0.
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_brightness`, :ref:`command_contrast`,
+:ref:`command_saturation`.
+
+::
+
+    cpi> ev 0
+    cpi> ev 6 192.168.0.1
+
 
 .. _command_exit:
 
@@ -203,35 +320,16 @@ The :ref:`command_exit` command is used to terminate the application. You can
 also use the standard UNIX :kbd:`Ctrl+D` end of file sequence to quit.
 
 
-
 .. _command_exposure:
 
 exposure
 ========
 
-**Syntax:** exposure *mode|speed* *[addresses]*
+**Syntax:** exposure (auto | *speed*) *[addresses]*
 
-The :ref:`command_exposure` command is used to set the exposure mode or speed
-of the camera on all or some of the defined servers. The mode can be one of the
-following:
-
-* antishake
-* auto
-* backlight
-* beach
-* fireworks
-* fixedfps
-* night
-* nightpreview
-* snow
-* sports
-* spotlight
-* verylong
-
-Alternatively you can specify an explicit exposure speed in milliseconds.  Note
-that the exposure speed is limited by the framerate. Hence, if the camera's
-framerate is currently 30fps then the exposure speed cannot be slower than
-33.333ms (1000/30). Adjust framerate prior to adjusting exposure speed.
+The :ref:`command_exposure` command is used to set the exposure mode of the
+camera on all or some of the defined servers. The mode can be 'auto' or a speed
+measured in ms. Please note that exposure speed is limited by framerate.
 
 If no address is specified then all currently defined servers will be
 targetted. Multiple addresses can be specified with dash-separated ranges,
@@ -242,10 +340,8 @@ See also: :ref:`command_status`, :ref:`command_awb`, :ref:`command_metering`.
 ::
 
     cpi> exposure auto
-    cpi> exposure 33.33
-    cpi> exposure night 192.168.0.1
-    cpi> exposure 60.00 192.168.0.10
-    cpi> exposure backlight 192.168.0.1-192.168.0.10
+    cpi> exposure 30 192.168.0.1
+    cpi> exposure auto 192.168.0.1-192.168.0.10
 
 
 .. _command_find:
@@ -384,31 +480,6 @@ See also: :ref:`command_status`, :ref:`command_exposure`.
     cpi> iso 800 192.168.0.1-192.168.0.10
 
 
-.. _command_levels:
-
-levels
-======
-
-**Syntax:** levels *brightness* *contrast* *saturation* *[addresses]*
-
-The :ref:`command_levels` command is used to simultaneously set the brightness,
-contrast, and saturation levels on all or some of the defined servers.  Each
-level is specified as an integer number between 0 and 100. The default for each
-level is 50.
-
-If no address is specified then all currently defined servers will be
-targetted. Multiple addresses can be specified with dash-separated ranges,
-comma-separated lists, or any combination of the two.
-
-See also: :ref:`command_status`.
-
-::
-
-    cpi> levels 50 50 50
-    cpi> levels 70 50 50 192.168.0.1
-    cpi> levels 40 60 70 192.168.0.1-192.168.0.10
-
-
 .. _command_metering:
 
 metering
@@ -492,6 +563,30 @@ See also: :ref:`command_status`, :ref:`command_framerate`.
   cpi> resolution 640x480
   cpi> resolution 1280x720 192.168.0.54
   cpi> resolution 1280x720 192.168.0.1,192.168.0.3
+
+
+.. _command_saturation:
+
+saturation
+==========
+
+**Syntax:** saturation *value* *[addresses]*
+
+The :ref:`command_saturation` command is used to adjust the saturation level on
+all or some of the defined servers. Saturation is specified as an integer
+number between -100 and 100 (default 0).
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_brightness`, :ref:`command_contrast`,
+:ref:`command_ev`.
+
+::
+
+    cpi> saturation 0
+    cpi> saturation -50 192.168.0.1
 
 
 .. _command_servers:
