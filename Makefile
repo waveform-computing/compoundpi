@@ -8,7 +8,7 @@ COVERAGE=coverage
 PYFLAGS=
 DEST_DIR=/
 
-# Horrid hack to ensure setuptools is installed in our Python environment. This
+# Horrid hack to ensure setuptools is installed in our python environment. This
 # is necessary with Python 3.3's venvs which don't install it by default.
 ifeq ($(shell python -c "import setuptools" 2>&1),)
 SETUPTOOLS:=
@@ -43,6 +43,9 @@ DEB_SOURCES:=debian/changelog \
 DOC_SOURCES:=docs/conf.py \
 	$(wildcard docs/*.png) \
 	$(wildcard docs/*.svg) \
+	$(wildcard docs/*.dot) \
+	$(wildcard docs/*.mscgen) \
+	$(wildcard docs/*.gpi) \
 	$(wildcard docs/*.rst) \
 	$(wildcard docs/*.pdf)
 SUBDIRS:=icons $(NAME)/windows/fallback-theme
@@ -81,7 +84,9 @@ install: $(SUBDIRS)
 	$(PYTHON) $(PYFLAGS) setup.py install --root $(DEST_DIR)
 
 doc: $(DOC_SOURCES)
-	$(MAKE) -C docs html latexpdf
+	$(MAKE) -C docs clean
+	$(MAKE) -C docs html
+	$(MAKE) -C docs latexpdf
 
 source: $(DIST_TAR) $(DIST_ZIP)
 
@@ -96,6 +101,9 @@ deb: $(DIST_DEB) $(DIST_DSC)
 dist: $(DIST_EGG) $(DIST_DEB) $(DIST_DSC) $(DIST_TAR) $(DIST_ZIP)
 
 develop: tags
+	@# These have to be done separately to avoid a cockup...
+	$(PIP) install -U setuptools
+	$(PIP) install -U pip
 	$(PIP) install -e .[doc,test]
 
 test:
@@ -137,7 +145,7 @@ $(DIST_DEB): $(PY_SOURCES) $(SUBDIRS) $(DEB_SOURCES) $(MAN_PAGES)
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
-	debuild -b -i -I -Idist -Ibuild -Idocs/_build -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
+	debuild -b -i -I -Idist -Ibuild -Idocs/_build -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -I*.xcf -rfakeroot
 	mkdir -p dist/
 	for f in $(DIST_DEB); do cp ../$${f##*/} dist/; done
 
@@ -146,14 +154,15 @@ $(DIST_DSC): $(PY_SOURCES) $(SUBDIRS) $(DEB_SOURCES) $(MAN_PAGES)
 	# project_version.orig.tar.gz
 	$(PYTHON) $(PYFLAGS) setup.py sdist --dist-dir=../
 	rename -f 's/$(NAME)-(.*)\.tar\.gz/$(NAME)_$$1\.orig\.tar\.gz/' ../*
-	debuild -S -i -I -Idist -Ibuild -Idocs/_build -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -rfakeroot
+	debuild -S -i -I -Idist -Ibuild -Idocs/_build -Icoverage -I__pycache__ -I.coverage -Itags -I*.pyc -I*.vim -I*.xcf -rfakeroot
 	mkdir -p dist/
 	for f in $(DIST_DSC); do cp ../$${f##*/} dist/; done
 
 release-pi: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
+	$(MAKE) clean
 	# ensure there are no current uncommitted changes
 	test -z "$(shell git status --porcelain)"
-	# update the changelog with new release information
+	# update the debian changelog with new release information
 	dch --newversion $(VER)-1$(DEB_SUFFIX) --controlmaint
 	# commit the changes and add a new tag
 	git commit debian/changelog -m "Updated changelog for release $(VER)"
@@ -164,21 +173,21 @@ release-pi: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 release-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DEB_SOURCES)
 	# ensure there are no current uncommitted changes
 	test -z "$(shell git status --porcelain)"
-	# update the changelog with new release information
+	# update the debian changelog with new release information
 	dch --newversion $(VER)-1$(DEB_SUFFIX) --controlmaint
 	# commit the changes and add a new tag
 	git commit debian/changelog -m "Updated changelog for Ubuntu release"
 
-upload-pi: $(DIST_DEB) $(DIST_DSC)
-	# send the debs and dscs to Raspbian maintainer
-	./maildebs.py $(DIST_DEB) $(DIST_DSC)
-
-upload-ubuntu: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
+upload-pi: $(PY_SOURCES) $(DOC_SOURCES) $(DIST_DEB) $(DIST_DSC)
 	# build a source archive and upload to PyPI
 	$(PYTHON) $(PYFLAGS) setup.py sdist upload
+	# build the deb source archive and upload to Raspbian
+	dput raspberrypi dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
+	git push --tags
+
+upload-ubuntu: $(DIST_DEB) $(DIST_DSC)
 	# build the deb source archive and upload to the PPA
 	dput waveform-ppa dist/$(NAME)_$(VER)-1$(DEB_SUFFIX)_source.changes
-	git push --tags
 
 .PHONY: all install develop test doc source egg zip tar deb dist clean tags release-pi release-ubuntu upload-pi upload-ubuntu $(SUBDIRS)
 
