@@ -459,7 +459,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 time.sleep(delay)
             self.server.camera.capture_sequence(
                 self.stream_generator(count), format='jpeg',
-                use_video_port=use_video_port)
+                use_video_port=use_video_port, burst=not use_video_port)
             logging.info(
                     'Captured %d images from %s port',
                     count, 'video' if use_video_port else 'still')
