@@ -53,6 +53,7 @@ While WiFi may be tempting because of the lack of wires needed between the
 client and all the Pi servers, it is certainly not the optimal setup for
 running Compound Pi.
 
+
 Client Installation
 ===================
 
@@ -72,6 +73,7 @@ working with the following command line::
          remote           refid      st t when poll reach   delay   offset  jitter
     ==============================================================================
     *aaaaaaa.aaaaaaa nn.nnn.nnn.nnn   3 u  109 1024  377    4.639   -2.101  21.233
+
 
 Server Network Configuration
 ============================
@@ -107,6 +109,7 @@ following::
             pairwise=CCMP
             auth_alg=OPEN
     }
+
 
 Server Installation
 ===================
@@ -146,6 +149,7 @@ Restart the NTP daemon to use the new configuration::
 
     $ sudo service ntp restart
 
+
 Clone the SD Card
 =================
 
@@ -177,6 +181,7 @@ modules activate.
     card. If they are larger, they will still appear the same size as the
     source after cloning because you the cloning also duplicates the partition
     table of the smaller device.
+
 
 Testing the Servers
 ===================
@@ -279,6 +284,27 @@ Since version 0.3 a GUI client is also provided. The basic operations of the
 GUI client are essentially the same as the command line client, the only major
 difference being that download is performed automatically after capture. You
 can start the GUI client with the :ref:`cpigui` command.
+
+
+Generating video
+================
+
+Once you have images captured from your array of Pi servers, you may wish to
+convert them into video (e.g. for bullet-time effects and such like). The
+ordering of captured images is currently relatively tricky. However, once you
+have your images in an order that you like you can use the following ffmpeg
+command line to convert the series of JPEGs into an MP4 with H.264 encoding::
+
+    ffmpeg -y -f image2 -i frame%03d.jpg -r 24 -vcodec libx264 -profile high -preset slow output.mp4
+
+The above command line assumes that your images are all named something like
+``frame001.jpg`` or ``frame027.jpg`` and that they are in advancing numerical
+order. It also assumes that you wish the output to be called ``output.mp4``.
+x264 compression is quite computationally intensive, so this is something you
+want to do on a platform with a fair amount of power (like a full PC).
+
+.. # TODO update with server ordering instructions when this is complete
+
 
 Troubleshooting
 ===============
