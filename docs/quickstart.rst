@@ -12,6 +12,47 @@ other Pis.
 This quick start tutorial assumes you are using the Raspbian operating system
 on your Pis, and Ubuntu as your client.
 
+
+Hardware Selection
+==================
+
+Before doing anything it's worth thinking about what hardware to use in your
+setup. Firstly, there's the selection of Pi to use. The primary concern here is
+RAM size. Compound Pi uses each Pi's memory to store captured images to avoid
+dealing with any lengthy delays writing to SD cards (this isn't simply a matter
+of slow SD cards, but avoiding periodic flushes of the Linux disk cache which
+can severely impact the timing of shots).
+
+To this end, the more RAM in your Pi, the better. Compound Pi is capable of
+running on a model A or A+ (256Mb of RAM) but after the GPU has taken its share
+(128Mb) and the OS and Compound Pi server have grabbed theirs, there's
+typically less than 100Mb left for image storage. The model B or B+ (512Mb
+of RAM) is a better selection typically providing over 300Mb of temporary
+image storage. However, the Pi 2 model B (1Gb of RAM) is the obviously the
+ultimate choice as it typically has 800Mb or more of available memory for
+image storage, and the faster processor doesn't hurt either.
+
+The next important selection is the network between your client and Pi servers.
+Compound Pi can run over WiFi (in fact, this was the first configuration it
+was tested in) but there are numerous reasons why WiFi is sub-optimal:
+
+* WiFi has much worse ping times than Ethernet. Ping time is important to
+  obtaining well synchronized shots with Compound Pi.
+
+* WiFi is more complex to configure and debug when it goes wrong. A standard
+  NOOBS installation will work automatically over Ethernet with DHCP, but WiFi
+  typically requires association configuration and in a headless setup it can
+  be extremely annoying to debug.
+
+* Many WiFi adapters switch themselves off after idle periods to conserve
+  power.  This is a perfectly reasonable thing to do when attached to a laptop
+  running on batteries, but it's useless in the context of a server which has
+  to listen constantly for requests from the client.
+
+While WiFi may be tempting because of the lack of wires needed between the
+client and all the Pi servers, it is certainly not the optimal setup for
+running Compound Pi.
+
 Client Installation
 ===================
 
@@ -258,4 +299,3 @@ If :ref:`command_identify` is specified with one or more addresses, it will
 blink the LED on the specified Pi servers. This can be used to quickly figure
 out which address corresponds to which Pi (useful when dynamic addressing is
 used).
-
