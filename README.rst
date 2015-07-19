@@ -12,7 +12,7 @@ cameras.
 Links
 =====
 
-* The code is licensed under the `GPL v3`_ or above
+* The code is licensed under the `GPL v2`_ or above
 * The `source code`_ can be obtained from GitHub, which also hosts the
   `bug tracker`_
 * The `documentation`_ (which includes installation and quick start examples)
@@ -26,4 +26,4 @@ Links
 .. _documentation: http://compoundpi.readthedocs.org/
 .. _source code: https://github.com/waveform80/compoundpi
 .. _bug tracker: https://github.com/waveform80/compoundpi/issues
-.. _GPL v3: https://www.gnu.org/licenses/gpl-3.0.html
+.. _GPL v2: https://www.gnu.org/licenses/gpl-2.0.html

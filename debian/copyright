@@ -4,17 +4,17 @@ Source: http://compoundpi.readthedocs.org/
 
 Files: *
 Copyright: 2014, Dave Hughes <dave@waveform.org.uk>
-License: GPL-3+
+License: GPL-2+
 
 Files: compoundpi/qt/*
 Copyright: 2011, Dirk Thomas, Dorian Scholz, TU Darmstadt
            2014, Dave Hughes <dave@waveform.org.uk>
 License: BSD-3-Clause
 
-License: GPL-3+
+License: GPL-2+
  compoundpi is free software: you can redistribute it and/or modify it under
  the terms of the GNU General Public License as published by the Free Software
- Foundation, either version 3 of the License, or (at your option) any later
+ Foundation, either version 2 of the License, or (at your option) any later
  version.
  .
  compoundpi is distributed in the hope that it will be useful, but WITHOUT ANY
@@ -25,7 +25,7 @@ License: GPL-3+
  compoundpi.  If not, see <http://www.gnu.org/licenses/>.
  .
  On Debian systems, the complete text of the GNU General
- Public License version 3 can be found in "/usr/share/common-licenses/GPL-3".
+ Public License version 2 can be found in "/usr/share/common-licenses/GPL-2".
 
 License: BSD-3-Clause
  Redistribution and use in source and binary forms, with or without
