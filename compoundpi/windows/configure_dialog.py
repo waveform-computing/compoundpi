@@ -311,6 +311,20 @@ class ConfigureDialog(QtGui.QDialog):
             self.ui.vflip_checkbox.setChecked(value)
     vflip = property(_get_vflip, _set_vflip)
 
+    def _get_denoise(self):
+        return {
+            QtCore.Qt.Unchecked: False,
+            QtCore.Qt.PartiallyChecked: None,
+            QtCore.Qt.Checked: True,
+            }[self.ui.denoise_checkbox.checkState()]
+    def _set_denoise(self, value):
+        if value is None:
+            self.ui.denoise_checkbox.setTristate()
+            self.ui.denoise_checkbox.setCheckState(QtCore.Qt.PartiallyChecked)
+        else:
+            self.ui.denoise_checkbox.setChecked(value)
+    denoise = property(_get_denoise, _set_denoise)
+
     def edit_changed(self, text):
         self.update_ok()
 
@@ -343,7 +357,8 @@ class ConfigureDialog(QtGui.QDialog):
                     self.exposure_mode and
                     self.metering_mode and
                     self.hflip is not None and
-                    self.vflip is not None))
+                    self.vflip is not None and
+                    self.denoise is not None))
 
     def button_box_clicked(self, button):
         if self.ui.button_box.standardButton(button) == QtGui.QDialogButtonBox.RestoreDefaults:
@@ -360,6 +375,7 @@ class ConfigureDialog(QtGui.QDialog):
             self.saturation = 0
             self.hflip = False
             self.vflip = False
+            self.denoise = True
             self.update_ok()
 
 

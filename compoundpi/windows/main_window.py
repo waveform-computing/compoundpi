@@ -286,6 +286,7 @@ The project homepage and documentation is at
                 'ev',
                 'hflip',
                 'vflip',
+                'denoise',
                 )}
         settings = {
             attr: values.pop() if len(values) == 1 else None
@@ -356,6 +357,10 @@ The project homepage and documentation is at
                         ):
                     self.client.flip(
                             dialog.hflip, dialog.vflip,
+                            addresses=self.selected_addresses)
+                if dialog.denoise != settings['denoise']:
+                    self.client.denoise(
+                            dialog.denoise,
                             addresses=self.selected_addresses)
             finally:
                 self.ui.server_list.model().refresh_selected(update=True)

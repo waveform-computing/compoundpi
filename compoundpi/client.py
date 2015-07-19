@@ -106,6 +106,7 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     'ev',
     'hflip',
     'vflip',
+    'denoise',
     'timestamp',
     'images',
     ))):
@@ -213,6 +214,11 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
 
         Returns a boolean value indicating whether the camera's orientation is
         vertically flipped.
+
+    .. attribute:: denoise
+
+        Returns a boolean value indicating whether the camera's denoise
+        algorithm is active when capturing.
 
     .. attribute:: timestamp
 
@@ -669,6 +675,7 @@ class CompoundPiClient(object):
             r'SATURATION (?P<saturation>-?\d+)\n'
             r'EV (?P<ev>-?\d+)\n'
             r'FLIP (?P<hflip>0|1) (?P<vflip>0|1)\n'
+            r'DENOISE (?P<denoise>0|1)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
             r'IMAGES (?P<images>\d{,3})\n')
     def status(self, addresses=None):
@@ -721,6 +728,7 @@ class CompoundPiClient(object):
                     saturation=int(match.group('saturation')),
                     hflip=bool(int(match.group('hflip'))),
                     vflip=bool(int(match.group('vflip'))),
+                    denoise=bool(int(match.group('denoise'))),
                     timestamp=datetime.datetime.fromtimestamp(float(match.group('time'))),
                     images=int(match.group('images')),
                     )
@@ -937,6 +945,15 @@ class CompoundPiClient(object):
         default for both parameters is ``False``.
         """
         self._transact('FLIP %d %d' % (horizontal, vertical), addresses)
+
+    def denoise(self, value, addresses=None):
+        """
+        Called to change whether the firmware's denoise algorithm is active on
+        the servers at the specified *addresses* (or all defined servers if
+        *addresses* is omitted). The *value* is a simple boolean, which
+        defaults to ``True``.
+        """
+        self._transact('DENOISE %d' % int(value), addresses)
 
     def capture(self, count=1, video_port=False, delay=None, addresses=None):
         """

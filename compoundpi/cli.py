@@ -808,7 +808,8 @@ class CompoundPiCmd(Cmd):
         sunlight, tungsten
 
         Alternatively you can specify two comma-separated floating-point
-        numbers which specify the red and blue gains manually.
+        numbers which specify the red and blue gains manually (between 0.0 and
+        8.0).
 
         If no address is specified then all currently defined servers will be
         targetted. Multiple addresses can be specified with dash-separated
@@ -880,7 +881,7 @@ class CompoundPiCmd(Cmd):
         See also: status, awb, metering.
 
         cpi> exposure auto
-        cpi> exposure 30000 192.168.0.1
+        cpi> exposure 30 192.168.0.1
         cpi> exposure auto 192.168.0.1-192.168.0.10
         """
         if not arg:
@@ -1193,6 +1194,54 @@ class CompoundPiCmd(Cmd):
         elif match.start('value') < finish <= match.end('value'):
             # No completions for value
             return []
+
+    def do_denoise(self, arg):
+        """
+        Sets whether denoise will be applied to captures on the defined servers.
+
+        Syntax: denoise <value> [addresses]
+
+        The 'denoise' command is used to set whether the camera's software
+        denoise algorithm is active when capturing. The follow values can be
+        specified:
+
+        on, off
+
+        If no address is specified then all currently defined servers will be
+        targetted. Multiple addresses can be specified with dash-separated
+        ranges, comma-separated lists, or any combination of the two.
+
+        See also: status.
+
+        cpi> denoise off
+        cpi> denoise on 192.168.0.3
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a denoise value')
+        arg = arg.split(' ', 1)
+        self.client.denoise(self.parse_bool(arg[0]),
+            self.parse_arg(arg[1] if len(arg) > 1 else None))
+
+    def complete_denoise(self, text, line, start, finish):
+        cmd_re = re.compile(r'denoise(?P<value> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('value') < finish <= match.end('value'):
+            values = [
+                'false',
+                'true',
+                'no',
+                'yes',
+                'off',
+                'on',
+                ]
+            return [
+                value
+                for value in values
+                if value.startswith(text)
+                ]
 
     def do_flip(self, arg):
         """

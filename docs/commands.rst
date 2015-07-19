@@ -263,6 +263,31 @@ See also: :ref:`command_brightness`, :ref:`command_saturation`,
     cpi> contrast -50 192.168.0.1
 
 
+.. _command_denoise:
+
+denoise
+=======
+
+**Syntax:** denoise *value* *[addresses]*
+
+The :ref:`command_denoise` command is used to set whether the camera's software
+denoise algorithm is active when capturing. The follow values can be specified:
+
+* on
+* off
+
+If no address is specified then all currently defined servers will be
+targetted. Multiple addresses can be specified with dash-separated ranges,
+comma-separated lists, or any combination of the two.
+
+See also: :ref:`command_status`.
+
+::
+
+    cpi> denoise off
+    cpi> denoise on 192.168.0.3
+
+
 .. _command_download:
 
 download

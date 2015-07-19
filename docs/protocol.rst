@@ -292,6 +292,18 @@ level is given as an integer number between -100 and 100 (default 0).
 An OK response is expected with no data.
 
 
+.. _protocol_denoise:
+
+**Syntax:** DENOISE *value*
+
+The :ref:`protocol_denoise` command changes whether the camera's software
+denoise algorithm is active (for both images and video). The new value is
+given as an integer which represents a boolean (0 being false, and anything
+else interpreted as true).
+
+An OK response is expected with no data.
+
+
 .. _protocol_ev:
 
 EV
@@ -504,6 +516,7 @@ contain the following lines in its data portion, in the order given below::
     SATURATION <saturation>
     EV <ev>
     FLIP <hflip> <vflip>
+    DENOISE <denoise>
     TIMESTAMP <time>
     IMAGES <images>
 
@@ -568,6 +581,10 @@ Where:
     Gives the camera's orientation as 1 or 0 (indicating the flip is or is not
     active respectively)
 
+*<denoise>*
+    Gives the camera's software denoise status as 1 or 0 (indicating denoise
+    is active or not respectively)
+
 *<time>*
     Gives the timestamp at which the :ref:`protocol_status` command was
     received in UNIX time format (a dotted-decimal number of seconds since the
@@ -590,6 +607,7 @@ For example, the data portion of the OK response may look like the following::
     SATURATION 0
     EV 0
     FLIP 0 0
+    DENOISE 1
     TIMESTAMP 1400803173.991651
     IMAGES 1
 

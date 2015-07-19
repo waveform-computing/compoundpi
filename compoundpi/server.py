@@ -233,6 +233,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                     'BLINK':        self.do_blink,
                     'CAPTURE':      self.do_capture,
                     'CLEAR':        self.do_clear,
+                    'DENOISE':      self.do_denoise,
                     'EXPOSURE':     self.do_exposure,
                     'FLIP':         self.do_flip,
                     'FRAMERATE':    self.do_framerate,
@@ -333,6 +334,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             'SATURATION {saturation}\n'
             'EV {ev}\n'
             'FLIP {hflip} {vflip}\n'
+            'DENOISE {denoise}\n'
             'TIMESTAMP {timestamp}\n'
             'IMAGES {images}\n'.format(
                 width=self.server.camera.resolution[0],
@@ -354,6 +356,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 saturation=self.server.camera.saturation,
                 hflip=int(self.server.camera.hflip),
                 vflip=int(self.server.camera.vflip),
+                denoise=int(self.server.camera.image_denoise),
                 timestamp=time.time(),
                 images=len(self.server.images),
                 ))
@@ -422,6 +425,12 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         ev = int(ev)
         logging.info('Changing camera EV to %d', ev)
         self.server.camera.exposure_compensation = ev
+
+    def do_denoise(self, denoise):
+        denoise = bool(denoise)
+        logging.info('Changing camera denoise to %s', denoise)
+        self.server.camera.image_denoise = denoise
+        self.server.camera.video_denoise = denoise
 
     def do_flip(self, horizontal, vertical):
         horizontal = bool(int(horizontal))
