@@ -663,18 +663,18 @@ class CompoundPiClient(object):
         self._servers = self._parse_ping(self._responses(count=count))
 
     status_re = re.compile(
-            r'RESOLUTION (?P<width>\d+) (?P<height>\d+)\n'
+            r'RESOLUTION (?P<width>\d+),(?P<height>\d+)\n'
             r'FRAMERATE (?P<rate>\d+(/\d+)?)\n'
-            r'AWB (?P<awb_mode>[a-z]+) (?P<awb_red>\d+(/\d+)?) (?P<awb_blue>\d+(/\d+)?)\n'
-            r'AGC (?P<agc_mode>[a-z]+) (?P<agc_analog>\d+(/\d+)?) (?P<agc_digital>\d+(/\d+)?)\n'
-            r'EXPOSURE (?P<exp_mode>[a-z]+) (?P<exp_speed>\d+(\.\d+)?)\n'
+            r'AWB (?P<awb_mode>[a-z]+),(?P<awb_red>\d+(/\d+)?),(?P<awb_blue>\d+(/\d+)?)\n'
+            r'AGC (?P<agc_mode>[a-z]+),(?P<agc_analog>\d+(/\d+)?),(?P<agc_digital>\d+(/\d+)?)\n'
+            r'EXPOSURE (?P<exp_mode>[a-z]+),(?P<exp_speed>\d+(\.\d+)?)\n'
             r'ISO (?P<iso>\d+)\n'
             r'METERING (?P<metering_mode>[a-z]+)\n'
             r'BRIGHTNESS (?P<brightness>\d+)\n'
             r'CONTRAST (?P<contrast>-?\d+)\n'
             r'SATURATION (?P<saturation>-?\d+)\n'
             r'EV (?P<ev>-?\d+)\n'
-            r'FLIP (?P<hflip>0|1) (?P<vflip>0|1)\n'
+            r'FLIP (?P<hflip>0|1),(?P<vflip>0|1)\n'
             r'DENOISE (?P<denoise>0|1)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
             r'IMAGES (?P<images>\d{,3})\n')
@@ -751,7 +751,7 @@ class CompoundPiClient(object):
             client.find(10)
             client.resolution(1280, 720)
         """
-        self._transact('RESOLUTION %d %d' % (width, height), addresses)
+        self._transact('RESOLUTION %d,%d' % (width, height), addresses)
 
     def framerate(self, rate, addresses=None):
         """
@@ -811,7 +811,7 @@ class CompoundPiClient(object):
             status = client.status(addresses=addr)[addr]
             client.awb('off', status.awb_red, status.awb_blue)
         """
-        self._transact('AWB %s %f %f' % (mode, red, blue), addresses)
+        self._transact('AWB %s,%f,%f' % (mode, red, blue), addresses)
 
     def agc(self, mode, addresses=None):
         """
@@ -878,7 +878,7 @@ class CompoundPiClient(object):
             client.exposure('off', speed=status.exposure_speed)
 
         """
-        self._transact('EXPOSURE %s %f' % (mode, speed), addresses)
+        self._transact('EXPOSURE %s,%f' % (mode, speed), addresses)
 
     def metering(self, mode, addresses=None):
         """
@@ -944,7 +944,7 @@ class CompoundPiClient(object):
         whether to flip the camera's output along the corresponding axis. The
         default for both parameters is ``False``.
         """
-        self._transact('FLIP %d %d' % (horizontal, vertical), addresses)
+        self._transact('FLIP %d,%d' % (horizontal, vertical), addresses)
 
     def denoise(self, value, addresses=None):
         """
@@ -987,15 +987,15 @@ class CompoundPiClient(object):
             The captured images are stored in RAM on the servers for later
             retrieval with the :meth:`download` method.
         """
-        cmd = 'CAPTURE %d %d'
+        cmd = 'CAPTURE %d,%d,'
         params = [count, video_port]
         if delay:
-            cmd += ' %f'
+            cmd += '%f'
             params.append(time.time() + delay)
         self._transact(cmd % tuple(params), addresses)
 
     list_line_re = re.compile(
-            r'IMAGE (?P<index>\d+) (?P<time>\d+(\.\d+)?) (?P<size>\d+)')
+            r'IMAGE,(?P<index>\d+),(?P<time>\d+(\.\d+)?),(?P<size>\d+)')
     def list(self, addresses=None):
         """
         Called to list images available for download from the servers at the
@@ -1110,7 +1110,7 @@ class CompoundPiClient(object):
                 )
         self._progress_start = self._progress_update = self._progress_finish = None
         try:
-            self._transact('SEND %d %d' % (index, self.port), [address])
+            self._transact('SEND %d,%d' % (index, self.port), [address])
             if not self._server.event.wait(self.timeout):
                 raise CompoundPiSendTimeout(address)
             elif self._server.exception:

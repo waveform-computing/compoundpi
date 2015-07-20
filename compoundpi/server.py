@@ -322,18 +322,18 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def do_status(self):
         return (
-            'RESOLUTION {width} {height}\n'
+            'RESOLUTION {width},{height}\n'
             'FRAMERATE {framerate}\n'
-            'AWB {awb_mode} {awb_red} {awb_blue}\n'
-            'AGC {agc_mode} {agc_analog} {agc_digital}\n'
-            'EXPOSURE {exp_mode} {exp_speed}\n'
+            'AWB {awb_mode},{awb_red},{awb_blue}\n'
+            'AGC {agc_mode},{agc_analog},{agc_digital}\n'
+            'EXPOSURE {exp_mode},{exp_speed}\n'
             'ISO {iso}\n'
             'METERING {meter_mode}\n'
             'BRIGHTNESS {brightness}\n'
             'CONTRAST {contrast}\n'
             'SATURATION {saturation}\n'
             'EV {ev}\n'
-            'FLIP {hflip} {vflip}\n'
+            'FLIP {hflip},{vflip}\n'
             'DENOISE {denoise}\n'
             'TIMESTAMP {timestamp}\n'
             'IMAGES {images}\n'.format(
@@ -488,7 +488,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         for timestamp, stream in self.server.images:
             stream.seek(0, io.SEEK_END)
         return '\n'.join(
-            'IMAGE %d %f %d' % (index, timestamp, stream.tell())
+            'IMAGE,%d,%f,%d' % (index, timestamp, stream.tell())
             for (index, (timestamp, stream)) in enumerate(self.server.images)
             )
 

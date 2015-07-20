@@ -24,26 +24,26 @@ three servers involving a broadcast PING packet and the resulting responses:
 
 All messages are encoded as ASCII text.  Command messages consist of a non-zero
 positive integer sequence number followed by a single space, followed by the
-command in capital letters, optionally followed by space separated parameters
+command in capital letters, optionally followed by comma-separated parameters
 for the command. The following are all valid examples of command messages::
 
     1 HELLO 1400803122.359911
 
     2 CLEAR
 
-    3 CAPTURE 1 0
+    3 CAPTURE 1,0
 
     4 STATUS
 
     5 LIST
 
-    6 SEND 0 5647
+    6 SEND 0,5647
 
     7 FOO
 
 In other words, the generic form of a command message is::
 
-    <sequence-number> <command> [parameter1] [parameter2]...
+    <sequence-number> <command> [parameter1],[parameter2],...
 
 Response messages (from the servers to the client) consist of a non-zero
 positive integer sequence number (copied from the corresponding command),
@@ -52,26 +52,32 @@ was successful, optionally followed by a new-line character (ASCII character
 10), and any data the response is expected to include. For example::
 
     1 OK
-    VERSION 0.3
+    VERSION 0.4
 
     2 OK
 
     3 OK
 
     4 OK
-    RESOLUTION 1280 720
+    RESOLUTION 1280,720
     FRAMERATE 30
-    AWB auto 1.5 1.3
-    EXPOSURE auto 33.12 0
+    AWB auto,1.5,1.3
+    AGC auto,2.3,1.0
+    EXPOSURE auto,28196
     ISO 0
     METERING average
-    LEVELS 50 0 0
+    BRIGHTNESS 50
+    CONTRAST 0
+    SATURATION 0
     FLIP 0 0
+    EV 0
+    FLIP 0,0
+    DENOISE 1
     TIMESTAMP 1400803173.991651
     IMAGES 1
 
     5 OK
-    IMAGE 0 1400803173.012543 8083879
+    IMAGE,0,1400803173.012543,8083879
 
     6 OK
 
@@ -190,7 +196,7 @@ An OK response is expected with no data.
 AWB
 ===
 
-**Syntax:** AWB *mode* *[red blue]*
+**Syntax:** AWB *mode*,\ *red*,\ *blue*
 
 The :ref:`protocol_awb` command changes the camera's auto-white-balance mode
 which is provided as a lower case string. If the string is ``'off'`` then
@@ -232,7 +238,7 @@ An OK response is expected with no data.
 CAPTURE
 =======
 
-**Syntax:** CAPTURE *[count [video-port [sync]]]*
+**Syntax:** CAPTURE *count*,\ *video-port*,\ *sync*
 
 The :ref:`protocol_capture` command should cause the server to capture one or
 more images from the camera. The parameters are as follows:
@@ -323,7 +329,7 @@ An OK response is expected with no data.
 EXPOSURE
 ========
 
-**Syntax:** EXPOSURE *mode* *[speed]*
+**Syntax:** EXPOSURE *mode*,\ *speed*
 
 The :ref:`protocol_exposure` command changes the camera's exposure mode, speed,
 and compensation value. The mode is provided as a lower case string. If the
@@ -338,7 +344,7 @@ An OK response is expected with no data.
 FLIP
 ====
 
-**Syntax:** FLIP *horizontal* *vertical*
+**Syntax:** FLIP *horizontal*,\ *vertical*
 
 The :ref:`protocol_flip` command changes the camera's orientation. The
 horizontal and vertical parameters must be integer numbers which will be
@@ -409,16 +415,16 @@ The :ref:`protocol_list` command causes the server to respond with a new-line
 separated list detailing all locally stored images. Each line in the data
 portion of the response has the following format::
 
-    IMAGE <number> <timestamp> <size>
+    IMAGE,<number>,<timestamp>,<size>
 
 For example, if five images are stored on the server the data portion of the
 OK response may look like this::
 
-    IMAGE 0 1398618927.307944 8083879
-    IMAGE 1 1398619000.53127 7960423
-    IMAGE 2 1398619013.658935 7996156
-    IMAGE 3 1398619014.122921 8061197
-    IMAGE 4 1398619014.314919 8053651
+    IMAGE,0,1398618927.307944,8083879
+    IMAGE,1,1398619000.53127,7960423
+    IMAGE,2,1398619013.658935,7996156
+    IMAGE,3,1398619014.122921,8061197
+    IMAGE,4,1398619014.314919,8053651
 
 The :samp:`number` portion of the line is a zero-based integer index for the
 image which can be used with the :ref:`protocol_send` command to retrieve the
@@ -446,7 +452,7 @@ An OK response is expected with no data.
 RESOLUTION
 ==========
 
-**Syntax:** RESOLUTION *width* *height*
+**Syntax:** RESOLUTION *width*,\ *height*
 
 The :ref:`protocol_resolution` command changes the camera's configuration to
 use the specified capture resolution which is two integer numbers giving the
@@ -473,7 +479,7 @@ An OK response is expected with no data.
 SEND
 ====
 
-**Syntax:** SEND *index* *port*
+**Syntax:** SEND *index*,\ *port*
 
 The :ref:`protocol_send` command causes the specified image to be sent from the
 server to the client. The parameters are as follows:
@@ -504,18 +510,18 @@ The :ref:`protocol_status` command causes the server to send the client
 information about its current configuration. Specifically, the response must
 contain the following lines in its data portion, in the order given below::
 
-    RESOLUTION <width> <height>
+    RESOLUTION <width>,<height>
     FRAMERATE <rate>
-    AWB <awb_mode> <awb_red> <awb_blue>
-    AGC <agc_mode> <agc_analog> <agc_digital>
-    EXPOSURE <exp_mode> <exp_speed>
+    AWB <awb_mode>,<awb_red>,<awb_blue>
+    AGC <agc_mode>,<agc_analog>,<agc_digital>
+    EXPOSURE <exp_mode>,<exp_speed>
     ISO <iso>
     METERING <metering_mode>
     BRIGHTNESS <brightness>
     CONTRAST <contrast>
     SATURATION <saturation>
     EV <ev>
-    FLIP <hflip> <vflip>
+    FLIP <hflip>,<vflip>
     DENOISE <denoise>
     TIMESTAMP <time>
     IMAGES <images>
