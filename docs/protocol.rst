@@ -412,19 +412,22 @@ LIST
 **Syntax:** LIST
 
 The :ref:`protocol_list` command causes the server to respond with a new-line
-separated list detailing all locally stored images. Each line in the data
+separated list detailing all locally stored files. Each line in the data
 portion of the response has the following format::
 
-    IMAGE,<number>,<timestamp>,<size>
+    <filetype>,<number>,<timestamp>,<size>
 
-For example, if five images are stored on the server the data portion of the
-OK response may look like this::
+For example, if four images and one video are stored on the server the data
+portion of the OK response may look like this::
 
     IMAGE,0,1398618927.307944,8083879
     IMAGE,1,1398619000.53127,7960423
     IMAGE,2,1398619013.658935,7996156
     IMAGE,3,1398619014.122921,8061197
-    IMAGE,4,1398619014.314919,8053651
+    VIDEO,4,1398619014.314919,28053651
+
+The filetype will be ``IMAGE``, ``VIDEO``, or ``MOTION`` depending on the
+type of data contained within.
 
 The :samp:`number` portion of the line is a zero-based integer index for the
 image which can be used with the :ref:`protocol_send` command to retrieve the
@@ -443,6 +446,60 @@ METERING
 
 The :ref:`protocol_metering` command changes the camera's light metering mode.
 The new mode is provided as a lower case string.
+
+An OK response is expected with no data.
+
+
+.. _protocol_record:
+
+RECORD
+======
+
+**Syntax:** RECORD *length*,\ *format*,\ *quality*,\ *bitrate*,\ *sync*,\ *intra-period*,\ *motion-output*
+
+The :ref:`protocol_record` command should cause the server to record a video
+for *length* seconds from the camera. The parameters are as follows:
+
+*length*
+    Specifies the length of time to record for as a non-zero floating point
+    number.
+
+*format*
+    Specifies the encoding to use. Valid values are ``mjpeg`` and ``h264``.
+
+*quality*
+    Specifies the quality of the encoding. If unspecified or zero, a suitable
+    default will be selected for the specified encoding. Valid values are 1 to
+    40 for ``h264`` encoding (smaller is better), and 1 to 100 for ``mjpeg``
+    encoding (larger is better).
+
+*bitrate*
+    Specifies the bitrate limit for the video encoder. Defaults to 17000000
+    if unspecified.
+
+*sync*
+    Specifies the timestamp at which the recording should begin. The
+    timestamp's form is UNIX time: the number of seconds since the UNIX epoch
+    specified as a dotted-decimal. The timestamp must be in the future, and it
+    is important for the server's clock to be properly synchronized in order
+    for this functionality to operate correctly. If unspecified, the recording
+    should begin immediately upon receipt of the command.
+
+*intra-period*
+    Only valid if format is ``h264``. Specifies the number of frames in a GOP
+    (group of pictures), the first of which must be a keyframe (I-frame).
+    Defaults to 30 if unspecified.
+
+*motion-output*
+    Only valid if format is ``h264``. If unspecified or 0, only video data is
+    output. If 1, motion estimation vector data is also recorded as a separate
+    file with an equivalent timestamp to the corresponding video data.
+
+The video recorded in response to the command should be stored locally on the
+server until its retrieval is requested by the :ref:`protocol_send` command.
+The timestamp at which the recording was started must be stored. Storage in
+this implementation is simply in RAM, but implementations are free to use any
+storage medium they see fit.
 
 An OK response is expected with no data.
 
@@ -481,21 +538,21 @@ SEND
 
 **Syntax:** SEND *index*,\ *port*
 
-The :ref:`protocol_send` command causes the specified image to be sent from the
+The :ref:`protocol_send` command causes the specified file to be sent from the
 server to the client. The parameters are as follows:
 
 *index*
-    Specifies the zero-based index of the image that the client wants the
-    server to send. This must match one of the indexes output by the
+    Specifies the zero-based index of the file that the client wants the server
+    to send. This must match one of the indexes output by the
     :ref:`protocol_list` command.
 
 *port*
     Specifies the TCP port on the client that the server should connect to in
-    order to transmit the image data. This is given as an integer number (never
-    a service name).
+    order to transmit the data. This is given as an integer number (never a
+    service name).
 
-Assuming *index* refers to a valid image index, the server must connect to the
-specified TCP port on the client, send the bytes of the image, and finally
+Assuming *index* refers to a valid image file, the server must connect to the
+specified TCP port on the client, send the bytes of the file, and finally
 close the connection. The server must also send an OK response with no data.
 
 

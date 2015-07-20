@@ -28,10 +28,10 @@ CompoundPiStatus
 .. autoclass:: CompoundPiStatus(resolution, framerate, awb_mode, ...)
     :members:
 
-CompoundPiImage
+CompoundPiFile
 ===============
 
-.. autoclass:: CompoundPiImage(image, timestamp, size)
+.. autoclass:: CompoundPiFile(filetype, image, timestamp, size)
     :members:
 
 Resolution

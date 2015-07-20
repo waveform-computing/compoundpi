@@ -237,31 +237,37 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     """
 
 
-class CompoundPiImage(namedtuple('CompoundPiImage', (
+class CompoundPiFile(namedtuple('CompoundPiFile', (
+    'filetype',
     'index',
     'timestamp',
     'size',
     ))):
     """
     This class is a namedtuple derivative used to store information about an
-    image stored in the memory of a Compound Pi server.  It is recommended you
+    files stored in the memory of a Compound Pi server.  It is recommended you
     access the information stored by this class by attribute name rather than
-    position (for example: ``image.size`` rather than ``image[2]``).
+    position (for example: ``f.size`` rather than ``f[3]``).
+
+    .. attribute:: filetype
+
+        Specifies what sort of file this is. Can be one of ``IMAGE``,
+        ``VIDEO``, or ``MOTION``.
 
     .. attribute:: index
 
-        Specifies the index of the image on the server. This is the index that
+        Specifies the index of the file on the server. This is the index that
         should be passed to :meth:`CompoundPiClient.download` in order to
-        retrieve this image.
+        retrieve this file.
 
     .. attribute:: timestamp
 
-        Specifies the timestamp on the server at which the image was captured
-        as a :class:`~datetime.datetime` instance.
+        Specifies the timestamp on the server at which the file was captured as
+        a :class:`~datetime.datetime` instance.
 
     .. attribute:: size
 
-        Specifies the size of the image as an integer number of bytes.
+        Specifies the size of the file as an integer number of bytes.
     """
 
 
@@ -994,14 +1000,62 @@ class CompoundPiClient(object):
             params.append(time.time() + delay)
         self._transact(cmd % tuple(params), addresses)
 
+    def record(self, length, format='h264', quality=0, bitrate=17000000,
+            intra_period=None, motion_output=False, delay=None,
+            addresses=None):
+        """
+        Called to record video on the servers at the specified *addresses* (or
+        all defined servers if *addresses* is omitted). The *length* parameter
+        specifies the time (in seconds) to record for. This may be a decimal
+        value. The optional *format* parameter specifies the video codec to
+        use. This defaults to ``'h264'`` but may also be set to ``'mjpeg'``.
+
+        The optional *quality* parameter specifies the quality that the codec
+        will attempt to maintain. This is an integer value between 1 and 40 for
+        ``h264`` (lower values are better), or an integer value between 1 and
+        100 for ``mjpeg`` (higher values are better). The default provides
+        "good" quality. The optional *bitrate* parameter specifies the limit
+        of data that the codec is allowed to produce. The default is extremely
+        high to ensure bitrate limiting never occurs by default.
+
+        The optional *intra_period* parameter is only valid with the ``h264``
+        format and specifies the number of frames in a GOP (group of pictures).
+        As a GOP always starts with a keyframe (I-frame) this effectively
+        dictates how regularly keyframes occurs in the output. The default is
+        30 frames.
+
+        The optional *motion_output* parameter is only valid with the ``h264``
+        format and specifies that you wish to capture motion vector estimation
+        data as well as video data. This will be stored in a separate file on
+        the Compound Pi server.
+
+        The optional *delay* parameter defaults to ``None`` which indicates
+        that all servers should record video immediately upon receipt of the
+        :ref:`protocol_capture` message. When using broadcast messages (when
+        *addresses* is omitted) this typically results in near simultaneous
+        recording, especially with fast, low latency networks like ethernet.
+
+        .. note::
+
+            Note that this method merely causes the servers to record video.
+            The captured video is stored in RAM on the servers for later
+            retrieval with the :meth:`download` method.
+        """
+        cmd = 'RECORD %f,%s,%d,%d,%d,%d,'
+        params = [length, format, quality, bitrate, intra_period, motion_output]
+        if delay:
+            cmd += '%f'
+            params.append(time.time() + delay)
+        self._transact(cmd % tuple(params), addresses)
+
     list_line_re = re.compile(
-            r'IMAGE,(?P<index>\d+),(?P<time>\d+(\.\d+)?),(?P<size>\d+)')
+            r'(?P<filetype>IMAGE|VIDEO|MOTION),(?P<index>\d+),(?P<time>\d+(\.\d+)?),(?P<size>\d+)')
     def list(self, addresses=None):
         """
         Called to list images available for download from the servers at the
         specified *addresses* (or all defined servers if *addresses* is
         omitted). The method returns a mapping of address to sequences of
-        :class:`CompoundPiImage` which provide the index, capture timestamp,
+        :class:`CompoundPiFile` which provide the index, capture timestamp,
         and size of each image available on the server. For example, to
         enumerate the total size of all images stored on all servers::
 
@@ -1033,7 +1087,8 @@ class CompoundPiClient(object):
                 if match is None:
                     errors.append(CompoundPiInvalidResponse(address))
                 else:
-                    result[address].append(CompoundPiImage(
+                    result[address].append(CompoundPiFile(
+                        match.group('filetype'),
                         int(match.group('index')),
                         datetime.datetime.fromtimestamp(float(match.group('time'))),
                         int(match.group('size')),

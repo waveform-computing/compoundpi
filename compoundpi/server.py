@@ -49,6 +49,7 @@ import SocketServer as socketserver
 import shutil
 import signal
 import warnings
+from collections import namedtuple
 
 import daemon
 import daemon.runner
@@ -106,6 +107,34 @@ def register_handlers(cls):
         if callable(handler) and hasattr(handler, 'command')
         }
     return cls
+
+
+class CompoundPiFile(object):
+    """
+    Represents a file stored in memory on the Compound Pi Server. The *filetype*
+    attribute is ``IMAGE``, ``VIDEO``, or ``MOTION`` depending on the content
+    of the stream. The 
+    """
+    def __init__(self, filetype, timestamp=None):
+        self._filetype = filetype
+        self._timestamp = timestamp
+        self._stream = io.BytesIO()
+
+    @property
+    def filetype(self):
+        return self._filetype
+
+    @property
+    def timestamp(self):
+        return self._timestamp
+
+    @property
+    def stream(self):
+        return self._stream
+
+    @property
+    def size(self):
+        return self._stream.seek(0, io.SEEK_END)
 
 
 class CompoundPiUDPServer(socketserver.UDPServer):
@@ -199,7 +228,7 @@ class CompoundPiServer(TerminalApplication):
             self.server.client_address = None
             self.server.client_timestamp = None
             self.server.responders = {}
-            self.server.images = []
+            self.server.files = []
             self.server.camera = picamera.PiCamera()
             try:
                 logging.info('Starting server thread')
@@ -358,7 +387,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             'FLIP {hflip},{vflip}\n'
             'DENOISE {denoise}\n'
             'TIMESTAMP {timestamp}\n'
-            'IMAGES {images}\n'.format(
+            'FILES {files}\n'.format(
                 width=self.server.camera.resolution[0],
                 height=self.server.camera.resolution[1],
                 framerate=self.server.camera.framerate,
@@ -380,7 +409,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 vflip=int(self.server.camera.vflip),
                 denoise=int(self.server.camera.image_denoise),
                 timestamp=time.time(),
-                images=len(self.server.images),
+                files=len(self.server.files),
                 ))
 
     @handler('RESOLUTION', int, int)
@@ -459,23 +488,26 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         logging.info('Changing camera vertical flip to %s', vertical)
         self.server.camera.vflip = vertical
 
-    def stream_generator(self, count):
+    def image_stream_generator(self, count):
         for i in range(count):
-            stream = io.BytesIO()
-            self.server.images.append((time.time(), stream))
-            yield stream
+            f = CompoundPiFile('IMAGE')
+            self.server.files.append(f)
+            yield f.stream
+
+    def wait_until(self, sync):
+        if sync is not None:
+            delay = sync - time.time()
+            if delay <= 0.0:
+                raise ValueError('Sync time in past')
+            time.sleep(delay)
 
     @handler('CAPTURE', int, boolint, float)
     def do_capture(self, count=1, use_video_port=False, sync=None):
         self.server.camera.led = False
         try:
-            if sync is not None:
-                delay = sync - time.time()
-                if delay <= 0.0:
-                    raise ValueError('Sync time in past')
-                time.sleep(delay)
+            self.wait_until(sync)
             self.server.camera.capture_sequence(
-                self.stream_generator(count), format='jpeg',
+                self.image_stream_generator(count), format='jpeg',
                 use_video_port=use_video_port, burst=not use_video_port)
             logging.info(
                     'Captured %d images from %s port',
@@ -483,36 +515,55 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         finally:
             self.server.camera.led = True
 
+    @handler('RECORD', float, lowerstr, int, int, int, boolint, float)
+    def do_record(self, length, format='h264', quality=0, bitrate=17000000,
+            intra_period=None, motion_output=False, sync=None):
+        self.server.camera.led = False
+        try:
+            # Ensure video and motion streams have equivalent timestamps
+            video_file = CompoundPiFile('VIDEO')
+            if motion_output:
+                motion_stream = CompoundPiFile('MOTION', video_file.timestamp).stream
+            else:
+                motion_stream = None
+            self.wait_until(sync)
+            self.server.camera.start_recording(
+                    video_file.stream, format=format, quality=quality,
+                    bitrate=bitrate, intra_period=intra_period,
+                    motion_output=motion_stream)
+            self.server.camera.wait_recording(length)
+            self.server.camera.stop_recording()
+            # XXX What about the CompoundPiFile instances in the case of an error?
+        finally:
+            self.server.camera.led = True
+
     @handler('SEND', int, int)
-    def do_send(self, image, port):
-        timestamp, stream = self.server.images[image]
-        size = stream.seek(0, io.SEEK_END)
-        logging.info('Sending image %d', image)
+    def do_send(self, file_num, port):
+        f = self.server.files[file_num]
+        logging.info('Sending file %d', file_num)
         client_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         client_sock.connect((self.client_address[0], port))
         client_file = client_sock.makefile('wb')
         try:
-            client_file.write(struct.pack(native_str('>L'), size))
+            client_file.write(struct.pack(native_str('>L'), f.size))
             client_file.flush()
-            stream.seek(0)
-            shutil.copyfileobj(stream, client_file)
+            f.stream.seek(0)
+            shutil.copyfileobj(f.stream, client_file)
         finally:
             client_file.close()
             client_sock.close()
 
     @handler('LIST')
     def do_list(self):
-        for timestamp, stream in self.server.images:
-            stream.seek(0, io.SEEK_END)
         return '\n'.join(
-            'IMAGE,%d,%f,%d' % (index, timestamp, stream.tell())
-            for (index, (timestamp, stream)) in enumerate(self.server.images)
+            '%s,%d,%f,%d' % (f.filetype, index, f.timestamp, f.size)
+            for index, f in enumerate(self.server.files)
             )
 
     @handler('CLEAR')
     def do_clear(self):
-        logging.info('Clearing images')
-        del self.server.images[:]
+        logging.info('Clearing files')
+        del self.server.files[:]
 
 
 main = CompoundPiServer()
