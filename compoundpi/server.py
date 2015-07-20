@@ -247,6 +247,17 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 raise ValueError('Unable to parse request')
             seqno = int(match.group('seqno'))
             command = match.group('command')
+            # Implement special handling for ACK and HELLO. ACK sends no
+            # response and has no handler. HELLO doesn't check the sequence
+            # number and can come from a new client
+            if command == 'ACK':
+                self.ack_response(seqno)
+                return
+            if command != 'HELLO':
+                if self.client_address != self.server.client_address:
+                    raise CompoundPiInvalidClient(self.client_address[0])
+                elif seqno <= self.server.seqno:
+                    raise CompoundPiStaleSequence(self.client_address[0], seqno)
             if match.group('params'):
                 params = match.group('params').split(',')
             else:
@@ -274,6 +285,12 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         self.server.responders[(self.client_address, seqno)] = NetworkRepeater(
                 self.socket, self.client_address, data)
 
+    def ack_response(self, seqno):
+        responder = self.server.responders.pop((self.client_address, seqno), None)
+        if responder:
+            responder.terminate = True
+            responder.join()
+
     def dispatch(self, command, *params):
         # Look up the handler in self.handlers (this dict is defined by the
         # register_handlers decorator on the class)
@@ -290,22 +307,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             converter(param)
             for converter, param in zip(handler.params, params)
             )
-        if handler == self.do_ack:
-            self.do_ack(seqno)
-            return
-        elif handler != self.do_hello:
-            if self.client_address != self.server.client_address:
-                raise CompoundPiInvalidClient(self.client_address[0])
-            elif seqno <= self.server.seqno:
-                raise CompoundPiStaleSequence(self.client_address[0], seqno)
         return handler(*params)
-
-    @handler('ACK', int)
-    def do_ack(self, seqno):
-        responder = self.server.responders.pop((self.client_address, seqno), None)
-        if responder:
-            responder.terminate = True
-            responder.join()
 
     @handler('HELLO', float)
     def do_hello(self, timestamp):
