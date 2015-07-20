@@ -105,6 +105,7 @@ def register_handlers(cls):
         for name, handler in cls.__dict__.items()
         if callable(handler) and hasattr(handler, 'command')
         }
+    return cls
 
 
 class CompoundPiUDPServer(socketserver.UDPServer):
