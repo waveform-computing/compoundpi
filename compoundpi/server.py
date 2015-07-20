@@ -27,6 +27,10 @@ from __future__ import (
 native_str = str
 str = type('')
 range = xrange
+try:
+    from itertools import izip as zip
+except ImportError:
+    pass
 
 import sys
 import os
@@ -81,6 +85,26 @@ def group(s):
         return int(s)
     except ValueError:
         return grp.getgrnam(s).gr_gid
+
+def boolint(s):
+    return bool(int(s))
+
+def lowerstr(s):
+    return s.strip().lower()
+
+def handler(command, *params):
+    def decorator(f):
+        f.command = command
+        f.params = params
+        return f
+    return decorator
+
+def register_handlers(cls):
+    cls.handlers = {
+        handler.command: getattr(cls, name)
+        for name, handler in cls.__dict__.items()
+        if callable(handler) and hasattr(handler, 'command')
+        }
 
 
 class CompoundPiUDPServer(socketserver.UDPServer):
@@ -201,6 +225,7 @@ class CompoundPiServer(TerminalApplication):
         self.server.shutdown()
 
 
+@register_handlers
 class CameraRequestHandler(socketserver.DatagramRequestHandler):
     request_re = re.compile(
             r'(?P<seqno>\d+) '
@@ -210,7 +235,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             r'(?P<result>OK|ERROR)(\n(?P<data>.*))?')
 
     def handle(self):
-        data = self.rfile.read().strip()
+        data = self.rfile.read().decode('utf-8').strip()
         logging.debug(
                 '%s:%d > %r',
                 self.client_address[0], self.client_address[1], data)
@@ -222,44 +247,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             seqno = int(match.group('seqno'))
             command = match.group('command')
             if match.group('params'):
-                params = match.group('params').split()
+                params = match.group('params').split(',')
             else:
                 params = ()
-            try:
-                handler = {
-                    'ACK':          self.do_ack,
-                    'AGC':          self.do_agc,
-                    'AWB':          self.do_awb,
-                    'BLINK':        self.do_blink,
-                    'CAPTURE':      self.do_capture,
-                    'CLEAR':        self.do_clear,
-                    'DENOISE':      self.do_denoise,
-                    'EXPOSURE':     self.do_exposure,
-                    'FLIP':         self.do_flip,
-                    'FRAMERATE':    self.do_framerate,
-                    'HELLO':        self.do_hello,
-                    'ISO':          self.do_iso,
-                    'BRIGHTNESS':   self.do_brightness,
-                    'CONTRAST':     self.do_contrast,
-                    'SATURATION':   self.do_saturation,
-                    'EV':           self.do_ev,
-                    'LIST':         self.do_list,
-                    'METERING':     self.do_metering,
-                    'RESOLUTION':   self.do_resolution,
-                    'SEND':         self.do_send,
-                    'STATUS':       self.do_status,
-                    }[command]
-            except KeyError:
-                raise ValueError('Unknown command %s' % command)
-            if handler == self.do_ack:
-                self.do_ack(seqno)
-                return
-            elif handler != self.do_hello:
-                if self.client_address != self.server.client_address:
-                    raise CompoundPiInvalidClient(self.client_address[0])
-                elif seqno <= self.server.seqno:
-                    raise CompoundPiStaleSequence(self.client_address[0], seqno)
-            response = handler(*params)
+            response = self.dispatch(command, *params)
             self.server.seqno = seqno
             if not response:
                 response = ''
@@ -282,15 +273,41 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         self.server.responders[(self.client_address, seqno)] = NetworkRepeater(
                 self.socket, self.client_address, data)
 
+    def dispatch(self, command, *params):
+        # Look up the handler in self.handlers (this dict is defined by the
+        # register_handlers decorator on the class)
+        try:
+            handler = self.handlers[command]
+        except KeyError:
+            raise ValueError('Unknown command %s' % command)
+        # The handler we get back is an unbound method; bind it to this
+        # instance
+        handler = handler.__get__(self, CameraRequestHandler)
+        # Convert params for the handler; we deliberately use zip here (instead
+        # of zip_longest) so that optional params are omitted from conversion
+        params = (
+            converter(param)
+            for converter, param in zip(handler.params, params)
+            )
+        if handler == self.do_ack:
+            self.do_ack(seqno)
+            return
+        elif handler != self.do_hello:
+            if self.client_address != self.server.client_address:
+                raise CompoundPiInvalidClient(self.client_address[0])
+            elif seqno <= self.server.seqno:
+                raise CompoundPiStaleSequence(self.client_address[0], seqno)
+        return handler(*params)
+
+    @handler('ACK', int)
     def do_ack(self, seqno):
-        seqno = int(seqno)
         responder = self.server.responders.pop((self.client_address, seqno), None)
         if responder:
             responder.terminate = True
             responder.join()
 
+    @handler('HELLO', float)
     def do_hello(self, timestamp):
-        timestamp = float(timestamp)
         if self.server.client_address == self.client_address:
             if timestamp <= self.server.client_timestamp:
                 raise CompoundPiStaleClientTime(self.client_address, timestamp)
@@ -309,6 +326,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         finally:
             self.server.camera.led = True
 
+    @handler('BLINK')
     def do_blink(self):
         # Test we can control the LED (root required) before sending "OK".  If
         # we can, then send OK and return to ensure the client doesn't timeout
@@ -320,6 +338,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         thread.daemon = True
         thread.start()
 
+    @handler('STATUS')
     def do_status(self):
         return (
             'RESOLUTION {width},{height}\n'
@@ -361,34 +380,32 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 images=len(self.server.images),
                 ))
 
+    @handler('RESOLUTION', int, int)
     def do_resolution(self, width, height):
-        width, height = int(width), int(height)
         logging.info('Changing camera resolution to %dx%d', width, height)
         self.server.camera.resolution = (width, height)
 
+    @handler('FRAMERATE', fractions.Fraction)
     def do_framerate(self, rate):
-        rate = fractions.Fraction(rate)
         logging.info('Changing camera framerate to %.2ffps', rate)
         self.server.camera.framerate = rate
 
+    @handler('AWB', lowerstr, float, float)
     def do_awb(self, mode, red=0.0, blue=0.0):
-        mode = mode.lower()
-        red = float(red)
-        blue = float(blue)
         logging.info('Changing camera AWB mode to %s', mode)
         self.server.camera.awb_mode = mode
         if mode == 'off':
             logging.info('Changing camera AWB gains to %.2f, %.2f', red, blue)
             self.server.camera.awb_gains = (red, blue)
 
+    @handler('AGC', lowerstr)
     def do_agc(self, mode):
-        mode = mode.lower()
         logging.info('Changing camera AGC mode to %s', mode)
         self.server.camera.exposure_mode = mode
 
+    @handler('EXPOSURE', lowerstr, float)
     def do_exposure(self, mode, speed):
-        mode = mode.lower()
-        speed = int(float(speed) * 1000)
+        speed = int(speed * 1000)
         logging.info('Changing camera exposure speed mode to %s', mode)
         if mode == 'auto':
             self.server.camera.shutter_speed = 0
@@ -396,45 +413,44 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             logging.info('Changing camera exposure speed to %.4fms', speed / 1000.0)
             self.server.camera.shutter_speed = speed
 
+    @handler('METERING', lowerstr)
     def do_metering(self, mode):
-        mode = mode.lower()
         logging.info('Changing camera metering mode to %s', mode)
         self.server.camera.meter_mode = mode
 
+    @handler('ISO', int)
     def do_iso(self, iso):
-        iso = int(iso)
         logging.info('Changing camera ISO to %d', iso)
         self.server.camera.iso = iso
 
+    @handler('BRIGHTNESS', int)
     def do_brightness(self, brightness):
-        brightness = int(brightness)
         logging.info('Changing camera brightness to %d', brightness)
         self.server.camera.brightness = brightness
 
+    @handler('CONTRAST', int)
     def do_contrast(self, contrast):
-        contrast = int(contrast)
         logging.info('Changing camera contrast to %d', contrast)
         self.server.camera.contrast = contrast
 
+    @handler('SATURATION', int)
     def do_saturation(self, saturation):
-        saturation = int(saturation)
         logging.info('Changing camera saturation to %d', saturation)
         self.server.camera.saturation = saturation
 
+    @handler('EV', int)
     def do_ev(self, ev):
-        ev = int(ev)
         logging.info('Changing camera EV to %d', ev)
         self.server.camera.exposure_compensation = ev
 
+    @handler('DENOISE', boolint)
     def do_denoise(self, denoise):
-        denoise = bool(denoise)
         logging.info('Changing camera denoise to %s', denoise)
         self.server.camera.image_denoise = denoise
         self.server.camera.video_denoise = denoise
 
+    @handler('FLIP', boolint, boolint)
     def do_flip(self, horizontal, vertical):
-        horizontal = bool(int(horizontal))
-        vertical = bool(int(vertical))
         logging.info('Changing camera horizontal flip to %s', horizontal)
         self.server.camera.hflip = horizontal
         logging.info('Changing camera vertical flip to %s', vertical)
@@ -446,10 +462,8 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             self.server.images.append((time.time(), stream))
             yield stream
 
+    @handler('CAPTURE', int, boolint, float)
     def do_capture(self, count=1, use_video_port=False, sync=None):
-        count = int(count)
-        use_video_port = bool(int(use_video_port))
-        sync = float(sync) if sync else None
         self.server.camera.led = False
         try:
             if sync is not None:
@@ -466,9 +480,8 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         finally:
             self.server.camera.led = True
 
+    @handler('SEND', int, int)
     def do_send(self, image, port):
-        image = int(image)
-        port = int(port)
         timestamp, stream = self.server.images[image]
         size = stream.seek(0, io.SEEK_END)
         logging.info('Sending image %d', image)
@@ -484,6 +497,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             client_file.close()
             client_sock.close()
 
+    @handler('LIST')
     def do_list(self):
         for timestamp, stream in self.server.images:
             stream.seek(0, io.SEEK_END)
@@ -492,6 +506,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             for (index, (timestamp, stream)) in enumerate(self.server.images)
             )
 
+    @handler('CLEAR')
     def do_clear(self):
         logging.info('Clearing images')
         del self.server.images[:]
