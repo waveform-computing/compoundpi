@@ -40,6 +40,8 @@ import select
 import struct
 import socket
 import SocketServer as socketserver
+import inspect
+from functools import wraps
 from fractions import Fraction
 from collections import namedtuple
 try:
@@ -49,6 +51,7 @@ except ImportError:
 
 from . import __version__
 from .common import NetworkRepeater
+from .protocol import CompoundPiProtocol
 from .exc import (
     CompoundPiBadResponse,
     CompoundPiFutureResponse,
@@ -108,7 +111,7 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
     'vflip',
     'denoise',
     'timestamp',
-    'images',
+    'files',
     ))):
     """
     This class is a namedtuple derivative used to store the status of a
@@ -230,9 +233,9 @@ class CompoundPiStatus(namedtuple('CompoundPiStatus', (
         difference in the server's timestamps to determine whether any servers
         have lost time sync.
 
-    .. attribute:: images
+    .. attribute:: files
 
-        Returns an integer number indicating the number of images currently
+        Returns an integer number indicating the number of files currently
         stored in the server's memory.
     """
 
@@ -269,6 +272,49 @@ class CompoundPiFile(namedtuple('CompoundPiFile', (
 
         Specifies the size of the file as an integer number of bytes.
     """
+
+
+def client(cls):
+    """
+    Decorator to convert CompoundPiProtocol into CompoundPiClientProtocol.
+
+    The client decorator is relatively simple; for each declared handler method
+    the body of the method is re-written to convert each argument according to
+    its defined type, then format the resulting command and arguments into a
+    command string which is returned.
+    """
+    def client_message(fn):
+        @wraps(fn)
+        def wrapper(*args, **kwargs):
+            argspec = inspect.getargspec(fn)
+            callargs = inspect.getcallargs(fn, *args, **kwargs)
+            return '{command} {params}'.format(
+                command=fn.command,
+                params=','.join(
+                    '' if value is None else str(value)
+                    for arg, conv in zip(argspec.args[1:], fn.params)
+                    for value in (None if callargs[arg] is None else conv(callargs[arg]),)
+                    )
+                )
+        return wrapper
+
+    for name, fn in cls.__mro__[1].__dict__.items():
+        if hasattr(fn, 'command'):
+            setattr(cls, name, client_message(fn))
+    return cls
+
+
+@client
+class CompoundPiClientProtocol(CompoundPiProtocol):
+    """
+    Generator for Compound Pi protocol messages. This class is generated
+    automatically from the description of the syntax in
+    :mod:`compoundpi.protocol`. Methods are provided for each protocol message.
+    When called with the appropriate arguments for the message (which are
+    type-checked according to the protocol spec), each method will return the
+    correctly formatted protocol message.
+    """
+    pass
 
 
 class CompoundPiClient(object):
@@ -321,14 +367,8 @@ class CompoundPiClient(object):
     server at a time, so the *address* parameter is mandatory.
     """
 
-    request_re = re.compile(
-            r'(?P<seqno>\d+) '
-            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
-    response_re = re.compile(
-            r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
-
     def __init__(self, progress=None):
+        self._protocol = CompoundPiClientProtocol()
         self._seqno = 0
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
@@ -451,7 +491,7 @@ class CompoundPiClient(object):
         """)
 
     def _send_command(self, address, seqno, data):
-        assert self.request_re.match(data)
+        assert self._protocol.request_re.match(data)
         logging.debug('%s Tx %s', address, data)
         if isinstance(data, str):
             data = data.encode('utf-8')
@@ -479,7 +519,7 @@ class CompoundPiClient(object):
                     data, server_address = self._socket.recvfrom(512)
                     data = data.decode('utf-8')
                     logging.debug('%s Rx %s', server_address, data)
-                    match = self.response_re.match(data)
+                    match = self._protocol.response_re.match(data)
                     address, port = server_address
                     address = IPv4Address(address)
                     if port != self.port:
@@ -604,7 +644,7 @@ class CompoundPiClient(object):
         if address in self:
             raise CompoundPiRedefinedServer(address)
         self._seqno += 1
-        data = '%d HELLO %f' % (self._seqno, time.time())
+        data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
         self._send_command(
             (str(address), self.port), self._seqno, data)
         response = self._parse_ping(self._responses({address}))
@@ -663,7 +703,7 @@ class CompoundPiClient(object):
         """
         self._servers = set()
         self._seqno += 1
-        data = '%d HELLO %f' % (self._seqno, time.time())
+        data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
         self._send_command(
             (str(self.network.broadcast), self.port), self._seqno, data)
         self._servers = self._parse_ping(self._responses(count=count))
@@ -683,7 +723,7 @@ class CompoundPiClient(object):
             r'FLIP (?P<hflip>0|1),(?P<vflip>0|1)\n'
             r'DENOISE (?P<denoise>0|1)\n'
             r'TIMESTAMP (?P<time>\d+(\.\d+)?)\n'
-            r'IMAGES (?P<images>\d{,3})\n')
+            r'FILES (?P<files>\d{,3})\n')
     def status(self, addresses=None):
         """
         Called to determine the status of servers. The :meth:`status` method
@@ -707,7 +747,8 @@ class CompoundPiClient(object):
         """
         responses = [
             (address, self.status_re.match(data))
-            for (address, data) in self._transact('STATUS', addresses).items()
+            for (address, data) in self._transact(
+                self._protocol.do_status(), addresses).items()
             ]
         errors = []
         result = {}
@@ -736,7 +777,7 @@ class CompoundPiClient(object):
                     vflip=bool(int(match.group('vflip'))),
                     denoise=bool(int(match.group('denoise'))),
                     timestamp=datetime.datetime.fromtimestamp(float(match.group('time'))),
-                    images=int(match.group('images')),
+                    files=int(match.group('files')),
                     )
         if errors:
             raise CompoundPiTransactionFailed(
@@ -757,7 +798,7 @@ class CompoundPiClient(object):
             client.find(10)
             client.resolution(1280, 720)
         """
-        self._transact('RESOLUTION %d,%d' % (width, height), addresses)
+        self._transact(self._protocol.do_resolution(width, height), addresses)
 
     def framerate(self, rate, addresses=None):
         """
@@ -774,7 +815,7 @@ class CompoundPiClient(object):
             client.find(10)
             client.framerate(24)
         """
-        self._transact('FRAMERATE %s' % rate, addresses)
+        self._transact(self._protocol.do_framerate(rate), addresses)
 
     def awb(self, mode, red=0.0, blue=0.0, addresses=None):
         """
@@ -817,7 +858,7 @@ class CompoundPiClient(object):
             status = client.status(addresses=addr)[addr]
             client.awb('off', status.awb_red, status.awb_blue)
         """
-        self._transact('AWB %s,%f,%f' % (mode, red, blue), addresses)
+        self._transact(self._protocol.do_awb(mode, red, blue), addresses)
 
     def agc(self, mode, addresses=None):
         """
@@ -849,7 +890,7 @@ class CompoundPiClient(object):
             gains to a particular value (in contrast to AWB and exposure
             speed).
         """
-        self._transact('AGC %s' % mode, addresses)
+        self._transact(self._protocol.do_agc(mode), addresses)
 
     def exposure(self, mode, speed=0, addresses=None):
         """
@@ -884,7 +925,7 @@ class CompoundPiClient(object):
             client.exposure('off', speed=status.exposure_speed)
 
         """
-        self._transact('EXPOSURE %s,%f' % (mode, speed), addresses)
+        self._transact(self._protocol.do_exposure(mode, speed), addresses)
 
     def metering(self, mode, addresses=None):
         """
@@ -898,7 +939,7 @@ class CompoundPiClient(object):
         * ``'matrix'``
         * ``'spot'``
         """
-        self._transact('METERING %s' % mode, addresses)
+        self._transact(self._protocol.do_metering(mode), addresses)
 
     def iso(self, value, addresses=None):
         """
@@ -907,7 +948,7 @@ class CompoundPiClient(object):
         *mode* parameter specifies the new ISO settings as an integer value.
         values are 0 (meaning auto), 100, 200, 320, 400, 500, 640, and 800.
         """
-        self._transact('ISO %d' % value, addresses)
+        self._transact(self._protocol.do_iso(value), addresses)
 
     def brightness(self, value, addresses=None):
         """
@@ -915,7 +956,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between 0 and 100.
         """
-        self._transact('BRIGHTNESS %d' % value, addresses)
+        self._transact(self._protocol.do_brightness(value), addresses)
 
     def contrast(self, value, addresses=None):
         """
@@ -923,7 +964,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between -100 and 100.
         """
-        self._transact('CONTRAST %d' % value, addresses)
+        self._transact(self._protocol.do_contrast(value), addresses)
 
     def saturation(self, value, addresses=None):
         """
@@ -931,7 +972,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between -100 and 100.
         """
-        self._transact('SATURATION %d' % value, addresses)
+        self._transact(self._protocol.do_saturation(value), addresses)
 
     def ev(self, value, addresses=None):
         """
@@ -940,7 +981,7 @@ class CompoundPiClient(object):
         omitted). The new level is specified an integer between -24 and 24
         where each increment represents 1/6th of a stop.
         """
-        self._transact('EV %d' % value, addresses)
+        self._transact(self._protocol.do_ev(value), addresses)
 
     def flip(self, horizontal, vertical, addresses=None):
         """
@@ -950,7 +991,7 @@ class CompoundPiClient(object):
         whether to flip the camera's output along the corresponding axis. The
         default for both parameters is ``False``.
         """
-        self._transact('FLIP %d,%d' % (horizontal, vertical), addresses)
+        self._transact(self._protocol.do_flip(horizontal, vertical), addresses)
 
     def denoise(self, value, addresses=None):
         """
@@ -959,7 +1000,7 @@ class CompoundPiClient(object):
         *addresses* is omitted). The *value* is a simple boolean, which
         defaults to ``True``.
         """
-        self._transact('DENOISE %d' % int(value), addresses)
+        self._transact(self._protocol.do_denoise(value), addresses)
 
     def capture(self, count=1, video_port=False, delay=None, addresses=None):
         """
@@ -993,12 +1034,11 @@ class CompoundPiClient(object):
             The captured images are stored in RAM on the servers for later
             retrieval with the :meth:`download` method.
         """
-        cmd = 'CAPTURE %d,%d,'
-        params = [count, video_port]
         if delay:
-            cmd += '%f'
-            params.append(time.time() + delay)
-        self._transact(cmd % tuple(params), addresses)
+            delay = time.time() + delay
+        else:
+            delay = None
+        self._transact(self._protocol.do_capture(count, video_port, delay), addresses)
 
     def record(self, length, format='h264', quality=0, bitrate=17000000,
             intra_period=None, motion_output=False, delay=None,
@@ -1041,23 +1081,24 @@ class CompoundPiClient(object):
             The captured video is stored in RAM on the servers for later
             retrieval with the :meth:`download` method.
         """
-        cmd = 'RECORD %f,%s,%d,%d,%d,%d,'
-        params = [length, format, quality, bitrate, intra_period, motion_output]
         if delay:
-            cmd += '%f'
-            params.append(time.time() + delay)
-        self._transact(cmd % tuple(params), addresses)
+            delay = time.time() + delay
+        else:
+            delay = None
+        self._transact(self._protocol.do_record(
+            length, format, quality, bitrate, intra_period, motion_output, delay),
+            addresses)
 
     list_line_re = re.compile(
             r'(?P<filetype>IMAGE|VIDEO|MOTION),(?P<index>\d+),(?P<time>\d+(\.\d+)?),(?P<size>\d+)')
     def list(self, addresses=None):
         """
-        Called to list images available for download from the servers at the
+        Called to list files available for download from the servers at the
         specified *addresses* (or all defined servers if *addresses* is
         omitted). The method returns a mapping of address to sequences of
         :class:`CompoundPiFile` which provide the index, capture timestamp,
         and size of each image available on the server. For example, to
-        enumerate the total size of all images stored on all servers::
+        enumerate the total size of all files stored on all servers::
 
             from compoundpi.client import CompoundPiClient
 
@@ -1066,9 +1107,9 @@ class CompoundPiClient(object):
             client.find(10)
             client.capture()
             size = sum(
-                image.size
-                for addr, images in client.list().items()
-                for image in images
+                f.size
+                for addr, files in client.list().items()
+                for f in files
                 )
             print('%d bytes available for download' % size)
         """
@@ -1077,7 +1118,8 @@ class CompoundPiClient(object):
                 self.list_line_re.match(line)
                 for line in data.splitlines()
                 ]
-            for (address, data) in self._transact('LIST', addresses).items()
+            for (address, data) in self._transact(
+                self._protocol.do_list(), addresses).items()
             }
         errors = []
         result = {}
@@ -1100,13 +1142,13 @@ class CompoundPiClient(object):
 
     def clear(self, addresses=None):
         """
-        Called to clear captured images from the RAM of the servers at the
+        Called to clear captured files from the RAM of the servers at the
         specified *addresses* (or all defined servers if *addresses* is
         omitted). Currently the protocol for the :ref:`protocol_clear` message
-        is fairly crude: it simply clears all captured images on the server;
-        there is no method for specifying a subset of images to wipe.
+        is fairly crude: it simply clears all captured files on the server;
+        there is no method for specifying a subset of files to wipe.
         """
-        self._transact('CLEAR', addresses)
+        self._transact(self._protocol.do_clear(), addresses)
 
     def identify(self, addresses=None):
         """
@@ -1115,7 +1157,7 @@ class CompoundPiClient(object):
         Currently, the identification takes the form of the server blinking
         the camera's LED for 5 seconds.
         """
-        self._transact('BLINK', addresses)
+        self._transact(self._protocol.do_blink(), addresses)
 
     def download(self, address, index, output):
         """
@@ -1125,12 +1167,12 @@ class CompoundPiClient(object):
 
         The :meth:`download` method differs from all other client methods in
         that it targets a single server at a time (attempting to simultaneously
-        download images from multiple servers would be extremely inefficient).
+        download files from multiple servers would be extremely inefficient).
         The available image indices can be determined by calling the
-        :meth:`list` method beforehand. Note that downloading images from
-        servers does *not* wipe the image from the server's RAM. Once all
-        images have been successfully retrieved, you should use the
-        :meth:`clear` method to free up memory on the servers. For example::
+        :meth:`list` method beforehand. Note that downloading files from
+        servers does *not* wipe the file from the server's RAM. Once all files
+        have been successfully retrieved, you should use the :meth:`clear`
+        method to free up memory on the servers. For example::
 
             import io
             from compoundpi.client import CompoundPiClient
@@ -1139,17 +1181,17 @@ class CompoundPiClient(object):
             client.network = '192.168.0.0/24'
             # Capture an image on all servers
             client.capture()
-            # Download all available images from all servers
-            for addr, images in client.list().items():
-                for image in images:
+            # Download all available files from all servers
+            for addr, files in client.list().items():
+                for f in files:
                     print('Downloading image %d from %s (%d bytes)' % (
-                        image.index,
+                        f.index,
                         addr,
-                        image.size,
+                        f.size,
                         ))
-                    with io.open('%s-%d.jpg' % (addr, image.index)) as f:
-                        client.download(addr, image.index, f)
-            # Wipe all images on all servers
+                    with io.open('%s-%d.jpg' % (addr, f.index)) as f:
+                        client.download(addr, f.index, f)
+            # Wipe all files on all servers
             client.clear()
         """
         self._server.source = address
@@ -1165,7 +1207,7 @@ class CompoundPiClient(object):
                 )
         self._progress_start = self._progress_update = self._progress_finish = None
         try:
-            self._transact('SEND %d,%d' % (index, self.port), [address])
+            self._transact(self._protocol.do_send(index, self.port), [address])
             if not self._server.event.wait(self.timeout):
                 raise CompoundPiSendTimeout(address)
             elif self._server.exception:
@@ -1194,7 +1236,7 @@ class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
             try:
                 received = 0
                 while received < size:
-                    data = self.rfile.read(1024)
+                    data = self.rfile.read(4096)
                     received += len(data)
                     if not data:
                         break

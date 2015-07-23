@@ -38,7 +38,6 @@ import io
 import re
 import pwd
 import grp
-import fractions
 import time
 import random
 import logging
@@ -49,7 +48,8 @@ import SocketServer as socketserver
 import shutil
 import signal
 import warnings
-from collections import namedtuple
+import inspect
+from functools import wraps
 
 import daemon
 import daemon.runner
@@ -59,6 +59,7 @@ import RPi.GPIO as GPIO
 from . import __version__
 from .terminal import TerminalApplication
 from .common import NetworkRepeater
+from .protocol import CompoundPiProtocol
 from .exc import (
     CompoundPiInvalidClient,
     CompoundPiStaleSequence,
@@ -87,37 +88,22 @@ def group(s):
     except ValueError:
         return grp.getgrnam(s).gr_gid
 
-def boolint(s):
-    return bool(int(s))
-
-def lowerstr(s):
-    return s.strip().lower()
-
-def handler(command, *params):
-    def decorator(f):
-        f.command = command
-        f.params = params
-        return f
-    return decorator
-
-def register_handlers(cls):
-    cls.handlers = {
-        handler.command: getattr(cls, name)
-        for name, handler in cls.__dict__.items()
-        if callable(handler) and hasattr(handler, 'command')
-        }
-    return cls
-
 
 class CompoundPiFile(object):
     """
-    Represents a file stored in memory on the Compound Pi Server. The *filetype*
-    attribute is ``IMAGE``, ``VIDEO``, or ``MOTION`` depending on the content
-    of the stream. The 
+    Represents a file stored in memory on the Compound Pi Server. The
+    *filetype* attribute is ``IMAGE``, ``VIDEO``, or ``MOTION`` depending on
+    the content of the stream. The *timestamp* attribute is the UNIX epoch
+    timestamp immediately prior to capture/record start. The *stream* attribute
+    contains the file data, and the *size* attribute returns the size of the
+    stream (note: this seeks to the end of the stream).
     """
     def __init__(self, filetype, timestamp=None):
         self._filetype = filetype
-        self._timestamp = timestamp
+        if timestamp is None:
+            self._timestamp = time.time()
+        else:
+            self._timestamp = timestamp
         self._stream = io.BytesIO()
 
     @property
@@ -189,58 +175,74 @@ class CompoundPiServer(TerminalApplication):
         warnings.showwarning = self.showwarning
         warnings.filterwarnings('ignore', category=CompoundPiStaleSequence)
         warnings.filterwarnings('ignore', category=CompoundPiStaleClientTime)
-        pidfile = daemon.runner.make_pidlockfile(args.pidfile, 5)
-        if daemon.runner.is_pidfile_stale(pidfile):
-            pidfile.break_lock()
+        if args.debug:
+            # Don't bother with daemon context in debug mode; we generally
+            # want to debug protocol stuff anyway...
+            signal.signal(signal.SIGINT, self.interrupt)
+            signal.signal(signal.SIGTERM, self.terminate)
+            self.privileged_setup(args)
+            self.serve_forever()
+        else:
+            pidfile = daemon.runner.make_pidlockfile(args.pidfile, 5)
+            if daemon.runner.is_pidfile_stale(pidfile):
+                pidfile.break_lock()
+            self.privileged_setup(args)
+            # Ensure the server's socket, any log file, and stderr are preserved
+            # (if not forking)
+            files_preserve = [self.server.socket]
+            for handler in logging.getLogger().handlers:
+                if isinstance(handler, logging.FileHandler):
+                    files_preserve.append(handler.stream)
+            logging.info('Entering daemon context')
+            with daemon.DaemonContext(
+                    # The following odd construct is to ensure detachment only
+                    # where sensible (see default setting of detach_process)
+                    detach_process=None if args.daemon else False,
+                    stderr=None if args.daemon else sys.stderr,
+                    uid=args.user, gid=args.group,
+                    files_preserve=files_preserve,
+                    pidfile=pidfile,
+                    signal_map={
+                        signal.SIGTERM: self.terminate,
+                        signal.SIGINT:  self.interrupt,
+                        }
+                    ):
+                self.serve_forever()
+            logging.info('Exiting daemon context')
+
+    def privileged_setup(self, args):
+        # Bind to the socket before entering daemon context in case the port
+        # requested is privileged
         address = socket.getaddrinfo(
             args.bind, args.port, 0, socket.SOCK_DGRAM)[0][-1]
         logging.info('Listening on %s:%d', address[0], address[1])
-        self.server = CompoundPiUDPServer(address, CameraRequestHandler)
+        self.server = CompoundPiUDPServer(address, CompoundPiServerProtocol)
         # Test GPIO before entering the daemon context (GPIO access usually
         # requires root privileges for access to /dev/mem - better to bomb out
         # earlier than later)
         GPIO.setmode(GPIO.BCM)
         GPIO.gpio_function(5)
-        # Ensure the server's socket, any log file, and stderr are preserved
-        # (if not forking)
-        files_preserve = [self.server.socket]
-        for handler in logging.getLogger().handlers:
-            if isinstance(handler, logging.FileHandler):
-                files_preserve.append(handler.stream)
-        logging.info('Entering daemon context')
-        with daemon.DaemonContext(
-                # The following odd construct is to ensure detachment only
-                # where sensible (see default setting of detach_process)
-                detach_process=None if args.daemon else False,
-                stderr=None if args.daemon else sys.stderr,
-                uid=args.user, gid=args.group,
-                files_preserve=files_preserve,
-                pidfile=pidfile,
-                signal_map={
-                    signal.SIGTERM: self.terminate,
-                    signal.SIGINT:  self.interrupt,
-                    }
-                ):
-            # seed the random number generator from the system clock
-            random.seed()
-            logging.info('Initializing camera')
-            self.server.seqno = 0
-            self.server.client_address = None
-            self.server.client_timestamp = None
-            self.server.responders = {}
-            self.server.files = []
-            self.server.camera = picamera.PiCamera()
-            try:
-                logging.info('Starting server thread')
-                thread = threading.Thread(target=self.server.serve_forever)
-                thread.start()
-                while thread.is_alive():
-                    thread.join(1)
-                logging.info('Server thread ended')
-            finally:
-                logging.info('Closing camera')
-                self.server.camera.close()
-        logging.info('Exiting daemon context')
+
+    def serve_forever(self):
+        # seed the random number generator from the system clock
+        random.seed()
+        logging.info('Initializing camera')
+        self.server.seqno = 0
+        self.server.client_address = None
+        self.server.client_timestamp = None
+        self.server.responders = {}
+        self.server.files = []
+        self.server.camera = picamera.PiCamera()
+        try:
+            logging.info('Starting server thread')
+            thread = threading.Thread(target=self.server.serve_forever)
+            thread.start()
+            while thread.is_alive():
+                thread.join(1)
+            logging.info('Server thread ended')
+        finally:
+            logging.info('Closing camera')
+            self.server.camera.close()
 
     def showwarning(self, message, category, filename, lineno, file=None,
             line=None):
@@ -255,19 +257,56 @@ class CompoundPiServer(TerminalApplication):
         self.server.shutdown()
 
 
-@register_handlers
-class CameraRequestHandler(socketserver.DatagramRequestHandler):
-    request_re = re.compile(
-            r'(?P<seqno>\d+) '
-            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
-    response_re = re.compile(
-            r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?')
+def server(protocol):
+    """
+    Decorator to convert handler arguments in CompoundPiServerProtocol.
 
+    This is necessarily rather complicated compared to the client equivalent;
+    in Python 2.x socket server request handlers are based on old-style classes
+    which means we can't simply convert CompoundPiProtocol into a mixin class
+    and use multiple inheritance. So instead we use the *protocol* as a
+    template, looking up similarly named methods in *cls* and decorating them
+    before adding a handler map to *cls*.
+    """
+    def method_decorator(fn, arg_names, arg_types):
+        @wraps(fn)
+        def wrapper(self, *args):
+            typed_args = [
+                    arg_type(value) if value else None
+                    for arg_type, value in zip(arg_types, args)
+                    ]
+            return fn(self, **{
+                arg_name: value
+                for arg_name, value in zip(arg_names, typed_args)
+                if value is not None
+                })
+        return wrapper
+
+    def class_decorator(cls):
+        handlers = {}
+        for name, handler in cls.__dict__.items():
+            if name in protocol.__dict__:
+                template = protocol.__dict__[name]
+                if inspect.isfunction(template) and hasattr(template, 'command'):
+                    arg_names = inspect.getargspec(template).args[1:]
+                    arg_types = template.params
+                    wrapped_handler = method_decorator(handler, arg_names, arg_types)
+                    handlers[template.command] = wrapped_handler
+                    setattr(cls, name, wrapped_handler)
+        cls.handlers = handlers
+        cls.request_re = protocol.request_re
+        cls.response_re = protocol.response_re
+        return cls
+
+    return class_decorator
+
+
+@server(CompoundPiProtocol)
+class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
     def handle(self):
         data = self.rfile.read().decode('utf-8').strip()
         logging.debug(
-                '%s:%d > %r',
+                '%s:%d Rx %r',
                 self.client_address[0], self.client_address[1], data)
         seqno = 0
         try:
@@ -288,7 +327,7 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 elif seqno <= self.server.seqno:
                     raise CompoundPiStaleSequence(self.client_address[0], seqno)
             if match.group('params'):
-                params = match.group('params').split(',')
+                params = (p.strip() for p in match.group('params').split(','))
             else:
                 params = ()
             response = self.dispatch(command, *params)
@@ -296,9 +335,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             if not response:
                 response = ''
             self.send_response(seqno, '%d OK\n%s' % (seqno, response))
-        except Warning as w:
-            # Don't respond to raised warnings, just log them
-            warnings.warn(w)
         except Exception as e:
             # Otherwise, send an ERROR response
             logging.error(str(e))
@@ -306,11 +342,11 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
 
     def send_response(self, seqno, data):
         assert self.response_re.match(data)
+        logging.debug(
+                '%s:%d Tx %r',
+                self.client_address[0], self.client_address[1], data)
         if isinstance(data, str):
             data = data.encode('utf-8')
-        logging.debug(
-                '%s:%d < %r',
-                self.client_address[0], self.client_address[1], data)
         self.server.responders[(self.client_address, seqno)] = NetworkRepeater(
                 self.socket, self.client_address, data)
 
@@ -329,16 +365,13 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             raise ValueError('Unknown command %s' % command)
         # The handler we get back is an unbound method; bind it to this
         # instance
-        handler = handler.__get__(self, CameraRequestHandler)
-        # Convert params for the handler; we deliberately use zip here (instead
-        # of zip_longest) so that optional params are omitted from conversion
-        params = (
-            converter(param)
-            for converter, param in zip(handler.params, params)
-            )
+        handler = handler.__get__(self, CompoundPiServerProtocol)
+        # Some magic happens here because the handler we're calling is actually
+        # a wrapper created by @server. Basically parameters are magically
+        # converted from strings to something more useful and defaults are
+        # filled in as necessary
         return handler(*params)
 
-    @handler('HELLO', float)
     def do_hello(self, timestamp):
         if self.server.client_address == self.client_address:
             if timestamp <= self.server.client_timestamp:
@@ -358,7 +391,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         finally:
             self.server.camera.led = True
 
-    @handler('BLINK')
     def do_blink(self):
         # Test we can control the LED (root required) before sending "OK".  If
         # we can, then send OK and return to ensure the client doesn't timeout
@@ -370,7 +402,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         thread.daemon = True
         thread.start()
 
-    @handler('STATUS')
     def do_status(self):
         return (
             'RESOLUTION {width},{height}\n'
@@ -412,17 +443,14 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 files=len(self.server.files),
                 ))
 
-    @handler('RESOLUTION', int, int)
     def do_resolution(self, width, height):
         logging.info('Changing camera resolution to %dx%d', width, height)
         self.server.camera.resolution = (width, height)
 
-    @handler('FRAMERATE', fractions.Fraction)
     def do_framerate(self, rate):
         logging.info('Changing camera framerate to %.2ffps', rate)
         self.server.camera.framerate = rate
 
-    @handler('AWB', lowerstr, float, float)
     def do_awb(self, mode, red=0.0, blue=0.0):
         logging.info('Changing camera AWB mode to %s', mode)
         self.server.camera.awb_mode = mode
@@ -430,12 +458,10 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             logging.info('Changing camera AWB gains to %.2f, %.2f', red, blue)
             self.server.camera.awb_gains = (red, blue)
 
-    @handler('AGC', lowerstr)
     def do_agc(self, mode):
         logging.info('Changing camera AGC mode to %s', mode)
         self.server.camera.exposure_mode = mode
 
-    @handler('EXPOSURE', lowerstr, float)
     def do_exposure(self, mode, speed):
         speed = int(speed * 1000)
         logging.info('Changing camera exposure speed mode to %s', mode)
@@ -445,43 +471,35 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             logging.info('Changing camera exposure speed to %.4fms', speed / 1000.0)
             self.server.camera.shutter_speed = speed
 
-    @handler('METERING', lowerstr)
     def do_metering(self, mode):
         logging.info('Changing camera metering mode to %s', mode)
         self.server.camera.meter_mode = mode
 
-    @handler('ISO', int)
     def do_iso(self, iso):
         logging.info('Changing camera ISO to %d', iso)
         self.server.camera.iso = iso
 
-    @handler('BRIGHTNESS', int)
     def do_brightness(self, brightness):
         logging.info('Changing camera brightness to %d', brightness)
         self.server.camera.brightness = brightness
 
-    @handler('CONTRAST', int)
     def do_contrast(self, contrast):
         logging.info('Changing camera contrast to %d', contrast)
         self.server.camera.contrast = contrast
 
-    @handler('SATURATION', int)
     def do_saturation(self, saturation):
         logging.info('Changing camera saturation to %d', saturation)
         self.server.camera.saturation = saturation
 
-    @handler('EV', int)
     def do_ev(self, ev):
         logging.info('Changing camera EV to %d', ev)
         self.server.camera.exposure_compensation = ev
 
-    @handler('DENOISE', boolint)
     def do_denoise(self, denoise):
         logging.info('Changing camera denoise to %s', denoise)
         self.server.camera.image_denoise = denoise
         self.server.camera.video_denoise = denoise
 
-    @handler('FLIP', boolint, boolint)
     def do_flip(self, horizontal, vertical):
         logging.info('Changing camera horizontal flip to %s', horizontal)
         self.server.camera.hflip = horizontal
@@ -501,7 +519,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
                 raise ValueError('Sync time in past')
             time.sleep(delay)
 
-    @handler('CAPTURE', int, boolint, float)
     def do_capture(self, count=1, use_video_port=False, sync=None):
         self.server.camera.led = False
         try:
@@ -515,7 +532,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         finally:
             self.server.camera.led = True
 
-    @handler('RECORD', float, lowerstr, int, int, int, boolint, float)
     def do_record(self, length, format='h264', quality=0, bitrate=17000000,
             intra_period=None, motion_output=False, sync=None):
         self.server.camera.led = False
@@ -537,7 +553,6 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
         finally:
             self.server.camera.led = True
 
-    @handler('SEND', int, int)
     def do_send(self, file_num, port):
         f = self.server.files[file_num]
         logging.info('Sending file %d', file_num)
@@ -553,14 +568,12 @@ class CameraRequestHandler(socketserver.DatagramRequestHandler):
             client_file.close()
             client_sock.close()
 
-    @handler('LIST')
     def do_list(self):
         return '\n'.join(
             '%s,%d,%f,%d' % (f.filetype, index, f.timestamp, f.size)
             for index, f in enumerate(self.server.files)
             )
 
-    @handler('CLEAR')
     def do_clear(self):
         logging.info('Clearing files')
         del self.server.files[:]

@@ -60,7 +60,7 @@ class NetworkRepeater(threading.Thread):
     class.
     """
 
-    def __init__(self, socket, address, data, timeout=5, interval=0.2):
+    def __init__(self, socket, address, data, timeout=5, interval=0.5):
         super(NetworkRepeater, self).__init__()
         self.socket = socket
         self.address = address

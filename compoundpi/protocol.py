@@ -173,12 +173,16 @@ from __future__ import (
     division,
     )
 str = type('')
+try:
+    from itertools import izip as zip
+except ImportError:
+    pass
 
 
+import re
 import inspect
 import fractions
 from textwrap import dedent
-from abc import ABCMeta, abstractmethod
 
 
 class boolstr(int):
@@ -203,7 +207,6 @@ class lowerstr(str):
 
 def handler(command, *params):
     def decorator(f):
-        f = abstractmethod(f)
         argspec = inspect.getargspec(f)
         assert argspec.varargs is None
         assert argspec.keywords is None
@@ -215,8 +218,12 @@ def handler(command, *params):
 
 
 class CompoundPiProtocol(object):
-    __metaclass__ = ABCMeta
-    __slots__ = ()
+    request_re = re.compile(
+            r'(?P<seqno>\d+) '
+            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
+    response_re = re.compile(
+            r'(?P<seqno>\d+) '
+            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
 
     """
     This abstract base class describes the Compound Pi protocol. The class

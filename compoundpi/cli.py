@@ -177,14 +177,7 @@ class CompoundPiClientApplication(TerminalApplication):
 
 
 class CompoundPiCmd(Cmd):
-
     prompt = 'cpi> '
-    request_re = re.compile(
-            r'(?P<seqno>\d+) '
-            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
-    response_re = re.compile(
-            r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
 
     def __init__(self):
         Cmd.__init__(self)
@@ -271,7 +264,7 @@ class CompoundPiCmd(Cmd):
                 result.add(self.parse_address(i))
         return result
 
-    def parse_arg(self, arg=None):
+    def parse_addresses(self, arg=None):
         if arg:
             return self.parse_address_list(arg)
         elif not len(self.client):
@@ -511,7 +504,7 @@ class CompoundPiCmd(Cmd):
 
         cpi> status
         """
-        responses = self.client.status(self.parse_arg(arg))
+        responses = self.client.status(self.parse_addresses(arg))
         min_time = min(status.timestamp for status in responses.values())
         self.pprint_table(
             [
@@ -556,7 +549,7 @@ class CompoundPiCmd(Cmd):
                         'none'
                         ),
                     status.timestamp - min_time,
-                    status.images,
+                    status.files,
                     )
                 for address in sorted(self.client)
                 if address in responses
@@ -639,7 +632,7 @@ class CompoundPiCmd(Cmd):
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid resolution "%s"' % arg[0])
         self.client.resolution(
-            width, height, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            width, height, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_resolution(self, text, line, start, finish):
         cmd_re = re.compile(r'resolution(?P<res> +[^ ]+(?P<addr> +.*)?)?')
@@ -703,7 +696,7 @@ class CompoundPiCmd(Cmd):
         except (TypeError, ValueError) as exc:
             raise CmdSyntaxError('Invalid framerate "%s"' % arg[0])
         self.client.framerate(
-            rate, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            rate, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_framerate(self, text, line, start, finish):
         cmd_re = re.compile(r'framerate(?P<rate> +[^ ]+(?P<addr> +.*)?)?')
@@ -765,7 +758,7 @@ class CompoundPiCmd(Cmd):
         arg = arg.split(' ', 1)
         self.client.agc(
                 arg[0].lower(),
-                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+                addresses=self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_agc(self, text, line, start, finish):
         cmd_re = re.compile(r'agc(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
@@ -829,7 +822,7 @@ class CompoundPiCmd(Cmd):
         if re.match(r'[a-z]+', arg[0]):
             self.client.awb(
                 arg[0].lower(),
-                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+                addresses=self.parse_addresses(arg[1] if len(arg) > 1 else None))
         else:
             try:
                 red_gain, blue_gain = (float(f) for f in arg[0].split(',', 1))
@@ -837,7 +830,7 @@ class CompoundPiCmd(Cmd):
                 raise CmdSyntaxError('Invalid red/blue gains: %s' % arg[0])
             self.client.awb(
                 'off', red_gain, blue_gain,
-                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+                addresses=self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_awb(self, text, line, start, finish):
         cmd_re = re.compile(r'awb(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
@@ -890,7 +883,7 @@ class CompoundPiCmd(Cmd):
         if re.match(r'[a-z]+', arg[0]):
             self.client.exposure(
                 arg[0].lower(),
-                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+                addresses=self.parse_addresses(arg[1] if len(arg) > 1 else None))
         else:
             try:
                 speed = float(arg[0])
@@ -898,7 +891,7 @@ class CompoundPiCmd(Cmd):
                 raise CmdSyntaxError('Invalid exposure speed: %s' % arg[0])
             self.client.exposure(
                 'off', speed,
-                addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+                addresses=self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_exposure(self, text, line, start, finish):
         cmd_re = re.compile(r'exposure(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
@@ -951,7 +944,7 @@ class CompoundPiCmd(Cmd):
         arg = arg.split(' ', 1)
         self.client.metering(
             arg[0].lower(),
-            addresses=self.parse_arg(arg[1] if len(arg) > 1 else None))
+            addresses=self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_metering(self, text, line, start, finish):
         cmd_re = re.compile(r'metering(?P<mode> +[^ ]+(?P<addr> +.*)?)?')
@@ -1004,7 +997,7 @@ class CompoundPiCmd(Cmd):
             except ValueError:
                 raise CmdSyntaxError('Invalid ISO value "%s"' % arg[0])
         self.client.iso(
-            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            value, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_iso(self, text, line, start, finish):
         cmd_re = re.compile(r'iso(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1058,7 +1051,7 @@ class CompoundPiCmd(Cmd):
         except ValueError:
             raise CmdSyntaxError('Invalid brightness value "%s"' % arg[0])
         self.client.brightness(
-            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            value, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_brightness(self, text, line, start, finish):
         cmd_re = re.compile(r'brightness(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1099,7 +1092,7 @@ class CompoundPiCmd(Cmd):
         except ValueError:
             raise CmdSyntaxError('Invalid contrast value "%s"' % arg[0])
         self.client.contrast(
-            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            value, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_contrast(self, text, line, start, finish):
         cmd_re = re.compile(r'contrast(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1140,7 +1133,7 @@ class CompoundPiCmd(Cmd):
         except ValueError:
             raise CmdSyntaxError('Invalid saturation value "%s"' % arg[0])
         self.client.saturation(
-            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            value, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_saturation(self, text, line, start, finish):
         cmd_re = re.compile(r'saturation(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1183,7 +1176,7 @@ class CompoundPiCmd(Cmd):
         except ValueError:
             raise CmdSyntaxError('Invalid EV value "%s"' % arg[0])
         self.client.ev(
-            value, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            value, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_ev(self, text, line, start, finish):
         cmd_re = re.compile(r'ev(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1220,7 +1213,7 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError('You must specify a denoise value')
         arg = arg.split(' ', 1)
         self.client.denoise(self.parse_bool(arg[0]),
-            self.parse_arg(arg[1] if len(arg) > 1 else None))
+            self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_denoise(self, text, line, start, finish):
         cmd_re = re.compile(r'denoise(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1279,7 +1272,7 @@ class CompoundPiCmd(Cmd):
         except KeyError:
             raise CmdSyntaxError('Invalid orientation "%s"' % arg[0])
         self.client.flip(
-            hflip, vflip, self.parse_arg(arg[1] if len(arg) > 1 else None))
+            hflip, vflip, self.parse_addresses(arg[1] if len(arg) > 1 else None))
 
     def complete_flip(self, text, line, start, finish):
         cmd_re = re.compile(r'flip(?P<value> +[^ ]+(?P<addr> +.*)?)?')
@@ -1304,7 +1297,7 @@ class CompoundPiCmd(Cmd):
         """
         Captures images from the defined servers.
 
-        Syntax: capture [addresses]
+        Syntax: capture [<count> images] [after <delay>] [on <addresses>]
 
         The 'capture' command causes the servers to capture an image. Note
         that this does not cause the captured images to be sent to the client.
@@ -1323,30 +1316,55 @@ class CompoundPiCmd(Cmd):
         cpi> capture 192.168.0.1
         cpi> capture 192.168.0.50-192.168.0.53
         """
-        self.client.capture(
-            self.capture_count, self.video_port, self.capture_delay,
-            self.parse_arg(arg))
+        count = 1
+        delay = None
+        addresses = None
+        if arg:
+            arg = [a.lower() for a in arg.split()]
+            if len(arg) >= 2:
+                if arg[1] in ('image', 'images'):
+                    count = int(arg[0])
+                    del arg[:2]
+            if len(arg) >= 2:
+                if arg[0] == 'after':
+                    delay = float(arg[1])
+                    del arg[:2]
+            if len(arg) >= 2:
+                if arg[0] == 'on':
+                    addresses = self.parse_addresses(arg[1])
+                    del arg[:2]
+            if arg:
+                raise CmdSyntaxError('Unable to parse capture options')
+        self.client.capture(count, self.video_port, delay, addresses)
 
     def complete_capture(self, text, line, start, finish):
-        return self.complete_server(text, line, start, finish)
+        cmd_re = re.compile(
+                r'capture'
+                r'(?P<count> +\d+ +images?)?'
+                r'(?P<delay> +after +\d+(\.\d+)?)?'
+                r'(?P<addr> +on +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
 
     def do_download(self, arg=''):
         """
-        Downloads captured images from the defined servers.
+        Downloads captured files from the defined servers.
 
         Syntax: download [addresses]
 
-        The 'download' command causes each server to send its captured images
-        to the client. Servers are contacted consecutively to avoid saturating
-        the network bandwidth. Once images are successfully downloaded from a
-        server, they are wiped from the server.
+        The 'download' command causes each server to send its captured files to
+        the client. Servers are contacted consecutively to avoid saturating the
+        network bandwidth. Once all files are successfully downloaded from all
+        servers, all servers are wiped clean.
 
         See also: capture, clear.
 
         cpi> download
         cpi> download 192.168.0.1
         """
-        responses = self.client.list(self.parse_arg(arg))
+        responses = self.client.list(self.parse_addresses(arg))
         for (address, images) in responses.items():
             for image in images:
                 filename = '{ts:%Y%m%d-%H%M%S%f}-{addr}.jpg'.format(
@@ -1356,30 +1374,29 @@ class CompoundPiCmd(Cmd):
                     if output.tell() != image.size:
                         raise CmdError('Wrong size for image %s' % filename)
                 logging.info('Downloaded %s' % filename)
-        self.client.clear(self.parse_arg(arg))
+        self.client.clear(self.parse_addresses(arg))
 
     def complete_download(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
 
     def do_clear(self, arg):
         """
-        Clear the image store on the specified servers.
+        Clear the file store on the specified servers.
 
         Syntax: clear [addresses]
 
-        The 'clear' command can be used to clear the in-memory image store
-        on the specified Pi servers (or all Pi servers if no address is
-        given). The 'download' command automatically clears the image store
-        after successful transfers so this command is only useful in the case
-        that the operator wants to discard images without first downloading
-        them.
+        The 'clear' command can be used to clear the in-memory file store on
+        the specified Pi servers (or all Pi servers if no address is given).
+        The 'download' command automatically clears the file store after
+        successful transfers so this command is only useful in the case that
+        the operator wants to discard files without first downloading them.
 
         See also: download, capture.
 
         cpi> clear
         cpi> clear 192.168.0.1-192.168.0.10
         """
-        self.client.clear(self.parse_arg(arg))
+        self.client.clear(self.parse_addresses(arg))
 
     def complete_clear(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
@@ -1403,7 +1420,7 @@ class CompoundPiCmd(Cmd):
         cpi> identify 192.168.0.1
         cpi> identify 192.168.0.3-192.168.0.5
         """
-        self.client.identify(self.parse_arg(arg))
+        self.client.identify(self.parse_addresses(arg))
 
     def complete_identify(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
