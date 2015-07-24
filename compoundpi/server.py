@@ -539,6 +539,8 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
             # Ensure video and motion streams have equivalent timestamps
             video_file = CompoundPiFile('VIDEO')
             if motion_output:
+                if format != 'h264':
+                    raise ValueError('Format must be h264 for motion output')
                 motion_file = CompoundPiFile('MOTION', video_file.timestamp)
             else:
                 motion_file = None
@@ -552,6 +554,9 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
             self.server.files.append(video_file)
             if motion_file:
                 self.server.files.append(motion_file)
+            logging.info(
+                'Recorded %.1f seconds of %s video%s', length, format,
+                ' with motion' if motion_output else '')
         finally:
             self.server.camera.led = True
 
