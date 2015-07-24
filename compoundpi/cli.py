@@ -1297,7 +1297,7 @@ class CompoundPiCmd(Cmd):
         """
         Captures images from the defined servers.
 
-        Syntax: capture [<count> images] [after <delay>] [on <addresses>]
+        Syntax: capture [addresses]
 
         The 'capture' command causes the servers to capture an image. Note
         that this does not cause the captured images to be sent to the client.
@@ -1316,37 +1316,12 @@ class CompoundPiCmd(Cmd):
         cpi> capture 192.168.0.1
         cpi> capture 192.168.0.50-192.168.0.53
         """
-        count = 1
-        delay = None
-        addresses = None
-        if arg:
-            arg = [a.lower() for a in arg.split()]
-            if len(arg) >= 2:
-                if arg[1] in ('image', 'images'):
-                    count = int(arg[0])
-                    del arg[:2]
-            if len(arg) >= 2:
-                if arg[0] == 'after':
-                    delay = float(arg[1])
-                    del arg[:2]
-            if len(arg) >= 2:
-                if arg[0] == 'on':
-                    addresses = self.parse_addresses(arg[1])
-                    del arg[:2]
-            if arg:
-                raise CmdSyntaxError('Unable to parse capture options')
-        self.client.capture(count, self.video_port, delay, addresses)
+        self.client.capture(
+            self.capture_count, self.video_port, self.capture_delay,
+            self.parse_addresses(arg))
 
     def complete_capture(self, text, line, start, finish):
-        cmd_re = re.compile(
-                r'capture'
-                r'(?P<count> +\d+ +images?)?'
-                r'(?P<delay> +after +\d+(\.\d+)?)?'
-                r'(?P<addr> +on +.*)?)?')
-        match = cmd_re.match(line)
-        assert match
-        if match.start('addr') < finish <= match.end('addr'):
-            return self.complete_server(text, line, start, finish)
+        return self.complete_server(text, line, start, finish)
 
     def do_download(self, arg=''):
         """
