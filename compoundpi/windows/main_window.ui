@@ -92,6 +92,7 @@
     <addaction name="separator"/>
     <addaction name="identify_action"/>
     <addaction name="configure_action"/>
+    <addaction name="reference_action"/>
     <addaction name="capture_action"/>
     <addaction name="separator"/>
     <addaction name="quit_action"/>
@@ -142,6 +143,7 @@
    <addaction name="separator"/>
    <addaction name="identify_action"/>
    <addaction name="configure_action"/>
+   <addaction name="reference_action"/>
    <addaction name="capture_action"/>
    <addaction name="separator"/>
    <addaction name="quit_action"/>
@@ -309,6 +311,17 @@
    </property>
    <property name="toolTip">
     <string>Toggle visibility of the toolbar</string>
+   </property>
+  </action>
+  <action name="reference_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>R&amp;eference</string>
+   </property>
+   <property name="toolTip">
+    <string>Copy the selected server's settings to all other servers</string>
    </property>
   </action>
  </widget>

@@ -88,6 +88,7 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.remove_action.setIcon(get_icon('list-remove'))
         self.ui.identify_action.setIcon(get_icon('dialog-information'))
         self.ui.configure_action.setIcon(get_icon('preferences-system'))
+        self.ui.reference_action.setIcon(get_icon('emblem-favorite'))
         self.ui.capture_action.setIcon(get_icon('camera-photo'))
         self.ui.copy_action.setIcon(get_icon('edit-copy'))
         self.ui.clear_action.setIcon(get_icon('edit-clear'))
@@ -106,6 +107,7 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.identify_action.triggered.connect(self.servers_identify)
         self.ui.capture_action.triggered.connect(self.servers_capture)
         self.ui.configure_action.triggered.connect(self.servers_configure)
+        self.ui.reference_action.triggered.connect(self.servers_reference)
         self.ui.copy_action.triggered.connect(self.images_copy)
         self.ui.export_action.triggered.connect(self.images_export)
         self.ui.clear_action.triggered.connect(self.images_clear)
@@ -369,6 +371,45 @@ The project homepage and documentation is at
             finally:
                 self.ui.server_list.model().refresh_selected(update=True)
 
+    def servers_reference(self):
+        # There can be only one! ... selected server that is
+        addr, status = next(iter(self.selected_servers))
+        try:
+            # Before we go setting resolution and framerate (which will reset
+            # the cameras, ensure AGC gains are allowed to float)
+            self.client.agc('auto')
+            self.client.resolution(*status.resolution)
+            self.client.framerate(status.framerate)
+            if status.awb_mode == 'off':
+                self.client.awb('off', status.awb_red, status.awb_blue)
+            else:
+                self.client.awb(status.awb_mode)
+            if status.agc_mode == 'off':
+                # We've just reset the resolution and framerate which has reset
+                # all the cameras. Given we can't directly set the gains we
+                # need to wait a decent number of frames to let the gains
+                # settle before we disable AGC. Here we wait long enough for 30
+                # frames to have been captured (1 second at "normal"
+                # framerates)
+                time.sleep(30.0 / status.framerate)
+                self.client.agc('off')
+            else:
+                self.client.agc(status.agc_mode)
+            if status.exposure_mode == 'off':
+                self.client.exposure('off', status.exposure_speed)
+            else:
+                self.client.exposure(status.exposure_mode)
+            self.client.ev(status.ev)
+            self.client.iso(status.iso)
+            self.client.metering(status.metering_mode)
+            self.client.brightness(status.brightness)
+            self.client.contrast(status.contrast)
+            self.client.saturation(status.saturation)
+            self.client.denoise(status.denoise)
+            self.client.flip(status.hflip, status.vflip)
+        finally:
+            self.ui.server_list.model().refresh_all(update=True)
+
     def images_copy(self):
         _, _, _, stream = self.selected_images[0]
         image = QtGui.QImage()
@@ -436,6 +477,7 @@ The project homepage and documentation is at
         menu.addSeparator()
         menu.addAction(self.ui.identify_action)
         menu.addAction(self.ui.configure_action)
+        menu.addAction(self.ui.reference_action)
         menu.addAction(self.ui.capture_action)
         menu.popup(self.ui.server_list.viewport().mapToGlobal(pos))
 
@@ -458,10 +500,12 @@ The project homepage and documentation is at
     def update_server_actions(self):
         has_rows = self.ui.server_list.model().rowCount() > 0
         has_selection = self.ui.server_list.selectionModel().hasSelection()
+        one_selected = len(self.ui.server_list.selectionModel().selectedRows()) == 1
         self.ui.remove_action.setEnabled(has_selection)
         self.ui.identify_action.setEnabled(has_selection)
         self.ui.capture_action.setEnabled(has_selection)
         self.ui.configure_action.setEnabled(has_selection)
+        self.ui.reference_action.setEnabled(one_selected)
         self.ui.refresh_action.setEnabled(has_rows)
         self.ui.image_list.model().refresh()
 

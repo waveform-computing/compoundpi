@@ -38,6 +38,7 @@ import warnings
 import datetime
 import socket
 import fractions
+import time
 try:
     from ipaddress import IPv4Address, IPv4Network
 except ImportError:
@@ -1545,6 +1546,71 @@ class CompoundPiCmd(Cmd):
         self.client.identify(self.parse_addresses(arg))
 
     def complete_identify(self, text, line, start, finish):
+        return self.complete_server(text, line, start, finish)
+
+    def do_reference(self, arg):
+        """
+        Copy the settings of a reference server to all others.
+
+        Syntax: reference <address>
+
+        The 'reference' command can be used to duplicate the settings of the
+        specified Pi server to all other currently known servers. This is
+        particularly useful when one is trying to produce shots that are as
+        close as possible to the output of the selected reference server.
+
+        A single address must be specified, from which settings will be
+        obtained, after which broadcasts will be used to update the settings on
+        all currently defined servers.
+
+        See also: status, servers.
+
+        cpi> reference 192.168.0.10
+        """
+        addr = self.parse_address(arg)
+        status = self.client.status([addr])[addr]
+        # Before we go setting resolution and framerate (which will reset the
+        # cameras, ensure AGC gains are allowed to float)
+        logging.info('Setting resolution and framerate')
+        self.client.agc('auto')
+        self.client.resolution(*status.resolution)
+        self.client.framerate(status.framerate)
+        logging.info('Setting white balance')
+        if status.awb_mode == 'off':
+            self.client.awb('off', status.awb_red, status.awb_blue)
+        else:
+            self.client.awb(status.awb_mode)
+        logging.info('Setting gain algorithm')
+        if status.agc_mode == 'off':
+            logging.info('Pausing for camera gains to settle')
+            # We've just reset the resolution and framerate which has reset all
+            # the cameras. Given we can't directly set the gains we need to
+            # wait a decent number of frames to let the gains settle before we
+            # disable AGC. Here we wait long enough for 30 frames to have
+            # been captured (1 second at "normal" framerates)
+            time.sleep(30.0 / status.framerate)
+            self.client.agc('off')
+        else:
+            self.client.agc(status.agc_mode)
+        logging.info('Setting exposure speed')
+        if status.exposure_mode == 'off':
+            self.client.exposure('off', status.exposure_speed)
+        else:
+            self.client.exposure(status.exposure_mode)
+        self.client.ev(status.ev)
+        logging.info('Setting ISO and metering')
+        self.client.iso(status.iso)
+        self.client.metering(status.metering_mode)
+        logging.info('Setting levels')
+        self.client.brightness(status.brightness)
+        self.client.contrast(status.contrast)
+        self.client.saturation(status.saturation)
+        logging.info('Setting denoise')
+        self.client.denoise(status.denoise)
+        logging.info('Setting orientation')
+        self.client.flip(status.hflip, status.vflip)
+
+    def complete_reference(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
 
 
