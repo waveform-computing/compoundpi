@@ -59,11 +59,12 @@ all images from the servers::
     client.resolution(1280, 720)
     client.capture()
     try:
-        for addr, images in client.list().items():
-            for image in images:
-                print('Downloading image from %s' % addr)
-                with io.open('%s.jpg' % addr) as output:
-                    client.download(addr, image.index, output)
+        for addr, files in client.list().items():
+            for f in files:
+                assert f.filetype == 'IMAGE'
+                print('Downloading from %s' % addr)
+                with io.open('%s.jpg' % addr, 'wb') as output:
+                    client.download(addr, f.index, output)
     finally:
         client.clear()
 
@@ -88,25 +89,29 @@ efficient)::
     print('Configuring servers')
     client.resolution(1280, 720)
     client.framerate(24)
+    client.agc('auto')
     client.awb('off', 1.5, 1.3)
-    client.exposure('auto')
     client.iso(100)
     client.metering('spot')
-    client.levels(50, 0, 0, 0)
+    client.brightness(50)
+    client.contrast(0)
+    client.saturation(0)
+    client.denoise(False)
     print('Capturing 5 images on all servers after 0.25 second delay')
     client.clear()
-    client.capture(5, True, 0.25)
+    client.capture(5, video_port=True, delay=0.25)
     for addr, status in client.status().items():
-        assert status.images == 5
+        assert status.files == 5
     print('Downloading captures')
     captures = {}
     try:
-        for addr, images in client.list().items():
-            for image in images:
-                print('Downloading capture %d from %s' % (image.index, addr))
+        for addr, files in client.list().items():
+            for f in files:
+                assert f.filetype == 'IMAGE'
+                print('Downloading capture %d from %s' % (f.index, addr))
                 stream = io.BytesIO()
                 captures.setdefault(addr, []).append(stream)
-                client.download(addr, image.index, stream)
+                client.download(addr, f.index, stream)
                 stream.seek(0)
     finally:
         client.clear()
