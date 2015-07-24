@@ -16,14 +16,19 @@ server package::
     the boot sequence. This will make the camera inaccessible to other
     processes unless the daemon is manually stopped or prevented from starting.
 
-On other platforms, the package can be installed from PyPI. Specify the ``server``
-option to pull in all dependencies required by the server component::
+On other platforms, the package can be installed from PyPI. First, ensure that
+you have the ``pip`` command installed (this is in the ``python-pip`` package
+on Debian and RedHat based distros). Use this to install compound pi,
+specifying the ``server`` option to pull in all dependencies required by the
+server component::
 
     $ sudo pip install "compoundpi[server]"
 
-The PyPI package does not include init-scripts (because it can't). You will
-need to write these for your platform manually if you wish the daemon to start
-automatically on boot-up.
+.. warning::
+
+    The PyPI package does not include init-scripts (because it can't). You will
+    need to write these for your platform manually if you wish the daemon to
+    start automatically on boot-up.
 
 
 ===================
@@ -37,8 +42,11 @@ available. On Ubuntu, the Waveform PPA can be used for simple installation::
     $ sudo apt-get update
     $ sudo apt-get install compoundpi-client
 
-On other platforms, the package can be installed from PyPI. Specify the ``client`` option to pull
-in all dependencies required by the client component::
+On other platforms, the package can be installed from PyPI. First, ensure that
+you have the ``pip`` command installed (this is in the ``python-pip`` package
+on Debian and RedHat based distros). Use this to install compound pi,
+specifying the ``client`` option to pull in all dependencies required by the
+client component::
 
     $ sudo pip install "compoundpi[client]"
 

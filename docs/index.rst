@@ -9,8 +9,8 @@ Table of Contents
    :maxdepth: 2
    :numbered:
 
-   install
    quickstart
+   install
    cpi
    cpid
    commands

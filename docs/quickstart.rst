@@ -26,11 +26,11 @@ can severely impact the timing of shots).
 To this end, the more RAM in your Pi, the better. Compound Pi is capable of
 running on a model A or A+ (256Mb of RAM) but after the GPU has taken its share
 (128Mb) and the OS and Compound Pi server have grabbed theirs, there's
-typically less than 100Mb left for image storage. The model B or B+ (512Mb
+typically less than 100Mb left for data storage. The model B or B+ (512Mb
 of RAM) is a better selection typically providing over 300Mb of temporary
-image storage. However, the Pi 2 model B (1Gb of RAM) is the obviously the
+data storage. However, the Pi 2 model B (1Gb of RAM) is the obviously the
 ultimate choice as it typically has 800Mb or more of available memory for
-image storage, and the faster processor doesn't hurt either.
+data storage, and the faster processor doesn't hurt either.
 
 The next important selection is the network between your client and Pi servers.
 Compound Pi can run over WiFi (in fact, this was the first configuration it
@@ -53,6 +53,16 @@ While WiFi may be tempting because of the lack of wires needed between the
 client and all the Pi servers, it is certainly not the optimal setup for
 running Compound Pi.
 
+Although it costs significantly more, the ultimate Compound Pi setup would
+involve power over Ethernet (`POE`_), allowing a single cable to run to each Pi
+carrying both data and power. Given you have to run one cable anyway for power,
+this minimizes the number of cables, while providing the best connectivity.
+The only downside is the cost of a POE capable switch (typically >$100) and a
+`POE HAT`_ for each Pi to split out the power from the data.
+
+.. _POE: https://en.wikipedia.org/wiki/Power_over_Ethernet
+.. _POE HAT: https://www.pi-supply.com/product/pi-poe-switch-hat-power-over-ethernet-for-raspberry-pi/
+
 
 Client Installation
 ===================
@@ -66,7 +76,7 @@ install the client and an NTP daemon::
     $ sudo apt-get install compoundpi-client ntp
 
 The NTP daemon will most likely be installed to synchronize with an NTP pool
-on the Internet (e.g. :samp:`pool.ntp.org`). This is fine, but check that it's
+on the Internet (e.g. ``pool.ntp.org``). This is fine, but check that it's
 working with the following command line::
 
     $ ntpq -p
@@ -133,8 +143,8 @@ would any other system daemon::
     $ sudo service cpid restart
 
 Ideally, you want all your Pi servers to sync with the NTP time server you set
-up on your client. Edit the :file:`/etc/ntp.conf` file and repalce the
-:samp:`server` lines with the IP address of your client (ideally you should
+up on your client. Edit the :file:`/etc/ntp.conf` file and replace the
+``server`` lines with the IP address of your client (ideally you should
 configure your router to give your client a fixed address)::
 
     ...
@@ -156,20 +166,20 @@ Clone the SD Card
 Once you've got a Pi running the Compound Pi daemon successfully, shut it down
 and place its SD card in any Linux machine with an SD card reader. Unmount any
 partitions that auto-mount, then figure out which device node represents the SD
-card. For example, the following would tell you that the SD card is sdd::
+card. For example, the following would tell you that the SD card is ``sdd``::
 
     $ dmesg | tail | grep "Attached SCSI removable disk"
     [    3.428459] sd 8:0:0:0: [sdd] Attached SCSI removable disk
 
 Clone the SD card into a disk file::
 
-    $ sudo dd if=/dev/sdd of=server.img
+    $ sudo dd if=/dev/sdd of=server.img bs=1M
 
 This will take some considerable time to finish. Once it has done so, eject the
 source SD card and insert the target one in its place. Remember to unmount any
 partitions which auto-mount, then execute the reverse command::
 
-    $ sudo dd if=server.img of=/dev/sdd
+    $ sudo dd if=server.img of=/dev/sdd bs=1M
 
 Repeat this last step for all remaining target cards. Finally, install the SD
 cards in your set of Pi servers and boot them all to ensure their camera
@@ -189,7 +199,7 @@ Testing the Servers
 Back on the Ubuntu client machine, execute :ref:`cpi` to run the client.
 You will be presented with a command line like the following::
 
-    CompoundPi Client version 0.3
+    CompoundPi Client version 0.4
     Type "help" for more information, or "find" to locate Pi servers
     cpi>
 
@@ -197,39 +207,57 @@ Firstly, ensure that the network configuration is correct. The
 :ref:`command_config` command can be used to print the current configuration::
 
     cpi> config
-    Setting       Value
-    ------------- --------------
-    network       192.168.0.0/16
-    port          5647
-    bind          0.0.0.0:5647
-    timeout       5
-    capture_delay 0
-    capture_count 1
-    video_port    False
-    time_delta    0.25
-    output        /tmp
-    warnings      False
+    Setting             Value
+    ------------------- --------------
+    network             192.168.0.0/16
+    port                5647
+    bind                0.0.0.0:5647
+    timeout             15
+    capture_delay       0.0
+    capture_quality     85
+    capture_count       1
+    video_port          False
+    record_delay        0.0
+    record_format       h264
+    record_quality      0
+    record_bitrate      17000000
+    record_motion       False
+    record_intra_period 30
+    time_delta          0.25
+    output              /tmp
+    warnings            False
 
 Assuming we're using a typical home router which gives out addresses in the
 192.168.1.x network, this is incorrect. In order for broadcasts to work, the
 network *must* have the correct definition - it's no good having a superset
-configured (192.168.0.0/16 is a superset of 192.168.1.0/24). To correct the
-network definition, use the :ref:`command_set` command::
+configured (192.168.0.0/16 is a superset of 192.168.1.0/24). See `IPv4
+subnetting`_ for more information about subnet configuration.
+
+.. _IPv4 subnetting: https://en.wikipedia.org/wiki/Subnetwork#IPv4_subnetting
+
+To correct the network definition, use the :ref:`command_set` command::
 
     cpi> set network 192.168.1.0/24
     cpi> config
-    Setting       Value
-    ------------- --------------
-    network       192.168.1.0/24
-    port          5647
-    bind          0.0.0.0:5647
-    timeout       5
-    capture_delay 0
-    capture_count 1
-    video_port    False
-    time_delta    0.25
-    output        /tmp
-    warnings      False
+    Setting             Value
+    ------------------- --------------
+    network             192.168.1.0/24
+    port                5647
+    bind                0.0.0.0:5647
+    timeout             15
+    capture_delay       0.0
+    capture_quality     85
+    capture_count       1
+    video_port          False
+    record_delay        0.0
+    record_format       h264
+    record_quality      0
+    record_bitrate      17000000
+    record_motion       False
+    record_intra_period 30
+    time_delta          0.25
+    output              /tmp
+    warnings            False
 
 To make permanent configuration changes, simply place them in a file named
 ``~/.cpi.ini`` like so::
@@ -257,9 +285,9 @@ server. If you only want to query a specific set of servers you can give their
 addresses as a parameter::
 
     cpi> status 192.168.1.154
-    Address        Mode        Shutter AWB    Exp  Meter   Flip Time Delta     #
-    -------------- ----------- ------- ------ ---- ------- ---- -------------- -
-    192.168.80.154 1280x720@30 auto    auto   auto average none 0:00:00        0
+    Address       Mode        AGC            AWB            Exp            Meter   Flip Clock          #
+    ------------- ----------- -------------- -------------- -------------- ------- ---- -------------- -
+    192.168.1.154 1280x800@30 auto (1.0,1.0) auto (1.6,1.3) auto (28.48ms) average none 0:00:00        0
 
 If any major discrepancies are detected (resolution, framerate, timestamp,
 etc.), the status command should notify you of them. The maximum discrepancy
@@ -325,3 +353,4 @@ If :ref:`command_identify` is specified with one or more addresses, it will
 blink the LED on the specified Pi servers. This can be used to quickly figure
 out which address corresponds to which Pi (useful when dynamic addressing is
 used).
+
