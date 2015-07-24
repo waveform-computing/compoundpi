@@ -238,24 +238,28 @@ The project homepage and documentation is at
         try:
             dialog.capture_count = int(self.settings.value('count', 1))
             dialog.capture_delay = float(self.settings.value('delay', 0.00))
+            dialog.capture_quality = int(self.settings.value('quality', 85))
             dialog.capture_video_port = int(self.settings.value('video_port', 0))
             if dialog.exec_():
                 self.settings.setValue('count', dialog.capture_count)
                 self.settings.setValue('delay', dialog.capture_delay or 0.0)
+                self.settings.setValue('quality', dialog.capture_quality)
                 self.settings.setValue('video_port', int(dialog.capture_video_port))
                 self.client.capture(
                         count=dialog.capture_count,
                         video_port=dialog.capture_video_port,
+                        quality=dialog.capture_quality,
                         delay=dialog.capture_delay,
                         addresses=self.selected_addresses)
                 responses = self.client.list(self.selected_addresses)
-                for (address, images) in responses.items():
-                    for image in images:
-                        stream = io.BytesIO()
-                        self.client.download(address, image.index, stream)
-                        if stream.tell() != image.size:
-                            raise IOError('Incorrect download size')
-                        self.images[address][image.timestamp] = stream
+                for (address, files) in responses.items():
+                    for f in files:
+                        if f.filetype == 'IMAGE':
+                            stream = io.BytesIO()
+                            self.client.download(address, f.index, stream)
+                            if stream.tell() != f.size:
+                                raise IOError('Incorrect download size')
+                            self.images[address][f.timestamp] = stream
                 # XXX Check ordering of self.images[address]
                 # XXX Rollback in the case of a partial download...
                 self.client.clear(self.selected_addresses)

@@ -547,8 +547,8 @@ class CompoundPiProtocol(object):
         """
         raise NotImplementedError
 
-    @handler('CAPTURE', int, boolstr, float)
-    def do_capture(self, count=1, use_video_port=False, sync=None):
+    @handler('CAPTURE', int, boolstr, int, float)
+    def do_capture(self, count=1, use_video_port=False, quality=None, sync=None):
         """
         The :ref:`protocol_capture` command should cause the server to capture
         one or more images from the camera. The parameters are as follows:
@@ -563,6 +563,10 @@ class CompoundPiProtocol(object):
             still port should be used (resulting in the best quality capture,
             but may cause significant delay between multiple consecutive
             shots). If 1, the video port should be used.
+
+        *quality*
+            Specifies the quality of the encoding. Valid values are 1 to 100
+            for ``jpeg`` encoding (larger is better).
 
         *sync*
             Specifies the timestamp at which the capture should be taken. The

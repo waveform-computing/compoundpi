@@ -91,6 +91,7 @@ def numeric_range(conversion, inclusive=True, min_value=None, max_value=None):
 
 network_timeout = numeric_range(conversion=int, min_value=1)
 capture_count = numeric_range(conversion=int, min_value=1)
+capture_quality = numeric_range(conversion=int, min_value=1, max_value=100)
 time_delay = numeric_range(conversion=float, min_value=0.0)
 time_delta = numeric_range(conversion=float, inclusive=False, min_value=0.0)
 record_quality = numeric_range(conversion=int, min_value=0, max_value=100)
@@ -164,6 +165,10 @@ class CompoundPiClientApplication(TerminalApplication):
             'captures. This must be less than the network delay '
             '(default: %(default)s)')
         self.parser.add_argument(
+            '--capture-quality', type=capture_quality, default='85', metavar='NUM',
+            help='specifies the quality that the codec should attempt to '
+            'maintain in image captures (default: %(default)s)')
+        self.parser.add_argument(
             '--capture-count', type=capture_count, default='1', metavar='NUM',
             help='specifies the number of consecutive pictures to capture '
             'when requested (default: %(default)s)')
@@ -209,6 +214,7 @@ class CompoundPiClientApplication(TerminalApplication):
         proc.client.bind = args.bind
         proc.client.timeout = args.timeout
         proc.capture_delay = args.capture_delay
+        proc.capture_quality = args.capture_quality
         proc.capture_count = args.capture_count
         proc.video_port = args.video_port
         proc.record_format = args.record_format
@@ -238,6 +244,7 @@ class CompoundPiCmd(Cmd):
             ))
         self.capture_delay = 0.0
         self.capture_count = 1
+        self.capture_quality = 85
         self.video_port = False
         self.record_format = 'h264'
         self.record_quality = 20
@@ -352,6 +359,7 @@ class CompoundPiCmd(Cmd):
                 ('bind',                '%s:%d' % self.client.bind),
                 ('timeout',             self.client.timeout),
                 ('capture_delay',       self.capture_delay),
+                ('capture_quality',     self.capture_quality),
                 ('capture_count',       self.capture_count),
                 ('video_port',          self.video_port),
                 ('record_delay',        self.record_delay),
@@ -396,6 +404,7 @@ class CompoundPiCmd(Cmd):
                 'timeout':             network_timeout,
                 'capture_delay':       time_delay,
                 'capture_count':       capture_count,
+                'capture_quality':     capture_quality,
                 'record_delay':        time_delay,
                 'record_format':       record_format,
                 'record_quality':      record_quality,
@@ -443,6 +452,7 @@ class CompoundPiCmd(Cmd):
                 'bind',
                 'timeout',
                 'capture_delay',
+                'capture_quality',
                 'capture_count',
                 'video_port',
                 'record_delay',
@@ -1393,8 +1403,8 @@ class CompoundPiCmd(Cmd):
         cpi> capture 192.168.0.50-192.168.0.53
         """
         self.client.capture(
-            self.capture_count, self.video_port, self.capture_delay,
-            self.parse_addresses(arg))
+            self.capture_count, self.video_port, self.capture_quality,
+            self.capture_delay, self.parse_addresses(arg))
 
     def complete_capture(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)

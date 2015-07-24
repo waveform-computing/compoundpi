@@ -6,8 +6,8 @@
    <rect>
     <x>0</x>
     <y>0</y>
-    <width>309</width>
-    <height>141</height>
+    <width>275</width>
+    <height>174</height>
    </rect>
   </property>
   <property name="windowTitle">
@@ -26,7 +26,7 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="0">
+     <item row="2" column="0">
       <widget class="QLabel" name="sync_label">
        <property name="text">
         <string>After</string>
@@ -36,7 +36,7 @@
        </property>
       </widget>
      </item>
-     <item row="2" column="1">
+     <item row="3" column="1">
       <widget class="QCheckBox" name="video_port_check">
        <property name="text">
         <string>Use video port</string>
@@ -53,13 +53,36 @@
        </property>
       </widget>
      </item>
-     <item row="1" column="1">
+     <item row="2" column="1">
       <widget class="QDoubleSpinBox" name="delay_spinbox">
        <property name="suffix">
         <string> seconds</string>
        </property>
        <property name="singleStep">
         <double>0.100000000000000</double>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="0">
+      <widget class="QLabel" name="quality_label">
+       <property name="text">
+        <string>At quality</string>
+       </property>
+       <property name="buddy">
+        <cstring>quality_spinbox</cstring>
+       </property>
+      </widget>
+     </item>
+     <item row="1" column="1">
+      <widget class="QSpinBox" name="quality_spinbox">
+       <property name="minimum">
+        <number>1</number>
+       </property>
+       <property name="maximum">
+        <number>100</number>
+       </property>
+       <property name="value">
+        <number>85</number>
        </property>
       </widget>
      </item>
@@ -79,6 +102,7 @@
  </widget>
  <tabstops>
   <tabstop>count_spinbox</tabstop>
+  <tabstop>quality_spinbox</tabstop>
   <tabstop>delay_spinbox</tabstop>
   <tabstop>video_port_check</tabstop>
   <tabstop>button_box</tabstop>
@@ -92,8 +116,8 @@
    <slot>accept()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>227</x>
-     <y>119</y>
+     <x>236</x>
+     <y>333</y>
     </hint>
     <hint type="destinationlabel">
      <x>157</x>
@@ -108,8 +132,8 @@
    <slot>reject()</slot>
    <hints>
     <hint type="sourcelabel">
-     <x>245</x>
-     <y>125</y>
+     <x>254</x>
+     <y>333</y>
     </hint>
     <hint type="destinationlabel">
      <x>254</x>

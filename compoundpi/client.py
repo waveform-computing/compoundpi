@@ -1002,7 +1002,8 @@ class CompoundPiClient(object):
         """
         self._transact(self._protocol.do_denoise(value), addresses)
 
-    def capture(self, count=1, video_port=False, delay=None, addresses=None):
+    def capture(self, count=1, video_port=False, quality=None, delay=None,
+            addresses=None):
         """
         Called to capture images on the servers at the specified *addresses*
         (or all defined servers if *addresses* is omitted). The optional
@@ -1038,9 +1039,11 @@ class CompoundPiClient(object):
             delay = time.time() + delay
         else:
             delay = None
-        self._transact(self._protocol.do_capture(count, video_port, delay), addresses)
+        self._transact(
+            self._protocol.do_capture(count, video_port, quality, delay),
+            addresses)
 
-    def record(self, length, format='h264', quality=0, bitrate=17000000,
+    def record(self, length, format='h264', quality=None, bitrate=None,
             intra_period=None, motion_output=False, delay=None,
             addresses=None):
         """

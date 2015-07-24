@@ -519,13 +519,14 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
                 raise ValueError('Sync time in past')
             time.sleep(delay)
 
-    def do_capture(self, count=1, use_video_port=False, sync=None):
+    def do_capture(self, count=1, use_video_port=False, quality=85, sync=None):
         self.server.camera.led = False
         try:
             self.wait_until(sync)
             self.server.camera.capture_sequence(
                 self.image_stream_generator(count), format='jpeg',
-                use_video_port=use_video_port, burst=not use_video_port)
+                quality=quality, use_video_port=use_video_port,
+                burst=not use_video_port)
             logging.info(
                     'Captured %d images from %s port',
                     count, 'video' if use_video_port else 'still')

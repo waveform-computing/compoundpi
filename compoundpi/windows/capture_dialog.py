@@ -41,6 +41,12 @@ class CaptureDialog(QtGui.QDialog):
         self.ui.count_spinbox.setValue(value)
     capture_count = property(_get_capture_count, _set_capture_count)
 
+    def _get_capture_quality(self):
+        return self.ui.quality_spinbox.value()
+    def _set_capture_quality(self, value):
+        self.ui.quality_spinbox.setValue(value)
+    capture_quality = property(_get_capture_quality, _set_capture_quality)
+
     def _get_capture_delay(self):
         return self.ui.delay_spinbox.value() or None
     def _set_capture_delay(self, value):
