@@ -126,9 +126,6 @@ class TerminalApplication(object):
         sys.excepthook = self.handle
         args = self.read_configuration(args)
         args = self.parser.parse_args(args)
-        # XXX
-        if args.debug:
-            args.log_level = logging.DEBUG
         self.configure_logging(args)
         if args.debug:
             try:

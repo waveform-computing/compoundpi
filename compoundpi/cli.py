@@ -62,6 +62,17 @@ def address(s):
 def network(s):
     return IPv4Network(s)
 
+def record_format(s):
+    s = s.strip().lower()
+    try:
+        return {
+            'h264':  'h264',
+            'mjpeg': 'mjpeg',
+            'mjpg':  'mjpeg',
+            }[s]
+    except KeyError:
+        raise ValueError('%s is not a valid recording format')
+
 def numeric_range(conversion, inclusive=True, min_value=None, max_value=None):
     def test(value):
         result = conversion(value)
@@ -80,8 +91,11 @@ def numeric_range(conversion, inclusive=True, min_value=None, max_value=None):
 
 network_timeout = numeric_range(conversion=int, min_value=1)
 capture_count = numeric_range(conversion=int, min_value=1)
-capture_delay = numeric_range(conversion=float, min_value=0.0)
+time_delay = numeric_range(conversion=float, min_value=0.0)
 time_delta = numeric_range(conversion=float, inclusive=False, min_value=0.0)
+record_quality = numeric_range(conversion=int, min_value=0, max_value=100)
+record_bitrate = numeric_range(conversion=int, min_value=1, max_value=25000000)
+record_intra_period = numeric_range(conversion=int, min_value=0)
 
 def path(s):
     s = os.path.expanduser(s)
@@ -145,7 +159,7 @@ class CompoundPiClientApplication(TerminalApplication):
             help='specifies the timeout (in seconds) for network '
             'transactions (default: %(default)s)')
         self.parser.add_argument(
-            '--capture-delay', type=capture_delay, default='0.0', metavar='SECS',
+            '--capture-delay', type=time_delay, default='0.0', metavar='SECS',
             help='specifies the delay (in seconds) used to synchronize '
             'captures. This must be less than the network delay '
             '(default: %(default)s)')
@@ -156,6 +170,32 @@ class CompoundPiClientApplication(TerminalApplication):
         self.parser.add_argument(
             '--video-port', action='store_true', default=False,
             help="if specified, use the camera's video port for rapid capture")
+        self.parser.add_argument(
+            '--record-format', type=record_format, default='h264', metavar='FMT',
+            help='specifies the codec to use for video recordings '
+            '(default: %(default)s)')
+        self.parser.add_argument(
+            '--record-quality', type=record_quality, default='0', metavar='NUM',
+            help='specifies the quality that the codec should attempt to '
+            'maintain in video recordings (default: %(default)s)')
+        self.parser.add_argument(
+            '--record-bitrate', type=record_bitrate, default='17000000', metavar='NUM',
+            help='specifies the bitrate cap applied to the video codec when '
+            'recording (default: %(default)s)')
+        self.parser.add_argument(
+            '--record-motion', action='store_true', default=False,
+            help='specifies whether motion vector estimation data should be '
+            'recorded with video (only valid for h264 format, '
+            'default: %(default)s)')
+        self.parser.add_argument(
+            '--record-delay', type=time_delay, default='0.0', metavar='SECS',
+            help='specifies the delay (in seconds) used to synchronize '
+            'recordings. This must be less than the network delay '
+            '(default: %(default)s)')
+        self.parser.add_argument(
+            '--record-intra-period', type=record_intra_period, default='30', metavar='FRAMES',
+            help='specifies the number of images in a GOP when recording in '
+            'h264 format (default: %(default)s)')
         self.parser.add_argument(
             '--time-delta', type=time_delta, default='0.25', metavar='SECS',
             help='specifies the maximum delta between server timestamps that '
@@ -171,6 +211,12 @@ class CompoundPiClientApplication(TerminalApplication):
         proc.capture_delay = args.capture_delay
         proc.capture_count = args.capture_count
         proc.video_port = args.video_port
+        proc.record_format = args.record_format
+        proc.record_quality = args.record_quality
+        proc.record_bitrate = args.record_bitrate
+        proc.record_motion = args.record_motion
+        proc.record_delay = args.record_delay
+        proc.record_intra_period = args.record_intra_period
         proc.time_delta = args.time_delta
         proc.output = args.output
         proc.cmdloop()
@@ -193,6 +239,12 @@ class CompoundPiCmd(Cmd):
         self.capture_delay = 0.0
         self.capture_count = 1
         self.video_port = False
+        self.record_format = 'h264'
+        self.record_quality = 20
+        self.record_bitrate = 17000000
+        self.record_motion = False
+        self.record_delay = 0.0
+        self.record_intra_period = 30
         self.time_delta = 0.25
         self.output = '/tmp'
         self.warnings = False
@@ -294,17 +346,23 @@ class CompoundPiCmd(Cmd):
         """
         self.pprint_table(
             [
-                ('Setting',       'Value'),
-                ('network',       self.client.network),
-                ('port',          self.client.port),
-                ('bind',          '%s:%d' % self.client.bind),
-                ('timeout',       self.client.timeout),
-                ('capture_delay', self.capture_delay),
-                ('capture_count', self.capture_count),
-                ('video_port',    self.video_port),
-                ('time_delta',    self.time_delta),
-                ('output',        self.output),
-                ('warnings',      self.warnings),
+                ('Setting',             'Value'),
+                ('network',             self.client.network),
+                ('port',                self.client.port),
+                ('bind',                '%s:%d' % self.client.bind),
+                ('timeout',             self.client.timeout),
+                ('capture_delay',       self.capture_delay),
+                ('capture_count',       self.capture_count),
+                ('video_port',          self.video_port),
+                ('record_delay',        self.record_delay),
+                ('record_format',       self.record_format),
+                ('record_quality',      self.record_quality),
+                ('record_bitrate',      self.record_bitrate),
+                ('record_motion',       self.record_motion),
+                ('record_intra_period', self.record_intra_period),
+                ('time_delta',          self.time_delta),
+                ('output',              self.output),
+                ('warnings',            self.warnings),
                 ]
             )
 
@@ -332,16 +390,22 @@ class CompoundPiCmd(Cmd):
         value = match.group('value').strip()
         try:
             value = {
-                'network':       network,
-                'port':          service,
-                'bind':          address,
-                'timeout':       network_timeout,
-                'capture_delay': capture_delay,
-                'capture_count': capture_count,
-                'video_port':    boolean,
-                'time_delta':    time_delta,
-                'output':        path,
-                'warnings':      boolean,
+                'network':             network,
+                'port':                service,
+                'bind':                address,
+                'timeout':             network_timeout,
+                'capture_delay':       time_delay,
+                'capture_count':       capture_count,
+                'record_delay':        time_delay,
+                'record_format':       record_format,
+                'record_quality':      record_quality,
+                'record_bitrate':      record_bitrate,
+                'record_motion':       boolean,
+                'record_intra_period': record_intra_period,
+                'video_port':          boolean,
+                'time_delta':          time_delta,
+                'output':              path,
+                'warnings':            boolean,
                 }[name](value)
         except KeyError:
             raise CmdSyntaxError('Invalid configuration variable: %s' % name)
@@ -361,8 +425,14 @@ class CompoundPiCmd(Cmd):
             value = match.group('value').strip()
             if name.startswith('output'):
                 return self.complete_path(text, value, start, finish)
-            elif name.startswith('video_port') or name.startswith('warnings'):
+            elif (
+                    name.startswith('video_port') or
+                    name.startswith('warnings') or
+                    name.startswith('record_motion')):
                 values = ['on', 'off', 'true', 'false', 'yes', 'no', '0', '1']
+                return [value for value in values if value.startswith(text)]
+            elif name.startswith('record_format'):
+                values = ['h264', 'mjpeg']
                 return [value for value in values if value.startswith(text)]
             else:
                 return []
@@ -375,6 +445,12 @@ class CompoundPiCmd(Cmd):
                 'capture_delay',
                 'capture_count',
                 'video_port',
+                'record_delay',
+                'record_format',
+                'record_quality',
+                'record_bitrate',
+                'record_motion',
+                'record_intra_period',
                 'time_delta',
                 'output',
                 'warnings',
@@ -1310,7 +1386,7 @@ class CompoundPiCmd(Cmd):
         still reasonably quick there will be a measurable difference between
         the timestamps of the last and first captures.
 
-        See also: download, clear.
+        See also: record, download, clear.
 
         cpi> capture
         cpi> capture 192.168.0.1
@@ -1322,6 +1398,55 @@ class CompoundPiCmd(Cmd):
 
     def complete_capture(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
+
+    def do_record(self, arg):
+        """
+        Record video from the defined servers.
+
+        Syntax: record <length> [addresses]
+
+        The 'record' command causes the servers to record video. Note that this
+        does not cause the recorded video to be sent to the client. See the
+        'download' command for more information. The length of time to record
+        for is specified as a number of seconds.
+
+        If no addresses are specified, a broadcast message to all defined
+        servers will be used in which case the timestamp of the recorded video
+        are likely to be extremely close together. If addresses are specified,
+        unicast messages will be sent to each server in turn.  While this is
+        still reasonably quick there will be a measurable difference between
+        the timestamps of the last and first recordings.
+
+        See also: capture, download, clear.
+
+        cpi> record 5
+        cpi> record 10 192.168.0.1
+        cpi> record 2.5 192.168.0.50-192.168.0.53
+        """
+        if not arg:
+            raise CmdSyntaxError('You must specify a recording length')
+        arg = arg.split(' ', 1)
+        try:
+            length = float(arg[0])
+            if length <= 0.0:
+                raise ValueError('Out of range')
+        except ValueError:
+            raise CmdSyntaxError('Invalid recording length "%s"' % arg[0])
+        self.client.record(
+            length, self.record_format, self.record_quality,
+            self.record_bitrate, self.record_intra_period, self.record_motion,
+            self.record_delay,
+            self.parse_addresses(arg[1] if len(arg) > 1 else None))
+
+    def complete_record(self, text, line, start, finish):
+        cmd_re = re.compile(r'record(?P<length> +[^ ]+(?P<addr> +.*)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
+        elif match.start('length') < finish <= match.end('length'):
+            # No completions for length
+            return []
 
     def do_download(self, arg=''):
         """
@@ -1340,14 +1465,18 @@ class CompoundPiCmd(Cmd):
         cpi> download 192.168.0.1
         """
         responses = self.client.list(self.parse_addresses(arg))
-        for (address, images) in responses.items():
-            for image in images:
-                filename = '{ts:%Y%m%d-%H%M%S%f}-{addr}.jpg'.format(
-                        ts=image.timestamp, addr=address)
+        for (address, files) in responses.items():
+            for f in files:
+                filename = '{ts:%Y%m%d-%H%M%S%f}-{addr}.{ext}'.format(
+                        ts=f.timestamp, addr=address, ext={
+                            'IMAGE': 'jpg',
+                            'VIDEO': 'h264',
+                            'MOTION': 'motion',
+                            }[f.filetype])
                 with io.open(os.path.join(self.output, filename), 'wb') as output:
-                    self.client.download(address, image.index, output)
-                    if output.tell() != image.size:
-                        raise CmdError('Wrong size for image %s' % filename)
+                    self.client.download(address, f.index, output)
+                    if output.tell() != f.size:
+                        raise CmdError('Wrong size for file %s' % filename)
                 logging.info('Downloaded %s' % filename)
         self.client.clear(self.parse_addresses(arg))
 

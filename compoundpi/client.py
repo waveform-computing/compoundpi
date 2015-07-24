@@ -1236,7 +1236,7 @@ class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
             try:
                 received = 0
                 while received < size:
-                    data = self.rfile.read(4096)
+                    data = self.rfile.read(16384)
                     received += len(data)
                     if not data:
                         break

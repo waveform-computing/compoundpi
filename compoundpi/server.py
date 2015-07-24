@@ -509,8 +509,8 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
     def image_stream_generator(self, count):
         for i in range(count):
             f = CompoundPiFile('IMAGE')
-            self.server.files.append(f)
             yield f.stream
+            self.server.files.append(f)
 
     def wait_until(self, sync):
         if sync is not None:
@@ -539,17 +539,19 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
             # Ensure video and motion streams have equivalent timestamps
             video_file = CompoundPiFile('VIDEO')
             if motion_output:
-                motion_stream = CompoundPiFile('MOTION', video_file.timestamp).stream
+                motion_file = CompoundPiFile('MOTION', video_file.timestamp)
             else:
-                motion_stream = None
+                motion_file = None
             self.wait_until(sync)
             self.server.camera.start_recording(
                     video_file.stream, format=format, quality=quality,
                     bitrate=bitrate, intra_period=intra_period,
-                    motion_output=motion_stream)
+                    motion_output=motion_file.stream if motion_file else None)
             self.server.camera.wait_recording(length)
             self.server.camera.stop_recording()
-            # XXX What about the CompoundPiFile instances in the case of an error?
+            self.server.files.append(video_file)
+            if motion_file:
+                self.server.files.append(motion_file)
         finally:
             self.server.camera.led = True
 
