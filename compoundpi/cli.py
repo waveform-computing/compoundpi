@@ -47,6 +47,7 @@ from . import __version__
 from .client import CompoundPiClient
 from .terminal import TerminalApplication
 from .cmdline import Cmd, CmdSyntaxError, CmdError, ENCODING
+from .exc import CompoundPiClientError
 
 
 def service(s):
@@ -292,6 +293,13 @@ class CompoundPiCmd(Cmd):
     def postloop(self):
         Cmd.postloop(self)
         self.client.bind = None
+
+    def onecmd(self, line):
+        # Don't crash'n'burn for standard client errors
+        try:
+            return Cmd.onecmd(self, line)
+        except CompoundPiClientError as exc:
+            self.pprint(str(exc) + '\n')
 
     def parse_address(self, s):
         try:
