@@ -317,125 +317,63 @@ class CompoundPiClientProtocol(CompoundPiProtocol):
     pass
 
 
-class CompoundPiClient(object):
+class CompoundPiServerList(object):
     """
-    Implements a network client for Compound Pi servers.
+    Manages the list of servers under the control of the client.
 
-    Upon construction, this class initializes the client to operate on the
-    network 192.168.0.0/16. Because the client utilizes UDP broadcast packets,
-    it is crucial that the network configuration (including the network mask)
-    is set correctly. If the default network is wrong (which is most likely the
-    case), you must correct it before issuing any commands. This can be done by
-    setting the :attr:`network` attribute.
+    The server list can be accessed via the :attr:`CompoundPiClient.servers`
+    attribute. The list of defined servers can be manipulated with the familiar
+    :meth:`append`, :meth:`remove`, and :meth:`extend` methods, and individual
+    entries can be replaced by assigning to them or deleted with :keyword:`del`
+    in the usual manner. The :meth:`find` method can be used to discover
+    available servers on the subnet via broadcast.
 
-    The class assumes the Compound Pi servers are listening on UDP port 5647 by
-    default. This can be altered via the :attr:`port` attribute. Finally, the
-    class listens on port 5647 on all available interfaces for responses. If
-    this is incorrect (or if you wish to limit the interfaces that the client
-    listens on), adjust the :attr:`bind` attribute.
-
-    The optional *progress* parameter to the constructor provides a set of
-    routines that the client will call when a long operation (typically a
-    network operation) is in progress. If specified, it must be a 3-tuple
-    consisting of ``(start, update, finish)`` routines. At the start of a long
-    operation the start routine will be called with a parameter indicating the
-    number of expected operations to complete. As the operation progress, the
-    update routine will be called with a parameter indicating the current
-    operation (the update routine may be called multiple times with the same
-    number, but it will never decrease within the span of one operation).
-    Finally, the finish routine will be called with no parameters (if the start
-    routine is called, the finish routine is guaranteed to be called).
-
-    Before controlling any Compound Pi servers, the client must either be told
-    the addresses of the servers, or discover them via broadcast. The
-    :meth:`add` and :meth:`remove` methods can be used to define the addresses
-    of servers explicitly. Alternatively, use the :meth:`find` method with an
-    optional count of expected servers to discover their addresses via
-    broadcast (this is most useful when the servers have dynamically allocated
-    addresses, e.g. via DHCP). You can query the server addresses that the
-    client knows about by treating the client instance as a sequence (iterable,
-    and supporting the standard :func:`len` function, and ``in`` operator, but
-    not indexable; the servers have no intrinsic "order").
-
-    Various methods are provided for configuring and controlling the cameras on
-    the Compound Pi servers (:meth:`resolution`, :meth:`framerate`,
-    :meth:`exposure`, :meth:`capture`, etc). Each method optionally accepts a
-    set of addresses to operate on. If omitted, the command is applied to all
-    servers that the client knows about (via a broadcast packet). The one
-    exception to this is the :meth:`download` method for retrieving captured
-    images. For the sake of efficiency this is expected to operate against one
-    server at a time, so the *address* parameter is mandatory.
+    Servers are typically added as IP addresses in string format, but all
+    values within the list will be converted to :class:`~ipaddress.IPv4Address`
+    instances (these can be coerced to strings for easy usage).
     """
-
-    def __init__(self, progress=None):
+    def __init__(self, progress):
         self._protocol = CompoundPiClientProtocol()
         self._seqno = 0
+        self._items = []
+        self._senders = {}
         self._socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self._socket.setsockopt(socket.SOL_SOCKET, socket.SO_BROADCAST, 1)
-        self._network = None
-        self._port = None
-        self._server = None
-        self._server_thread = None
-        self._servers = set()
-        self._senders = {}
-        self._progress_start = self._progress_update = self._progress_finish = None
-        if progress is not None:
-            (
-                self._progress_start,
-                self._progress_update,
-                self._progress_finish,
-                ) = progress
+        self._progress = progress
         self.network = '192.168.0.0/16'
         self.port = 5647
-        self.bind = ('0.0.0.0', 5647)
-        self.timeout = 5
+        self.timeout = 15
 
-    def _get_bind(self):
-        if self._server:
-            return self._server.socket.getsockname()
-    def _set_bind(self, value):
-        if self._server:
-            self._server.shutdown()
-            self._server.socket.close()
-            self._server_thread = None
-        if value is not None:
-            self._server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
-            self._server.event = threading.Event()
-            self._server.source = None
-            self._server.output = None
-            self._server.exception = None
-            self._server.progress_start = self._progress_start
-            self._server.progress_update = self._progress_update
-            self._server.progress_finish = self._progress_finish
-            self._server_thread = threading.Thread(target=self._server.serve_forever)
-            self._server_thread.daemon = True
-            self._server_thread.start()
-    bind = property(_get_bind, _set_bind, doc="""
-        Defines the port and interfaces the client will listen to for
-        responses.
+    def __len__(self):
+        return len(self._items)
 
-        This attribute defaults to ``('0.0.0.0', 5647)`` meaning that the
-        client defaults to listening on port 5647 on all available network
-        interfaces for responses from Compound Pi servers (the special address
-        ``0.0.0.0`` means "all available interfaces"). If you wish to change
-        the port, or limit the interfaces the client listens to, assign a tuple
-        of ``(address, port)`` to this attribute. For example::
+    def __iter__(self):
+        return iter(self._items)
 
-            from compoundpi.client import CompoundPiClient
+    def __reversed__(self):
+        return reversed(self._items)
 
-            client = CompoundPiClient()
-            client.bind = ('192.168.0.1', 8000)
+    def __contains__(self, address):
+        try:
+            self.index(address)
+        except ValueError:
+            return False
+        else:
+            return True
 
-        Querying this attribute will return a 2-tuple of the current address
-        and port that the client is listening on.
+    def __getitem__(self, index):
+        return self._items[index]
 
-        .. note::
+    def __setitem__(self, index, value):
+        # XXX What about slice?
+        if isinstance(index, slice):
+            raise NotImplementedError
+        self.remove(self._items[index])
+        self.insert(index, value)
 
-            The port of the client's bound socket doesn't need to match the
-            server's port. Both simply default to 5647 for the sake of
-            simplicity.
-        """)
+    def __delitem__(self, index):
+        del self._items[index]
 
     def _get_port(self):
         return self._port
@@ -452,20 +390,20 @@ class CompoundPiClient(object):
             from compoundpi.client import CompoundPiClient
 
             client = CompoundPiClient()
-            client.port = 8080
+            client.servers.port = 8080
 
         .. note::
 
-            The port of the client's bound socket doesn't need to match the
-            server's port. Both simply default to 5647 for the sake of
-            simplicity.
+            The port of the client's bound socket (see
+            :attr:`CompoundPiClient.bind` doesn't need to match the server's
+            port. Both simply default to 5647 for the sake of simplicity.
         """)
 
     def _get_network(self):
         return self._network
     def _set_network(self, value):
         self._network = IPv4Network(value)
-        self._servers = set()
+        self._items = []
     network = property(_get_network, _set_network, doc="""
         Defines the network that all servers belong to.
 
@@ -479,7 +417,7 @@ class CompoundPiClient(object):
             from compoundpi.client import CompoundPiClient
 
             client = CompoundPiClient()
-            client.network = '192.168.0.0/24'
+            client.servers.network = '192.168.0.0/24'
 
         Note that the network mask *must* be correct for broadcast packets to
         operate correctly. It is not enough for the network prefix alone to be
@@ -489,6 +427,177 @@ class CompoundPiClient(object):
         object which can be converted to a string, or enumerated to discover
         all potential addresses within the defined network.
         """)
+
+    def _get_timeout(self):
+        return self._timeout
+    def _set_timeout(self, value):
+        self._timeout = int(value)
+    timeout = property(_get_timeout, _set_timeout, doc="""
+        Defines the timeout for responses to commands.
+
+        This attribute specifies the length of time that the client will wait
+        for all servers to complete a command and return a response. If all
+        servers have not replied within the specified number of seconds a
+        :exc:`CompoundPiTransactionFailed` error will be raised.
+        """)
+
+    def index(self, address):
+        if not isinstance(address, IPv4Address):
+            address = IPv4Address(address)
+        return self._items.index(address)
+
+    def count(self, address):
+        return int(address in self)
+
+    def insert(self, index, address):
+        """
+        Called to explicitly add a server *address* to the client's list at the
+        specified *index*.  Before the server is added, the client will send a
+        :ref:`protocol_hello` to verify that the server is alive. You can query
+        the servers in the client's list by treating the list as an iterable::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.servers.network = '192.168.0.0/24'
+            client.servers.insert(0, '192.168.0.2')
+            assert len(client.servers) == 1
+            assert '192.168.0.2' in client.servers
+
+        Attempting to add an address that is already present in the client's
+        list will raise a :exc:`CompoundPiRedefinedServer` error.
+        """
+        if not isinstance(address, IPv4Address):
+            address = IPv4Address(address)
+        if address in self:
+            raise CompoundPiRedefinedServer(address)
+        self._seqno += 1
+        data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
+        self._send_command(
+            (str(address), self.port), self._seqno, data)
+        response = self._parse_ping(self._responses({address}))
+        if not address in response:
+            raise CompoundPiTransactionFailed([
+                CompoundPiMissingResponse(address)
+                ])
+        self._items.insert(index, address)
+
+    def append(self, address):
+        """
+        Called to explicitly add a server *address* to the client's list. This
+        is equivalent to insertion at the end of the list::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.servers.network = '192.168.0.0/24'
+            client.servers.append('192.168.0.2')
+            assert len(client.servers) == 1
+            assert '192.168.0.2' in client.servers
+
+        Attempting to add an address that is already present in the client's
+        list will raise a :exc:`CompoundPiRedefinedServer` error.
+        """
+        self.insert(len(self), address)
+
+    def extend(self, addresses):
+        """
+        Called to add multiple servers to the client's list. The *addresses*
+        parameter must be an iterable of addresses to add.
+        """
+        for address in addresses:
+            self.append(address)
+
+    def remove(self, address):
+        """
+        Called to explicitly remove a server *address* from the client's list.
+        Nothing is sent to a server that is removed from the list. If the
+        server is still active on the client's network after removal it will
+        continue to receive broadcast packets but the client will ignore any
+        responses from the server.
+
+        .. warning::
+
+            Please note that this may cause unexpected issues. For example,
+            such a server (active but unknown to a client) may capture images
+            in response to a broadcast :ref:`protocol_capture` message. For
+            this reason it is recommended that you shut down any servers that
+            you do not intend to communicate with. Future versions of the
+            protocol may include explicit disconnection messages to mitigate
+            this issue.
+
+        Attempting to remove an address that is not present in the client's
+        list will raise a :exc:`ValueError`.
+        """
+        if not isinstance(address, IPv4Address):
+            address = IPv4Address(address)
+        self._items.remove(address)
+
+    def move(self, index, address):
+        """
+        Called to move *address* (which must already be present within the
+        server list) to *index*. Positioning is as for :meth:`insert`; the
+        specified *address* will be moved so that it occupies *index* and all
+        later entries will be moved down.
+        """
+        self._items.insert(index, self._items.pop(self.index(address)))
+
+    def reverse(self):
+        """
+        Reverses the order of the servers in the list.
+        """
+        self._items.reverse()
+
+    def sort(self, cmp=None, key=None, reverse=False):
+        """
+        Sorts the servers in the list according to the specified *cmp*
+        comparison function, or the *key* comparison function. If *reverse* is
+        True, the order of the sort is reversed.
+        """
+        self._items.sort(cmp, key, reverse)
+
+    def find(self, count=0):
+        """
+        Called to discover servers on the client's network. The :meth:`find`
+        method broadcasts a :ref:`protocol_hello` message to the currently
+        configured network. If called with no expected *count*, the method then
+        waits for the network :attr:`timeout` (default 15 seconds) and adds all
+        servers that replied to the broadcast to the client's list. If called
+        with an expected *count* value, the method will terminate as soon as
+        *count* servers have replied. For example::
+
+            from compoundpi.client import CompoundPiClient
+
+            client = CompoundPiClient()
+            client.servers.network = '192.168.2.0/24'
+            client.servers.find(10)
+            assert len(client.servers) == 10
+            print('Found 10 clients:')
+            for addr in client.servers:
+                print(str(addr))
+
+        This method or the :meth:`append` method are usually the first methods
+        called after construction and configuration of the client instance.
+        """
+        self._items = []
+        self._seqno += 1
+        data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
+        self._send_command(
+            (str(self.network.broadcast), self.port), self._seqno, data)
+        self._items = self._parse_ping(self._responses(count=count))
+
+    def _parse_ping(self, responses):
+        addresses = list(responses.keys())
+        for address, (result, response) in responses.items():
+            response = response.strip()
+            if result == 'OK':
+                if response != 'VERSION %s' % __version__:
+                    warnings.warn(CompoundPiWrongVersion(address, response))
+                    addresses.remove(address)
+            else:
+                warnings.warn(CompoundPiHelloError(address, response))
+                addresses.remove(address)
+        return addresses
 
     def _send_command(self, address, seqno, data):
         assert self._protocol.request_re.match(data)
@@ -500,21 +609,19 @@ class CompoundPiClient(object):
 
     def _responses(self, servers=None, count=0):
         if servers is None:
-            servers = self._servers
+            servers = self._items
         if not count:
             count = len(servers)
         if not servers:
             servers = self.network
             if not count:
                 count = sum(1 for a in self.network)
-        if self._progress_start:
-            self._progress_start(count)
+        self._progress.start(count)
         result = {}
         start = time.time()
         try:
             while time.time() - start < self.timeout:
-                if self._progress_update:
-                    self._progress_update(len(result))
+                self._progress.update(len(result))
                 if select.select([self._socket], [], [], 1)[0]:
                     data, server_address = self._socket.recvfrom(512)
                     data = data.decode('utf-8')
@@ -554,28 +661,26 @@ class CompoundPiClient(object):
                                     )
                             if len(result) == count:
                                 break
-            if self._progress_update:
-                self._progress_update(len(result))
+            self._progress.update(len(result))
             return result
         finally:
             while self._senders:
                 _, sender = self._senders.popitem()
                 sender.terminate = True
                 sender.join()
-            if self._progress_finish:
-                self._progress_finish()
+            self._progress.finish()
 
     def _transact(self, data, addresses=None):
         if addresses is None:
-            if not self._servers:
+            if not self._items:
                 raise CompoundPiNoServers()
-            addresses = self._servers
-        elif set(addresses) - self._servers:
-            raise CompoundPiUndefinedServers(set(addresses) - self._servers)
+            addresses = self._items
+        elif set(addresses) - set(self._items):
+            raise CompoundPiUndefinedServers(set(addresses) - set(self._items))
         errors = []
         self._seqno += 1
         data = '%d %s' % (self._seqno, data)
-        if set(addresses) == self._servers:
+        if set(addresses) == self._items:
             self._send_command(
                 (str(self.network.broadcast), self.port), self._seqno, data)
         else:
@@ -598,115 +703,137 @@ class CompoundPiClient(object):
             raise CompoundPiTransactionFailed(errors)
         return responses
 
-    def __len__(self):
-        return len(self._servers)
 
-    def __iter__(self):
-        return iter(self._servers)
+class CompoundPiProgressHandler(object):
+    """
+    Progress handler class for the Compound Pi client. This class is used by
+    Compound Pi to "mock out" any progress handler methods missing from the
+    user's specified progress handler object for the purpose of keeping the
+    client code simple. There is generally no need for end users to utilise
+    this class.
+    """
+    def __init__(self, handler):
+        if hasattr(handler, 'start'):
+            self.start = handler.start
+        if hasattr(handler, 'update'):
+            self.update = handler.update
+        if hasattr(handler, 'finish'):
+            self.finish = handler.finish
 
-    def __contains__(self, address):
-        if not isinstance(address, IPv4Address):
-            address = IPv4Address(address)
-        return address in self._servers
+    def start(self, count):
+        logging.debug('progress.start fallback called')
 
-    def _parse_ping(self, responses):
-        for address, (result, response) in responses.items():
-            response = response.strip()
-            if result == 'OK':
-                if response != 'VERSION %s' % __version__:
-                    warnings.warn(CompoundPiWrongVersion(address, response))
-                    del responses[address]
-            else:
-                warnings.warn(CompoundPiHelloError(address, response))
-                del responses[address]
-        return set(responses.keys())
+    def update(self, count):
+        logging.debug('progress.update fallback called')
 
-    def add(self, address):
-        """
-        Called to explicitly add a server address to the client's list. Before
-        the server is added, the client will send a :ref:`protocol_hello` to
-        verify that the server is alive. You can query the servers in the
-        client's list by treating the client as an iterable::
+    def finish(self):
+        logging.debug('progress.finish fallback called')
+
+
+class CompoundPiClient(object):
+    """
+    Implements a network client for Compound Pi servers.
+
+    Upon construction, this class initializes the client to operate on the
+    network 192.168.0.0/16. Because the client utilizes UDP broadcast packets,
+    it is crucial that the network configuration (including the network mask)
+    is set correctly. If the default network is wrong (which is most likely the
+    case), you must correct it before issuing any commands. This can be done by
+    setting the :attr:`network` attribute.
+
+    The class assumes the Compound Pi servers are listening on UDP port 5647 by
+    default. This can be altered via the :attr:`port` attribute. Finally, the
+    class listens on port 5647 on all available interfaces for responses. If
+    this is incorrect (or if you wish to limit the interfaces that the client
+    listens on), adjust the :attr:`bind` attribute.
+
+    The optional *progress* parameter provides an object which will be notified
+    of long client operations. When the client begins a long operation it will
+    call the ``start`` method of the object with a single parameter indicating
+    the number of expected operations to complete. As the operation progresses,
+    the object's ``update`` method will be called with a parameter indicating
+    the current operation (the ``update`` method may be called multiple times
+    with the same number, but it will never decrease within the span of one
+    operation, and it will never exceed the count passed to ``start``). To
+    terminate a long operation prematurely, :keyword:`raise` an exception in
+    the ``update`` method. Finally, the object's ``finish`` routine will be
+    called with no parameters (if the ``start`` method is called, the
+    ``finish`` method is guaranteed to be called).
+
+    Before controlling any Compound Pi servers, the client must either be told
+    the addresses of the servers, or discover them via broadcast. The
+    :attr:`servers` attribute is the list of available servers. Servers can be
+    defined manually, or discovered by broadcast. See the
+    :class:`CompoundPiServerList` documentation for further information.
+
+    Various methods are provided for configuring and controlling the cameras on
+    the Compound Pi servers (:meth:`resolution`, :meth:`framerate`,
+    :meth:`exposure`, :meth:`capture`, etc). Each method optionally accepts a
+    set of addresses to operate on. If omitted, the command is applied to all
+    servers that the client knows about (via a broadcast packet). The one
+    exception to this is the :meth:`download` method for retrieving captured
+    images. For the sake of efficiency this is expected to operate against one
+    server at a time, so the *address* parameter is mandatory.
+    """
+
+    def __init__(self, progress=None):
+        progress = CompoundPiProgressHandler(progress)
+        self._protocol = CompoundPiClientProtocol()
+        self._server = None
+        self._server_thread = None
+        self._servers = CompoundPiServerList(progress)
+        self.bind = ('0.0.0.0', 5647)
+
+    def _get_servers(self):
+        return self._servers
+    def _set_servers(self, value):
+        #XXX
+        raise NotImplementedError
+    servers = property(_get_servers, _set_servers)
+
+    def _get_bind(self):
+        if self._server:
+            return self._server.socket.getsockname()
+    def _set_bind(self, value):
+        if self._server:
+            self._server.shutdown()
+            self._server.socket.close()
+            self._server_thread = None
+        if value is not None:
+            self._server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
+            self._server.event = threading.Event()
+            self._server.source = None
+            self._server.output = None
+            self._server.exception = None
+            self._server.progress = self._servers._progress
+            self._server_thread = threading.Thread(target=self._server.serve_forever)
+            self._server_thread.daemon = True
+            self._server_thread.start()
+    bind = property(_get_bind, _set_bind, doc="""
+        Defines the port and interfaces the client will listen to for
+        responses.
+
+        This attribute defaults to ``('0.0.0.0', 5647)`` meaning that the
+        client defaults to listening on port 5647 on all available network
+        interfaces for responses from Compound Pi servers (the special address
+        ``0.0.0.0`` means "all available interfaces"). If you wish to change
+        the port, or limit the interfaces the client listens to, assign a tuple
+        of ``(address, port)`` to this attribute. For example::
 
             from compoundpi.client import CompoundPiClient
 
             client = CompoundPiClient()
-            client.network = '192.168.0.0/24'
-            client.add('192.168.0.2')
-            assert len(client) == 1
-            assert '192.168.0.2' in client
+            client.bind = ('192.168.0.1', 8000)
 
-        Attempting to add an address that is already present in the client's
-        list will raise a :exc:`CompoundPiRedefinedServer` error.
-        """
-        if not isinstance(address, IPv4Address):
-            address = IPv4Address(address)
-        if address in self:
-            raise CompoundPiRedefinedServer(address)
-        self._seqno += 1
-        data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
-        self._send_command(
-            (str(address), self.port), self._seqno, data)
-        response = self._parse_ping(self._responses({address}))
-        if not address in response:
-            raise CompoundPiTransactionFailed([
-                CompoundPiMissingResponse(address)
-                ])
-        self._servers.add(address)
+        Querying this attribute will return a 2-tuple of the current address
+        and port that the client is listening on.
 
-    def remove(self, address):
-        """
-        Called to explicitly remove a server address from the client's list.
-        Nothing is sent to a server that is removed from the list. If the
-        server is still active on the client's network after removal it will
-        continue to receive broadcast packets but the client will ignore any
-        responses from the server.
+        .. note::
 
-        .. warning::
-
-            Please note that this may cause unexpected issues. For example,
-            such a server (active but unknown to a client) may capture images
-            in response to a broadcast :ref:`protocol_capture` message. For
-            this reason it is recommended that you shut down any servers that
-            you do not intend to communicate with. Future versions of the
-            protocol may include explicit disconnection messages to mitigate
-            this issue.
-
-        Attempting to remove an address that is not present in the client's
-        list will raise a :exc:`KeyError`.
-        """
-        if not isinstance(address, IPv4Address):
-            address = IPv4Address(address)
-        self._servers.remove(address)
-
-    def find(self, count=0):
-        """
-        Called to discover servers on the client's network. The :meth:`find`
-        method broadcasts a :ref:`protocol_hello` message to the currently
-        configured network. If called with no expected *count*, the method then
-        waits for the network :attr:`timeout` (default 15 seconds) and adds all
-        servers that replied to the broadcast to the client's list. If called
-        with an expected *count* value, the method will terminate as soon as
-        *count* servers have replied. For example::
-
-            from compoundpi.client import CompoundPiClient
-
-            client = CompoundPiClient()
-            client.find(10)
-            assert len(client) == 10
-            print('Found 10 clients:')
-            for addr in client:
-                print(str(addr))
-
-        This method or the :meth:`add` method are usually the first methods
-        called after construction and configuration of the client instance.
-        """
-        self._servers = set()
-        self._seqno += 1
-        data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
-        self._send_command(
-            (str(self.network.broadcast), self.port), self._seqno, data)
-        self._servers = self._parse_ping(self._responses(count=count))
+            The port of the client's bound socket doesn't need to match the
+            server's port. Both simply default to 5647 for the sake of
+            simplicity.
+        """)
 
     status_re = re.compile(
             r'RESOLUTION (?P<width>\d+),(?P<height>\d+)\n'
@@ -747,7 +874,7 @@ class CompoundPiClient(object):
         """
         responses = [
             (address, self.status_re.match(data))
-            for (address, data) in self._transact(
+            for (address, data) in self.servers._transact(
                 self._protocol.do_status(), addresses).items()
             ]
         errors = []
@@ -798,7 +925,8 @@ class CompoundPiClient(object):
             client.find(10)
             client.resolution(1280, 720)
         """
-        self._transact(self._protocol.do_resolution(width, height), addresses)
+        self.servers._transact(
+                self._protocol.do_resolution(width, height), addresses)
 
     def framerate(self, rate, addresses=None):
         """
@@ -815,7 +943,7 @@ class CompoundPiClient(object):
             client.find(10)
             client.framerate(24)
         """
-        self._transact(self._protocol.do_framerate(rate), addresses)
+        self.servers._transact(self._protocol.do_framerate(rate), addresses)
 
     def awb(self, mode, red=0.0, blue=0.0, addresses=None):
         """
@@ -858,7 +986,8 @@ class CompoundPiClient(object):
             status = client.status(addresses=addr)[addr]
             client.awb('off', status.awb_red, status.awb_blue)
         """
-        self._transact(self._protocol.do_awb(mode, red, blue), addresses)
+        self.servers._transact(
+            self._protocol.do_awb(mode, red, blue), addresses)
 
     def agc(self, mode, addresses=None):
         """
@@ -890,7 +1019,7 @@ class CompoundPiClient(object):
             gains to a particular value (in contrast to AWB and exposure
             speed).
         """
-        self._transact(self._protocol.do_agc(mode), addresses)
+        self.servers._transact(self._protocol.do_agc(mode), addresses)
 
     def exposure(self, mode, speed=0, addresses=None):
         """
@@ -925,7 +1054,8 @@ class CompoundPiClient(object):
             client.exposure('off', speed=status.exposure_speed)
 
         """
-        self._transact(self._protocol.do_exposure(mode, speed), addresses)
+        self.servers._transact(
+            self._protocol.do_exposure(mode, speed), addresses)
 
     def metering(self, mode, addresses=None):
         """
@@ -939,7 +1069,7 @@ class CompoundPiClient(object):
         * ``'matrix'``
         * ``'spot'``
         """
-        self._transact(self._protocol.do_metering(mode), addresses)
+        self.servers._transact(self._protocol.do_metering(mode), addresses)
 
     def iso(self, value, addresses=None):
         """
@@ -948,7 +1078,7 @@ class CompoundPiClient(object):
         *mode* parameter specifies the new ISO settings as an integer value.
         values are 0 (meaning auto), 100, 200, 320, 400, 500, 640, and 800.
         """
-        self._transact(self._protocol.do_iso(value), addresses)
+        self.servers._transact(self._protocol.do_iso(value), addresses)
 
     def brightness(self, value, addresses=None):
         """
@@ -956,7 +1086,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between 0 and 100.
         """
-        self._transact(self._protocol.do_brightness(value), addresses)
+        self.servers._transact(self._protocol.do_brightness(value), addresses)
 
     def contrast(self, value, addresses=None):
         """
@@ -964,7 +1094,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between -100 and 100.
         """
-        self._transact(self._protocol.do_contrast(value), addresses)
+        self.servers._transact(self._protocol.do_contrast(value), addresses)
 
     def saturation(self, value, addresses=None):
         """
@@ -972,7 +1102,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between -100 and 100.
         """
-        self._transact(self._protocol.do_saturation(value), addresses)
+        self.servers._transact(self._protocol.do_saturation(value), addresses)
 
     def ev(self, value, addresses=None):
         """
@@ -981,7 +1111,7 @@ class CompoundPiClient(object):
         omitted). The new level is specified an integer between -24 and 24
         where each increment represents 1/6th of a stop.
         """
-        self._transact(self._protocol.do_ev(value), addresses)
+        self.servers._transact(self._protocol.do_ev(value), addresses)
 
     def flip(self, horizontal, vertical, addresses=None):
         """
@@ -991,7 +1121,8 @@ class CompoundPiClient(object):
         whether to flip the camera's output along the corresponding axis. The
         default for both parameters is ``False``.
         """
-        self._transact(self._protocol.do_flip(horizontal, vertical), addresses)
+        self.servers._transact(
+            self._protocol.do_flip(horizontal, vertical), addresses)
 
     def denoise(self, value, addresses=None):
         """
@@ -1000,7 +1131,7 @@ class CompoundPiClient(object):
         *addresses* is omitted). The *value* is a simple boolean, which
         defaults to ``True``.
         """
-        self._transact(self._protocol.do_denoise(value), addresses)
+        self.servers._transact(self._protocol.do_denoise(value), addresses)
 
     def capture(self, count=1, video_port=False, quality=None, delay=None,
             addresses=None):
@@ -1039,7 +1170,7 @@ class CompoundPiClient(object):
             delay = time.time() + delay
         else:
             delay = None
-        self._transact(
+        self.servers._transact(
             self._protocol.do_capture(count, video_port, quality, delay),
             addresses)
 
@@ -1088,12 +1219,17 @@ class CompoundPiClient(object):
             delay = time.time() + delay
         else:
             delay = None
-        self._transact(self._protocol.do_record(
-            length, format, quality, bitrate, intra_period, motion_output, delay),
+        self.servers._transact(
+            self._protocol.do_record(
+                length, format, quality, bitrate, intra_period,
+                motion_output, delay),
             addresses)
 
     list_line_re = re.compile(
-            r'(?P<filetype>IMAGE|VIDEO|MOTION),(?P<index>\d+),(?P<time>\d+(\.\d+)?),(?P<size>\d+)')
+            r'(?P<filetype>IMAGE|VIDEO|MOTION),'
+            r'(?P<index>\d+),'
+            r'(?P<time>\d+(\.\d+)?),'
+            r'(?P<size>\d+)')
     def list(self, addresses=None):
         """
         Called to list files available for download from the servers at the
@@ -1121,7 +1257,7 @@ class CompoundPiClient(object):
                 self.list_line_re.match(line)
                 for line in data.splitlines()
                 ]
-            for (address, data) in self._transact(
+            for (address, data) in self.servers._transact(
                 self._protocol.do_list(), addresses).items()
             }
         errors = []
@@ -1151,7 +1287,7 @@ class CompoundPiClient(object):
         is fairly crude: it simply clears all captured files on the server;
         there is no method for specifying a subset of files to wipe.
         """
-        self._transact(self._protocol.do_clear(), addresses)
+        self.servers._transact(self._protocol.do_clear(), addresses)
 
     def identify(self, addresses=None):
         """
@@ -1160,7 +1296,7 @@ class CompoundPiClient(object):
         Currently, the identification takes the form of the server blinking
         the camera's LED for 5 seconds.
         """
-        self._transact(self._protocol.do_blink(), addresses)
+        self.servers._transact(self._protocol.do_blink(), addresses)
 
     def download(self, address, index, output):
         """
@@ -1203,14 +1339,11 @@ class CompoundPiClient(object):
         # As download is a long operation that always targets a single server,
         # we re-purpose progress notifications from counting server responses
         # to counting bytes received
-        progress = (
-                self._progress_start,
-                self._progress_update,
-                self._progress_finish,
-                )
-        self._progress_start = self._progress_update = self._progress_finish = None
+        save_progress = self._servers._progress
+        self._servers._progress = None
         try:
-            self._transact(self._protocol.do_send(index, self.port), [address])
+            self.servers._transact(
+                self._protocol.do_send(index, self.port), [address])
             if not self._server.event.wait(self.timeout):
                 raise CompoundPiSendTimeout(address)
             elif self._server.exception:
@@ -1219,11 +1352,7 @@ class CompoundPiClient(object):
             self._server.source = None
             self._server.output = None
             self._server.exception = None
-            (
-                self._progress_start,
-                self._progress_update,
-                self._progress_finish,
-                ) = progress
+            self._servers._progress = save_progress
 
 
 class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
@@ -1234,25 +1363,22 @@ class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
             size, = struct.unpack(
                 native_str('>L'),
                 self.rfile.read(struct.calcsize(native_str('>L'))))
-            if self.server.progress_start:
-                self.server.progress_start(size)
+            output.truncate(size)
+            output.seek(0)
+            self.server.progress.start(size)
             try:
-                received = 0
-                while received < size:
+                while output.tell() < size:
                     data = self.rfile.read(16384)
-                    received += len(data)
                     if not data:
                         break
                     self.server.output.write(data)
-                    if self.server.progress_update:
-                        self.server.progress_update(received)
+                    self.server.progress.update(output.tell())
             except Exception as e:
                 self.server.exception = e
             else:
                 self.server.exception = None
             finally:
-                if self.server.progress_finish:
-                    self.server.progress_finish()
+                self.server.progress.finish()
                 self.server.event.set()
 
 

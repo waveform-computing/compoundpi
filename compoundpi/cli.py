@@ -230,6 +230,36 @@ class CompoundPiClientApplication(TerminalApplication):
         proc.cmdloop()
 
 
+class CompoundPiProgress(object):
+    def __init__(self, stdout):
+        self.stdout = stdout
+        self.count = 0
+        self.output = None
+
+    def start(self, count):
+        self.count = count
+        self.output = ''
+        self.update(0)
+
+    def clear(self):
+        l = len(self.output)
+        self.stdout.write((b'\b' * l) + (b' ' * l) + (b'\b' * l))
+        self.stdout.flush()
+
+    def update(self, count):
+        self.clear()
+        percent_complete = (count * 100) // self.count
+        self.output = '[%-25s] %d%%' % (
+            '#' * (percent_complete // 4), percent_complete)
+        self.stdout.write(self.output.encode(ENCODING))
+        self.stdout.flush()
+
+    def finish(self):
+        self.clear()
+        self.count = 0
+        self.output = None
+
+
 class CompoundPiCmd(Cmd):
     prompt = 'cpi> '
 
@@ -239,11 +269,7 @@ class CompoundPiCmd(Cmd):
         self.pprint(
             'Type "help" for more information, '
             'or "find" to locate Pi servers')
-        self.client = CompoundPiClient(progress=(
-            self.progress_start,
-            self.progress_update,
-            self.progress_finish,
-            ))
+        self.client = CompoundPiClient(CompoundPiProgress(self.stdout))
         self.capture_delay = 0.0
         self.capture_count = 1
         self.capture_quality = 85
@@ -258,29 +284,6 @@ class CompoundPiCmd(Cmd):
         self.output = '/tmp'
         self.warnings = False
         warnings.simplefilter('always')
-
-    def progress_start(self, count):
-        self.progress_count = count
-        self.progress_output = ''
-        self.progress_update(0)
-
-    def progress_clear(self):
-        l = len(self.progress_output)
-        self.stdout.write((b'\b' * l) + (b' ' * l) + (b'\b' * l))
-        self.stdout.flush()
-
-    def progress_update(self, count):
-        self.progress_clear()
-        percent_complete = (count * 100) // self.progress_count
-        self.progress_output = '[%-25s] %d%%' % (
-            '#' * (percent_complete // 4), percent_complete)
-        self.stdout.write(self.progress_output.encode(ENCODING))
-        self.stdout.flush()
-
-    def progress_finish(self):
-        self.progress_clear()
-        self.progress_count = 0
-        self.progress_output = None
 
     def showwarning(self, message, category, filename, lineno, file=None,
             line=None):
@@ -307,7 +310,7 @@ class CompoundPiCmd(Cmd):
             a = IPv4Address(s.strip())
         except ValueError:
             raise CmdSyntaxError('Invalid address "%s"' % s)
-        if not a in self.client.network:
+        if not a in self.client.servers.network:
             raise CmdSyntaxError(
                 'Address "%s" does not belong to the configured network '
                 '"%s"' % (a, self.network))
@@ -335,7 +338,7 @@ class CompoundPiCmd(Cmd):
     def parse_addresses(self, arg=None):
         if arg:
             return self.parse_address_list(arg)
-        elif not len(self.client):
+        elif not len(self.client.servers):
             raise CmdError(
                     "You must define servers first (see help for 'find' "
                     "and 'add')")
@@ -343,7 +346,7 @@ class CompoundPiCmd(Cmd):
     def complete_server(self, text, line, start, finish):
         return [
             str(server)
-            for server in self.client
+            for server in self.client.servers
             if str(server).startswith(text)
             ]
 
@@ -363,10 +366,10 @@ class CompoundPiCmd(Cmd):
         self.pprint_table(
             [
                 ('Setting',             'Value'),
-                ('network',             self.client.network),
-                ('port',                self.client.port),
+                ('network',             self.client.servers.network),
+                ('port',                self.client.servers.port),
+                ('timeout',             self.client.servers.timeout),
                 ('bind',                '%s:%d' % self.client.bind),
-                ('timeout',             self.client.timeout),
                 ('capture_delay',       self.capture_delay),
                 ('capture_quality',     self.capture_quality),
                 ('capture_count',       self.capture_count),
@@ -429,7 +432,9 @@ class CompoundPiCmd(Cmd):
             raise CmdSyntaxError('Invalid configuration variable: %s' % name)
         except ValueError as e:
             raise CmdSyntaxError(e)
-        if name in ('network', 'port', 'bind', 'timeout'):
+        if name in ('network', 'port', 'timeout'):
+            setattr(self.client.servers, name, value)
+        elif name in ('bind',):
             setattr(self.client, name, value)
         else:
             setattr(self, name, value)
@@ -492,12 +497,12 @@ class CompoundPiCmd(Cmd):
         """
         if arg:
             raise CmdSyntaxError('Unexpected argument "%s"' % arg)
-        if not len(self.client):
+        if not len(self.client.servers):
             self.pprint('No servers are defined')
         else:
             self.pprint_table(
                 [('Address',)] +
-                [(server,) for server in self.client]
+                [(server,) for server in self.client.servers]
                 )
 
     def do_find(self, arg=''):
@@ -525,10 +530,10 @@ class CompoundPiCmd(Cmd):
                 raise CmdSyntaxError('Invalid find count "%d"' % arg)
         else:
             count = 0
-        self.client.find(count)
-        if not len(self.client):
+        self.client.servers.find(count)
+        if not len(self.client.servers):
             raise CmdError('Failed to find any servers')
-        logging.info('Found %d servers' % len(self.client))
+        logging.info('Found %d servers' % len(self.client.servers))
 
     def do_add(self, arg):
         """
@@ -550,13 +555,13 @@ class CompoundPiCmd(Cmd):
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to add')
         for addr in self.parse_address_list(arg):
-            self.client.add(addr)
+            self.client.servers.append(addr)
 
     def complete_add(self, text, line, start, finish):
         return [
             str(server)
-            for server in self.client.network
-            if server not in self.client
+            for server in self.client.servers.network
+            if server not in self.client.servers
             and str(server).startswith(text)
             ]
 
@@ -580,10 +585,39 @@ class CompoundPiCmd(Cmd):
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to remove')
         for addr in self.parse_address_list(arg):
-            self.client.remove(addr)
+            self.client.servers.remove(addr)
 
     def complete_remove(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
+
+    def do_sort(self, arg=''):
+        """
+        Sorts the list of servers numerically.
+
+        Syntax: sort [reverse]
+
+        The 'sort' command is used to sort the list of defined servers
+        numerically forwards or, if "reverse" is specified, backwards.
+
+        See also: add, remove, find.
+
+        cpi> sort
+        cpi> sort reverse
+        """
+        if arg == 'reverse':
+            reverse = True
+        elif arg:
+            raise CmdSyntaxError('Unexpected argument "%s"' % arg)
+        else:
+            reverse = False
+        self.client.servers.sort(reverse=reverse)
+
+    def complete_sort(self, text, line, start, finish):
+        cmd_re = re.compile(r'sort(?P<reverse> +[^ ]+)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('reverse') < finish <= match.end('reverse'):
+            return ['reverse'] if 'reverse'.startswith(text) else []
 
     def do_status(self, arg=''):
         """
@@ -646,7 +680,7 @@ class CompoundPiCmd(Cmd):
                     status.timestamp - min_time,
                     status.files,
                     )
-                for address in sorted(self.client)
+                for address in self.client.servers
                 if address in responses
                 for status in (responses[address],)
                 ])
