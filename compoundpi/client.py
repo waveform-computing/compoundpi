@@ -670,7 +670,7 @@ class CompoundPiServerList(object):
                 sender.join()
             self._progress.finish()
 
-    def _transact(self, data, addresses=None):
+    def transact(self, data, addresses=None):
         if addresses is None:
             if not self._items:
                 raise CompoundPiNoServers()
@@ -874,7 +874,7 @@ class CompoundPiClient(object):
         """
         responses = [
             (address, self.status_re.match(data))
-            for (address, data) in self.servers._transact(
+            for (address, data) in self.servers.transact(
                 self._protocol.do_status(), addresses).items()
             ]
         errors = []
@@ -925,7 +925,7 @@ class CompoundPiClient(object):
             client.find(10)
             client.resolution(1280, 720)
         """
-        self.servers._transact(
+        self.servers.transact(
                 self._protocol.do_resolution(width, height), addresses)
 
     def framerate(self, rate, addresses=None):
@@ -943,7 +943,7 @@ class CompoundPiClient(object):
             client.find(10)
             client.framerate(24)
         """
-        self.servers._transact(self._protocol.do_framerate(rate), addresses)
+        self.servers.transact(self._protocol.do_framerate(rate), addresses)
 
     def awb(self, mode, red=0.0, blue=0.0, addresses=None):
         """
@@ -986,7 +986,7 @@ class CompoundPiClient(object):
             status = client.status(addresses=addr)[addr]
             client.awb('off', status.awb_red, status.awb_blue)
         """
-        self.servers._transact(
+        self.servers.transact(
             self._protocol.do_awb(mode, red, blue), addresses)
 
     def agc(self, mode, addresses=None):
@@ -1019,7 +1019,7 @@ class CompoundPiClient(object):
             gains to a particular value (in contrast to AWB and exposure
             speed).
         """
-        self.servers._transact(self._protocol.do_agc(mode), addresses)
+        self.servers.transact(self._protocol.do_agc(mode), addresses)
 
     def exposure(self, mode, speed=0, addresses=None):
         """
@@ -1054,7 +1054,7 @@ class CompoundPiClient(object):
             client.exposure('off', speed=status.exposure_speed)
 
         """
-        self.servers._transact(
+        self.servers.transact(
             self._protocol.do_exposure(mode, speed), addresses)
 
     def metering(self, mode, addresses=None):
@@ -1069,7 +1069,7 @@ class CompoundPiClient(object):
         * ``'matrix'``
         * ``'spot'``
         """
-        self.servers._transact(self._protocol.do_metering(mode), addresses)
+        self.servers.transact(self._protocol.do_metering(mode), addresses)
 
     def iso(self, value, addresses=None):
         """
@@ -1078,7 +1078,7 @@ class CompoundPiClient(object):
         *mode* parameter specifies the new ISO settings as an integer value.
         values are 0 (meaning auto), 100, 200, 320, 400, 500, 640, and 800.
         """
-        self.servers._transact(self._protocol.do_iso(value), addresses)
+        self.servers.transact(self._protocol.do_iso(value), addresses)
 
     def brightness(self, value, addresses=None):
         """
@@ -1086,7 +1086,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between 0 and 100.
         """
-        self.servers._transact(self._protocol.do_brightness(value), addresses)
+        self.servers.transact(self._protocol.do_brightness(value), addresses)
 
     def contrast(self, value, addresses=None):
         """
@@ -1094,7 +1094,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between -100 and 100.
         """
-        self.servers._transact(self._protocol.do_contrast(value), addresses)
+        self.servers.transact(self._protocol.do_contrast(value), addresses)
 
     def saturation(self, value, addresses=None):
         """
@@ -1102,7 +1102,7 @@ class CompoundPiClient(object):
         *addresses* (or all defined servers if *addresses* is omitted). The
         new level is specified an integer between -100 and 100.
         """
-        self.servers._transact(self._protocol.do_saturation(value), addresses)
+        self.servers.transact(self._protocol.do_saturation(value), addresses)
 
     def ev(self, value, addresses=None):
         """
@@ -1111,7 +1111,7 @@ class CompoundPiClient(object):
         omitted). The new level is specified an integer between -24 and 24
         where each increment represents 1/6th of a stop.
         """
-        self.servers._transact(self._protocol.do_ev(value), addresses)
+        self.servers.transact(self._protocol.do_ev(value), addresses)
 
     def flip(self, horizontal, vertical, addresses=None):
         """
@@ -1121,7 +1121,7 @@ class CompoundPiClient(object):
         whether to flip the camera's output along the corresponding axis. The
         default for both parameters is ``False``.
         """
-        self.servers._transact(
+        self.servers.transact(
             self._protocol.do_flip(horizontal, vertical), addresses)
 
     def denoise(self, value, addresses=None):
@@ -1131,7 +1131,7 @@ class CompoundPiClient(object):
         *addresses* is omitted). The *value* is a simple boolean, which
         defaults to ``True``.
         """
-        self.servers._transact(self._protocol.do_denoise(value), addresses)
+        self.servers.transact(self._protocol.do_denoise(value), addresses)
 
     def capture(self, count=1, video_port=False, quality=None, delay=None,
             addresses=None):
@@ -1170,7 +1170,7 @@ class CompoundPiClient(object):
             delay = time.time() + delay
         else:
             delay = None
-        self.servers._transact(
+        self.servers.transact(
             self._protocol.do_capture(count, video_port, quality, delay),
             addresses)
 
@@ -1219,7 +1219,7 @@ class CompoundPiClient(object):
             delay = time.time() + delay
         else:
             delay = None
-        self.servers._transact(
+        self.servers.transact(
             self._protocol.do_record(
                 length, format, quality, bitrate, intra_period,
                 motion_output, delay),
@@ -1257,7 +1257,7 @@ class CompoundPiClient(object):
                 self.list_line_re.match(line)
                 for line in data.splitlines()
                 ]
-            for (address, data) in self.servers._transact(
+            for (address, data) in self.servers.transact(
                 self._protocol.do_list(), addresses).items()
             }
         errors = []
@@ -1287,7 +1287,7 @@ class CompoundPiClient(object):
         is fairly crude: it simply clears all captured files on the server;
         there is no method for specifying a subset of files to wipe.
         """
-        self.servers._transact(self._protocol.do_clear(), addresses)
+        self.servers.transact(self._protocol.do_clear(), addresses)
 
     def identify(self, addresses=None):
         """
@@ -1296,7 +1296,7 @@ class CompoundPiClient(object):
         Currently, the identification takes the form of the server blinking
         the camera's LED for 5 seconds.
         """
-        self.servers._transact(self._protocol.do_blink(), addresses)
+        self.servers.transact(self._protocol.do_blink(), addresses)
 
     def download(self, address, index, output):
         """
@@ -1342,7 +1342,7 @@ class CompoundPiClient(object):
         save_progress = self._servers._progress
         self._servers._progress = None
         try:
-            self.servers._transact(
+            self.servers.transact(
                 self._protocol.do_send(index, self.port), [address])
             if not self._server.event.wait(self.timeout):
                 raise CompoundPiSendTimeout(address)
