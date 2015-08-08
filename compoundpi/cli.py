@@ -585,10 +585,85 @@ class CompoundPiCmd(Cmd):
         if not arg:
             raise CmdSyntaxError('You must specify address(es) to remove')
         for addr in self.parse_address_list(arg):
-            self.client.servers.remove(addr)
+            try:
+                self.client.servers.remove(addr)
+            except ValueError:
+                logging.warning('%s was not in the server list', addr)
 
     def complete_remove(self, text, line, start, finish):
         return self.complete_server(text, line, start, finish)
+
+    def do_move(self, arg):
+        """
+        Move addresses within the list of servers.
+
+        Syntax: move <address> (top|bottom|to <index>|(above|below) <address>)
+
+        The 'move' command is used to move a server to another position within
+        the server list. The first address specified is moved to the position
+        described by the subsequent parameters. The 'top', 'bottom', and
+        'to' arguments specify absolute positions. Alternatively, 'above'
+        and 'below' can be used to specify a position relative to another
+        address.
+        """
+        match = re.match(
+                r' *(?P<addr>[^ ]+)'
+                r' *(?P<pos>top|bottom|to|above|below)'
+                r' *(?P<location>[^ ]+)?', arg.lower())
+        if not match:
+            raise CmdSyntaxError(
+                    'You must specify an address and a new position')
+        addr = self.parse_address(match.group('addr'))
+        if not addr in self.client.servers:
+            raise CmdSyntaxError('%s is not in the server list' % addr)
+        pos = match.group('pos')
+        location = match.group('location')
+        if pos in ('top', 'bottom'):
+            if location is not None:
+                raise CmdSyntaxError(
+                        'You cannot specify anything after top/bottom')
+            location = 0 if pos == 'top' else len(self.client.servers)
+        elif pos in ('above', 'below'):
+            location = self.parse_address(location)
+            if not location in self.client.servers:
+                raise CmdSyntaxError('%s is not in the server list' % location)
+            location = self.client.servers.index(location)
+            if pos == 'after':
+                location += 1
+        elif pos == 'to':
+            try:
+                location = int(location)
+            except ValueError:
+                raise CmdSyntaxError(
+                        'Invalid location for "to": "%s"' % location)
+        else:
+            raise CmdSyntaxError('Invalid location specification: "%s"' % pos)
+        self.client.servers.move(location, addr)
+
+    def complete_move(self, text, line, start, finish):
+        cmd_re = re.compile(r'move(?P<addr> +[^ ]+(?P<pos> +[^ ]+(?P<location> +[^ ]+)?)?)?')
+        match = cmd_re.match(line)
+        assert match
+        if match.start('location') < finish <= match.end('location'):
+            pos = match.group('pos').strip()
+            if pos.startswith('top') or pos.startswith('bottom'):
+                return []
+            elif pos.startswith('to'):
+                names = [str(i) for i in range(len(self.client.servers))]
+                return [name for name in names if name.startswith(text)]
+            else:
+                return self.complete_server(text, line, start, finish)
+        elif match.start('pos') < finish <= match.end('pos'):
+            names = [
+                'top',
+                'bottom',
+                'above',
+                'below',
+                'to',
+                ]
+            return [name + ' ' for name in names if name.startswith(text)]
+        elif match.start('addr') < finish <= match.end('addr'):
+            return self.complete_server(text, line, start, finish)
 
     def do_sort(self, arg=''):
         """
