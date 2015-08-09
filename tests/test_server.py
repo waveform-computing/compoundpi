@@ -166,91 +166,79 @@ with patch.dict('sys.modules', {
     def test_handler_bad_request():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'FOO', socket), ('localhost', 1), MagicMock())
-            assert m.call_count == 1
-            args, kwargs = m.call_args
-            assert args[0] == socket
-            assert args[1] == ('localhost', 1)
-            assert args[2].startswith('0 ERROR\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'FOO', socket), ('localhost', 1), MagicMock(seqno=2))
+            m.assert_called_once_with(
+                socket, ('localhost', 1), '0 ERROR\nUnable to parse request')
 
     def test_handler_unknown_command():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'0 FOO', socket), ('localhost', 1), MagicMock())
-            assert m.call_count == 1
-            args, kwargs = m.call_args
-            assert args[0] == socket
-            assert args[1] == ('localhost', 1)
-            assert args[2].startswith('0 ERROR\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'3 FOO', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=2))
+            m.assert_called_once_with(
+                socket, ('localhost', 1), '3 ERROR\nUnknown command FOO')
 
     def test_handler_unknown_command_with_params():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'0 FOO 1 2 3', socket), ('localhost', 1), MagicMock())
-            assert m.call_count == 1
-            args, kwargs = m.call_args
-            assert args[0] == socket
-            assert args[1] == ('localhost', 1)
-            assert args[2].startswith('0 ERROR\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'3 FOO 1 2 3', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=2))
+            m.assert_called_once_with(
+                socket, ('localhost', 1), '3 ERROR\nUnknown command FOO')
 
     def test_handler_invalid_client():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
-            with patch.object(compoundpi.server.warnings, 'warn') as w:
-                socket = Mock()
-                server = MagicMock()
-                server.client_address = ('foo', 1)
-                compoundpi.server.CameraRequestHandler(
-                        (b'0 LIST', socket), ('localhost', 1), server)
-                assert w.call_count == 1
-                assert isinstance(
-                        w.call_args[0][0], compoundpi.exc.CompoundPiInvalidClient)
+            socket = Mock()
+            server = MagicMock()
+            server.client_address = ('foo', 1)
+            compoundpi.server.CompoundPiServerProtocol(
+                    (b'0 LIST', socket), ('localhost', 1), server)
+            m.assert_called_once_with(
+                socket, ('localhost', 1),
+                '0 ERROR\nlocalhost: Invalid client or protocol error')
 
     def test_handler_stale_seqno():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
-            with patch.object(compoundpi.server.warnings, 'warn') as w:
-                socket = Mock()
-                server = MagicMock()
-                server.seqno = 10
-                server.client_address = ('localhost', 1)
-                compoundpi.server.CameraRequestHandler(
-                        (b'0 LIST', socket), ('localhost', 1), server)
-                assert w.call_count == 1
-                assert isinstance(
-                        w.call_args[0][0], compoundpi.exc.CompoundPiStaleSequence)
+            socket = Mock()
+            compoundpi.server.CompoundPiServerProtocol(
+                    (b'0 LIST', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=10))
+            m.assert_called_once_with(
+                socket, ('localhost', 1),
+                '0 ERROR\nlocalhost: Stale sequence number 0')
 
     def test_ack_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
             responder = Mock()
+            server = MagicMock()
             server.responders = {(('localhost', 1), 0): responder}
-            handler = compoundpi.server.CameraRequestHandler(
+            handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'0 ACK', socket), ('localhost', 1), server)
             assert responder.terminate == True
             assert responder.join.called_once_with()
 
     def test_hello_handler_stale_time():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
-            with patch.object(compoundpi.server.warnings, 'warn') as w:
-                socket = Mock()
-                server = MagicMock()
-                server.client_address = ('localhost', 1)
-                server.client_timestamp = 2000.0
-                handler = compoundpi.server.CameraRequestHandler(
-                        (b'0 HELLO 1000.0', socket), ('localhost', 1), server)
-                assert w.call_count == 1
-                assert isinstance(
-                        w.call_args[0][0], compoundpi.exc.CompoundPiStaleClientTime)
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'0 HELLO 1000.0', socket), ('localhost', 1),
+                    MagicMock(
+                        client_address=('localhost', 1),
+                        client_timestamp=2000.0))
+            m.assert_called_once_with(
+                socket, ('localhost', 1),
+                '0 ERROR\nlocalhost: Stale client time 1000.000000')
 
     def test_hello_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
             server = MagicMock()
             server.client_address = None
-            handler = compoundpi.server.CameraRequestHandler(
+            handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'0 HELLO 1000.0', socket), ('localhost', 1), server)
             assert server.client_address == ('localhost', 1)
             assert server.client_timestamp == 1000.0
@@ -263,7 +251,7 @@ with patch.dict('sys.modules', {
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             with patch.object(compoundpi.server.time, 'sleep') as sleep:
                 server = MagicMock()
-                handler = compoundpi.server.CameraRequestHandler(
+                handler = compoundpi.server.CompoundPiServerProtocol(
                         (b'1 BLINK', Mock()), ('localhost', 1), server)
                 start = time.time()
                 handler.blink_led(0.1)
@@ -278,7 +266,7 @@ with patch.dict('sys.modules', {
                 server = MagicMock()
                 server.client_address = ('localhost', 1)
                 server.seqno = 0
-                handler = compoundpi.server.CameraRequestHandler(
+                handler = compoundpi.server.CompoundPiServerProtocol(
                         (b'1 BLINK', socket), ('localhost', 1), server)
                 assert server.seqno == 1
                 m.assert_called_once_with(
@@ -297,6 +285,8 @@ with patch.dict('sys.modules', {
                 server.camera.awb_mode = 'auto'
                 server.camera.awb_gains = (1.5, 1.3)
                 server.camera.exposure_mode = 'off'
+                server.camera.analog_gain = 8.0
+                server.camera.digital_gain = 2.0
                 server.camera.exposure_speed = 100000
                 server.camera.exposure_compensation = 0
                 server.camera.iso = 100
@@ -306,228 +296,266 @@ with patch.dict('sys.modules', {
                 server.camera.saturation = 15
                 server.camera.hflip = True
                 server.camera.vflip = False
+                server.camera.image_denoise = False
+                server.camera.video_denoise = False
                 server.images = []
                 now.return_value = 2000.0
-                handler = compoundpi.server.CameraRequestHandler(
+                handler = compoundpi.server.CompoundPiServerProtocol(
                         (b'2 STATUS', socket), ('localhost', 1), server)
                 assert server.seqno == 2
                 m.assert_called_once_with(
                         socket, ('localhost', 1),
                         '2 OK\n'
-                        'RESOLUTION 1280 720\n'
+                        'RESOLUTION 1280,720\n'
                         'FRAMERATE 30\n'
-                        'AWB auto 1.5 1.3\n'
-                        'EXPOSURE off 100.0 0\n'
+                        'AWB auto,1.5,1.3\n'
+                        'AGC off,8.0,2.0\n'
+                        'EXPOSURE off,100.0\n'
                         'ISO 100\n'
                         'METERING spot\n'
-                        'LEVELS 50 25 15\n'
-                        'FLIP 1 0\n'
+                        'BRIGHTNESS 50\n'
+                        'CONTRAST 25\n'
+                        'SATURATION 15\n'
+                        'EV 0\n'
+                        'FLIP 1,0\n'
+                        'DENOISE 0\n'
                         'TIMESTAMP 2000.0\n'
-                        'IMAGES 0\n')
+                        'FILES 0\n')
 
     def test_resolution_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 RESOLUTION 1920 1080', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.resolution == (1920, 1080)
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 RESOLUTION 1920,1080', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.resolution == (1920, 1080)
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
     def test_framerate_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 FRAMERATE 30/2', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.framerate == 15
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 FRAMERATE 30/2', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.framerate == 15
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
     def test_awb_handler_auto():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 AWB auto 1.0 1.0', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.awb_mode == 'auto'
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 AWB auto,1.0,1.0', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.awb_mode == 'auto'
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
     def test_awb_handler_manual():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 AWB off 1.5 1.3', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.awb_mode == 'off'
-            assert server.camera.awb_gains == (1.5, 1.3)
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 AWB off,1.5,1.3', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.awb_mode == 'off'
+            assert handler.server.camera.awb_gains == (1.5, 1.3)
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
-    def test_exposure_handler():
+    def test_agc_handler_auto():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 EXPOSURE auto 20.0 24', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.exposure_mode == 'auto'
-            assert server.camera.shutter_speed == 20000.0
-            assert server.camera.exposure_compensation == 24
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 AGC auto', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.exposure_mode == 'auto'
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+
+    def test_agc_handler_manual():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 AGC off', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.exposure_mode == 'off'
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+
+    def test_exposure_handler_auto():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 EXPOSURE auto,1000.0', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            assert handler.server.seqno == 2
+            assert handler.server.camera.shutter_speed == 0
+
+    def test_exposure_handler_manual():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 EXPOSURE off,1000.0', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            assert handler.server.seqno == 2
+            assert handler.server.camera.shutter_speed == 1000000
 
     def test_metering_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 METERING spot', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.meter_mode == 'spot'
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 METERING spot', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.meter_mode == 'spot'
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
     def test_iso_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 ISO 400', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.iso == 400
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 ISO 400', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.iso == 400
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
-    def test_levels_handler():
+    def test_brightness_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 LEVELS 1 2 3', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.brightness == 1
-            assert server.camera.contrast == 2
-            assert server.camera.saturation == 3
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 BRIGHTNESS 50', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.brightness == 50
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+
+    def test_contrast_handler():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 CONTRAST 25', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.contrast == 25
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+
+    def test_saturation_handler():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 SATURATION 15', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.saturation == 15
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+
+    def test_ev_handler():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 EV -6', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.exposure_compensation == -6
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+
+    def test_denoise_handler():
+        with patch.object(compoundpi.server, 'NetworkRepeater') as m:
+            socket = Mock()
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 DENOISE 0', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert not handler.server.camera.image_denoise
+            assert not handler.server.camera.video_denoise
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
     def test_flip_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            handler = compoundpi.server.CameraRequestHandler(
-                    (b'2 FLIP 1 0', socket), ('localhost', 1), server)
-            assert server.seqno == 2
-            assert server.camera.hflip == True
-            assert server.camera.vflip == False
-            m.assert_called_once_with(
-                    socket, ('localhost', 1),
-                    '2 OK\n')
+            handler = compoundpi.server.CompoundPiServerProtocol(
+                    (b'2 FLIP 1,0', socket), ('localhost', 1),
+                    MagicMock(client_address=('localhost', 1), seqno=1))
+            assert handler.server.seqno == 2
+            assert handler.server.camera.hflip == True
+            assert handler.server.camera.vflip == False
+            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
 
-    def test_stream_generator():
+    def test_image_stream_generator():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             with patch.object(compoundpi.server.time, 'time') as now:
+                now.return_value = 100.0
                 with patch.object(compoundpi.server.io, 'BytesIO') as stream:
-                    server = MagicMock()
-                    server.images = []
-                    now.return_value = 100.0
                     stream.return_value = sentinel.stream
-                    handler = compoundpi.server.CameraRequestHandler(
-                            (b'2 ACK', Mock()), ('localhost', 1), server)
-                    for s in handler.stream_generator(2):
+                    handler = compoundpi.server.CompoundPiServerProtocol(
+                            (b'2 ACK', Mock()), ('localhost', 1),
+                            MagicMock(
+                                client_address=('localhost', 1), seqno=1,
+                                files=[]))
+                    for s in handler.image_stream_generator(2):
                         assert s is sentinel.stream
-                    assert server.images == [
-                        (100.0, sentinel.stream),
-                        (100.0, sentinel.stream),
-                        ]
+                    assert len(handler.server.files) == 2
+                    assert handler.server.files[0].filetype == 'IMAGE'
+                    assert handler.server.files[0].timestamp == 100.0
+                    assert handler.server.files[0].stream == sentinel.stream
+                    assert handler.server.files[1].filetype == 'IMAGE'
+                    assert handler.server.files[1].timestamp == 100.0
+                    assert handler.server.files[1].stream == sentinel.stream
 
     def test_capture_handler():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             socket = Mock()
-            server = MagicMock()
-            server.client_address = ('localhost', 1)
-            server.seqno = 1
-            with patch.object(compoundpi.server.CameraRequestHandler, 'stream_generator') as gen:
+            with patch.object(
+                    compoundpi.server.CompoundPiServerProtocol,
+                    'image_stream_generator') as gen:
                 gen.return_value = sentinel.iterator
-                handler = compoundpi.server.CameraRequestHandler(
-                        (b'2 CAPTURE 1 1', socket), ('localhost', 1), server)
-                assert server.seqno == 2
-                assert server.camera.led == True
-                server.camera.capture_sequence.assert_called_once_with(
-                        sentinel.iterator, format='jpeg', use_video_port=True)
-                m.assert_called_once_with(
-                        socket, ('localhost', 1),
-                        '2 OK\n')
+                handler = compoundpi.server.CompoundPiServerProtocol(
+                        (b'2 CAPTURE 1,1', socket), ('localhost', 1),
+                        MagicMock(client_address=('localhost', 1), seqno=1))
+                assert handler.server.seqno == 2
+                assert handler.server.camera.led == True
+                m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+                handler.server.camera.capture_sequence.assert_called_once_with(
+                        sentinel.iterator, format='jpeg', use_video_port=True,
+                        burst=False, quality=85)
 
     def test_capture_handler_with_sync():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             with patch.object(compoundpi.server.time, 'time') as now:
                 with patch.object(compoundpi.server.time, 'sleep') as sleep:
                     socket = Mock()
-                    server = MagicMock()
-                    server.client_address = ('localhost', 1)
-                    server.seqno = 1
                     now.return_value = 1000.0
-                    with patch.object(compoundpi.server.CameraRequestHandler, 'stream_generator') as gen:
+                    with patch.object(
+                            compoundpi.server.CompoundPiServerProtocol,
+                            'image_stream_generator') as gen:
                         gen.return_value = sentinel.iterator
-                        handler = compoundpi.server.CameraRequestHandler(
-                                (b'2 CAPTURE 1 0 1050.0', socket), ('localhost', 1), server)
-                        assert server.seqno == 2
-                        assert server.camera.led == True
+                        handler = compoundpi.server.CompoundPiServerProtocol(
+                                (b'2 CAPTURE 1,0,95,1050.0', socket), ('localhost', 1),
+                                MagicMock(client_address=('localhost', 1), seqno=1))
+                        assert handler.server.seqno == 2
+                        assert handler.server.camera.led == True
+                        m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
                         sleep.assert_called_once_with(50.0)
-                        server.camera.capture_sequence.assert_called_once_with(
-                                sentinel.iterator, format='jpeg', use_video_port=False)
-                        m.assert_called_once_with(
-                                socket, ('localhost', 1),
-                                '2 OK\n')
+                        handler.server.camera.capture_sequence.assert_called_once_with(
+                                sentinel.iterator, format='jpeg',
+                                use_video_port=False, burst=True, quality=95)
 
     def test_capture_handler_past_sync():
         with patch.object(compoundpi.server, 'NetworkRepeater') as m:
             with patch.object(compoundpi.server.time, 'time') as now:
                 with patch.object(compoundpi.server.time, 'sleep') as sleep:
                     socket = Mock()
-                    server = MagicMock()
-                    server.client_address = ('localhost', 1)
-                    server.seqno = 1
                     now.return_value = 1000.0
-                    with patch.object(compoundpi.server.CameraRequestHandler, 'stream_generator') as gen:
-                        handler = compoundpi.server.CameraRequestHandler(
-                                (b'2 CAPTURE 1 0 900.0', socket), ('localhost', 1), server)
-                        assert m.call_count == 1
-                        args, kwargs = m.call_args
-                        assert args[0] == socket
-                        assert args[1] == ('localhost', 1)
-                        assert args[2].startswith('2 ERROR\n')
+                    with patch.object(
+                            compoundpi.server.CompoundPiServerProtocol,
+                            'image_stream_generator') as gen:
+                        handler = compoundpi.server.CompoundPiServerProtocol(
+                                (b'2 CAPTURE 1,0,,900.0', socket), ('localhost', 1),
+                                MagicMock(client_address=('localhost', 1), seqno=1))
+                        m.assert_called_once_with(
+                            socket, ('localhost', 1), '2 ERROR\nSync time in past')
+

@@ -334,19 +334,21 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
             self.server.seqno = seqno
             if not response:
                 response = ''
-            self.send_response(seqno, '%d OK\n%s' % (seqno, response))
+            self.send_response(seqno, 'OK\n%s' % response)
         except Exception as e:
-            # Otherwise, send an ERROR response
+            # Otherwise, send an ERROR response. Note: we use the client's
+            # sequence number here in case it's stale (otherwise the client
+            # will ignore the response or associate it with the wrong call)
             logging.error(str(e))
-            self.send_response(seqno, '%d ERROR\n%s' % (seqno, e))
+            self.send_response(seqno, 'ERROR\n%s' % e)
 
     def send_response(self, seqno, data):
+        data = '%d %s' % (seqno, data)
         assert self.response_re.match(data)
         logging.debug(
                 '%s:%d Tx %r',
                 self.client_address[0], self.client_address[1], data)
-        if isinstance(data, str):
-            data = data.encode('utf-8')
+        data = data.encode('utf-8')
         self.server.responders[(self.client_address, seqno)] = NetworkRepeater(
                 self.socket, self.client_address, data)
 
@@ -375,7 +377,7 @@ class CompoundPiServerProtocol(socketserver.DatagramRequestHandler):
     def do_hello(self, timestamp):
         if self.server.client_address == self.client_address:
             if timestamp <= self.server.client_timestamp:
-                raise CompoundPiStaleClientTime(self.client_address, timestamp)
+                raise CompoundPiStaleClientTime(self.client_address[0], timestamp)
         self.server.client_address = self.client_address
         self.server.client_timestamp = timestamp
         return 'VERSION %s' % __version__
