@@ -26,7 +26,10 @@ from __future__ import (
     )
 native_str = str
 str = type('')
-range = xrange
+try:
+    from itertools import izip as zip
+except ImportError:
+    pass
 
 import sys
 import re
@@ -41,13 +44,19 @@ import struct
 import socket
 import SocketServer as socketserver
 import inspect
-from functools import wraps
+from functools import wraps, total_ordering
 from fractions import Fraction
 from collections import namedtuple
 try:
-    from ipaddress import IPv4Address, IPv4Network
-except ImportError:
+    # Py2 compat
     from ipaddr import IPv4Address, IPv4Network
+except ImportError:
+    from ipaddress import IPv4Address, IPv4Network
+try:
+    # Py2 compat
+    from itertools import izip_longest as zip_longest
+except ImportError:
+    from itertools import zip_longest
 
 from . import __version__
 from .common import NetworkRepeater
@@ -317,6 +326,7 @@ class CompoundPiClientProtocol(CompoundPiProtocol):
     pass
 
 
+@total_ordering
 class CompoundPiServerList(object):
     """
     Manages the list of servers under the control of the client.
@@ -373,7 +383,25 @@ class CompoundPiServerList(object):
         self.insert(index, value)
 
     def __delitem__(self, index):
-        del self._items[index]
+        self.remove(self._items[index])
+
+    def __le__(self, other):
+        count = 0
+        for count, (i, j) in enumerate(zip(self, other), start=1):
+            if i < j:
+                return True
+            elif i > j:
+                return False
+        return count == len(self)
+
+    def __eq__(self, other):
+        for i, j in zip_longest(self, other):
+            if i != j:
+                return False
+        return True
+
+    def __ne__(self, other):
+        return not self.__eq__(other)
 
     def _get_port(self):
         return self._port
@@ -641,7 +669,8 @@ class CompoundPiServerList(object):
                         seqno = int(match.group('seqno'))
                         # Unconditionally send an ACK to silence the responder
                         # of whatever server sent the message
-                        self._socket.sendto('%d ACK' % seqno, server_address)
+                        ack_msg = ('%d ACK' % seqno).encode('utf-8')
+                        self._socket.sendto(ack_msg, server_address)
                         # Silence the sender that the response corresponds
                         # to (if any)
                         sender = self._senders.get((server_address, seqno))
@@ -712,13 +741,14 @@ class CompoundPiProgressHandler(object):
     client code simple. There is generally no need for end users to utilise
     this class.
     """
-    def __init__(self, handler):
-        if hasattr(handler, 'start'):
-            self.start = handler.start
-        if hasattr(handler, 'update'):
-            self.update = handler.update
-        if hasattr(handler, 'finish'):
-            self.finish = handler.finish
+    def __init__(self, handler=None):
+        if handler is not None:
+            if hasattr(handler, 'start'):
+                self.start = handler.start
+            if hasattr(handler, 'update'):
+                self.update = handler.update
+            if hasattr(handler, 'finish'):
+                self.finish = handler.finish
 
     def start(self, count):
         logging.debug('progress.start fallback called')

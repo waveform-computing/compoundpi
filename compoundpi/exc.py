@@ -179,7 +179,7 @@ class CompoundPiRedefinedServer(CompoundPiClientError):
     "Exception raised when a server is added to the list twice"
 
     def __init__(self, address):
-        super(CompoundPiRedefinedServers, self).__init__(
+        super(CompoundPiRedefinedServer, self).__init__(
                 'server already defined: %s' % address)
 
 
