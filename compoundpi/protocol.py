@@ -205,6 +205,11 @@ class lowerstr(str):
         return super(lowerstr, cls).__new__(cls, value)
 
 
+class limitedfrac(fractions.Fraction):
+    def __new__(cls, value):
+        return super(limitedfrac, cls).__new__(cls, value).limit_denominator(65536)
+
+
 def handler(command, *params):
     def decorator(f):
         argspec = inspect.getargspec(f)
@@ -411,7 +416,7 @@ class CompoundPiProtocol(object):
         """
         raise NotImplementedError
 
-    @handler('FRAMERATE', fractions.Fraction)
+    @handler('FRAMERATE', limitedfrac)
     def do_framerate(self, rate):
         """
         The :ref:`protocol_framerate` command changes the camera's
@@ -423,8 +428,8 @@ class CompoundPiProtocol(object):
         """
         raise NotImplementedError
 
-    @handler('AWB', lowerstr, float, float)
-    def do_awb(self, mode, red=0.0, blue=0.0):
+    @handler('AWB', lowerstr, limitedfrac, limitedfrac)
+    def do_awb(self, mode, red=fractions.Fraction(1.0), blue=fractions.Fraction(1.0)):
         """
         The :ref:`protocol_awb` command changes the camera's auto-white-balance
         mode which is provided as a lower case string. If the string is

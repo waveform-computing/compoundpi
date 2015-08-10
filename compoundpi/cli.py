@@ -211,10 +211,10 @@ class CompoundPiClientApplication(TerminalApplication):
 
     def main(self, args):
         proc = CompoundPiCmd()
-        proc.client.network = args.network
-        proc.client.port = args.port
+        proc.client.servers.network = args.network
+        proc.client.servers.port = args.port
+        proc.client.servers.timeout = args.timeout
         proc.client.bind = args.bind
-        proc.client.timeout = args.timeout
         proc.capture_delay = args.capture_delay
         proc.capture_quality = args.capture_quality
         proc.capture_count = args.capture_count

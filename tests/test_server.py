@@ -32,6 +32,7 @@ import os
 import io
 import time
 import signal
+from fractions import Fraction
 
 import pytest
 from mock import Mock, MagicMock, patch, sentinel, call
@@ -348,7 +349,7 @@ with patch.dict('sys.modules', {
             m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.awb_mode == 'off'
-            assert handler.server.camera.awb_gains == (1.5, 1.3)
+            assert handler.server.camera.awb_gains == (Fraction(3, 2), Fraction(13, 10))
 
     def test_agc_handler_auto():
         with patch('compoundpi.server.NetworkRepeater') as m:

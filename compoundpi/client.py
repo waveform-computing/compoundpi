@@ -304,7 +304,7 @@ def client(cls):
                     for arg, conv in zip(argspec.args[1:], fn.params)
                     for value in (None if callargs[arg] is None else conv(callargs[arg]),)
                     )
-                )
+                ).rstrip()
         return wrapper
 
     for name, fn in cls.__mro__[1].__dict__.items():
@@ -829,6 +829,7 @@ class CompoundPiClient(object):
             self._server.shutdown()
             self._server.socket.close()
             self._server_thread = None
+            self._server = None
         if value is not None:
             self._server = CompoundPiDownloadServer(value, CompoundPiDownloadHandler)
             self._server.event = threading.Event()
@@ -837,7 +838,6 @@ class CompoundPiClient(object):
             self._server.exception = None
             self._server.progress = self._servers._progress
             self._server_thread = threading.Thread(target=self._server.serve_forever)
-            self._server_thread.daemon = True
             self._server_thread.start()
     bind = property(_get_bind, _set_bind, doc="""
         Defines the port and interfaces the client will listen to for
@@ -1370,11 +1370,11 @@ class CompoundPiClient(object):
         # we re-purpose progress notifications from counting server responses
         # to counting bytes received
         save_progress = self._servers._progress
-        self._servers._progress = None
+        self._servers._progress = CompoundPiProgressHandler()
         try:
             self.servers.transact(
-                self._protocol.do_send(index, self.port), [address])
-            if not self._server.event.wait(self.timeout):
+                self._protocol.do_send(index, self.bind[1]), [address])
+            if not self._server.event.wait(self.servers.timeout):
                 raise CompoundPiSendTimeout(address)
             elif self._server.exception:
                 raise self._server.exception
@@ -1393,16 +1393,16 @@ class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
             size, = struct.unpack(
                 native_str('>L'),
                 self.rfile.read(struct.calcsize(native_str('>L'))))
-            output.truncate(size)
-            output.seek(0)
+            self.server.output.truncate(size)
+            self.server.output.seek(0)
             self.server.progress.start(size)
             try:
-                while output.tell() < size:
+                while self.server.output.tell() < size:
                     data = self.rfile.read(16384)
                     if not data:
                         break
                     self.server.output.write(data)
-                    self.server.progress.update(output.tell())
+                    self.server.progress.update(self.server.output.tell())
             except Exception as e:
                 self.server.exception = e
             else:
