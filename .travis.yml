@@ -6,7 +6,7 @@ python:
     - "3.2"
     - "2.7"
     - "pypy"
-install: "pip install -e .[test]"
+install: "pip install --allow-external ipaddr --allow-unverified ipaddr -e .[test]"
 script: make test
 before_install:
     pip install codecov
