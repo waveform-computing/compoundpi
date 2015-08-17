@@ -1027,3 +1027,13 @@ def test_client_download_truncated():
     compoundpi.client.CompoundPiDownloadHandler(request, ('client', 5647), server)
     assert isinstance(server.exception, CompoundPiSendTruncated)
 
+def test_client_progress_defaults():
+    m = MagicMock()
+    p = compoundpi.client.CompoundPiProgressHandler(m)
+    p.start(10)
+    m.start.assert_called_once_with(10)
+    p.update(5)
+    m.update.assert_called_once_with(5)
+    p.finish()
+    m.finish.assert_called_once_with()
+
