@@ -243,7 +243,7 @@ with patch.dict('sys.modules', {
                     (b'0 HELLO 1000.0', socket), ('localhost', 1), server)
             m.assert_called_once_with(
                     socket, ('localhost', 1),
-                    b'0 OK\nVERSION %s' % compoundpi.__version__)
+                    ('0 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'))
             assert server.client_address == ('localhost', 1)
             assert server.client_timestamp == 1000.0
             assert server.seqno == 0
@@ -267,7 +267,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'1 BLINK', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=0))
-            m.assert_called_once_with(socket, ('localhost', 1), '1 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'1 OK\n')
             thread.assert_called_once_with(target=handler.blink_led, args=(5,))
             assert handler.server.seqno == 1
 
@@ -316,7 +316,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 RESOLUTION 1920,1080', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.resolution == (1920, 1080)
 
@@ -326,7 +326,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 FRAMERATE 30/2', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.framerate == 15
 
