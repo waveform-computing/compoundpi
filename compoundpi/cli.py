@@ -39,12 +39,9 @@ import datetime
 import socket
 import fractions
 import time
-try:
-    from ipaddress import IPv4Address, IPv4Network
-except ImportError:
-    from ipaddr import IPv4Address, IPv4Network
 
 from . import __version__
+from .ipaddress import IPv4Address, IPv4Network
 from .client import CompoundPiClient
 from .terminal import TerminalApplication
 from .cmdline import Cmd, CmdSyntaxError, CmdError, ENCODING

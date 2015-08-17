@@ -53,16 +53,12 @@ from fractions import Fraction
 from collections import namedtuple
 try:
     # Py2 compat
-    from ipaddr import IPv4Address, IPv4Network
-except ImportError:
-    from ipaddress import IPv4Address, IPv4Network
-try:
-    # Py2 compat
     from itertools import izip_longest as zip_longest
 except ImportError:
     from itertools import zip_longest
 
 from . import __version__
+from .ipaddress import IPv4Address, IPv4Network
 from .common import NetworkRepeater
 from .protocol import CompoundPiProtocol
 from .exc import (

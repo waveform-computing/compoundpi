@@ -24,12 +24,8 @@ from __future__ import (
     )
 str = type('')
 
-try:
-    from ipaddress import IPv4Address
-except ImportError:
-    from ipaddr import IPv4Address
-
 from . import get_ui_file
+from ..ipaddress import IPv4Address, IPv4Network
 from ..qt import QtCore, QtGui, loadUi
 
 
