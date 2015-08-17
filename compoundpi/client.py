@@ -581,13 +581,13 @@ class CompoundPiServerList(object):
         """
         self._items.reverse()
 
-    def sort(self, cmp=None, key=None, reverse=False):
+    def sort(self, key=None, reverse=False):
         """
-        Sorts the servers in the list according to the specified *cmp*
-        comparison function, or the *key* comparison function. If *reverse* is
-        True, the order of the sort is reversed.
+        Sorts the servers in the list according to the specified *key*
+        comparison function. If *reverse* is True, the order of the sort is
+        reversed.
         """
-        self._items.sort(cmp, key, reverse)
+        self._items.sort(key=key, reverse=reverse)
 
     def find(self, count=0):
         """
