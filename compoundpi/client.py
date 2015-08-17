@@ -42,7 +42,11 @@ import logging
 import select
 import struct
 import socket
-import SocketServer as socketserver
+try:
+    # Py2 compat
+    import SocketServer as socketserver
+except ImportError:
+    import socketserver
 import inspect
 from functools import wraps, total_ordering
 from fractions import Fraction

@@ -46,7 +46,11 @@ import logging
 import threading
 import struct
 import socket
-import SocketServer as socketserver
+try:
+    # Py2 compat
+    import SocketServer as socketserver
+except ImportError:
+    import socketserver
 import shutil
 import signal
 import warnings
