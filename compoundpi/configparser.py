@@ -31,36 +31,41 @@ from __future__ import (
     )
 str = type('')
 
-# Py3: remove this module entirely
+try:
+    import ConfigParser as _ConfigParser
+    import collections
 
-import collections
-import ConfigParser as _ConfigParser
+    BasicInterpolation = object()
 
-BasicInterpolation = object()
+    ExtendedInterpolation = object()
 
-ExtendedInterpolation = object()
-
-def ConfigParser(
-        defaults=None, dict_type=collections.OrderedDict,
-        allow_no_value=False, delimiters=('=', ':'),
-        comment_prefixes=('#', ';'), inline_comment_prefixes=None, strict=True,
-        empty_lines_in_values=True, default_section='DEFAULT',
-        interpolation=BasicInterpolation):
-    if not strict:
-        raise NotImplementedError
-    if not empty_lines_in_values:
-        raise NotImplementedError
-    if default_section != 'DEFAULT':
-        raise NotImplementedError
-    if delimiters != ('=', ':'):
-        raise NotImplementedError
-    if comment_prefixes != ('#', ';'):
-        raise NotImplementedError
-    if interpolation is None:
-        result = _ConfigParser.RawConfigParser(defaults, dict_type, allow_no_value)
-    elif interpolation is BasicInterpolation:
-        result = _ConfigParser.SafeConfigParser(defaults, dict_type, allow_no_value)
-    else:
-        raise NotImplementedError
-    return result
+    def ConfigParser(
+            defaults=None, dict_type=collections.OrderedDict,
+            allow_no_value=False, delimiters=('=', ':'),
+            comment_prefixes=('#', ';'), inline_comment_prefixes=None, strict=True,
+            empty_lines_in_values=True, default_section='DEFAULT',
+            interpolation=BasicInterpolation):
+        if not strict:
+            raise NotImplementedError
+        if not empty_lines_in_values:
+            raise NotImplementedError
+        if default_section != 'DEFAULT':
+            raise NotImplementedError
+        if delimiters != ('=', ':'):
+            raise NotImplementedError
+        if comment_prefixes != ('#', ';'):
+            raise NotImplementedError
+        if interpolation is None:
+            result = _ConfigParser.RawConfigParser(defaults, dict_type, allow_no_value)
+        elif interpolation is BasicInterpolation:
+            result = _ConfigParser.SafeConfigParser(defaults, dict_type, allow_no_value)
+        else:
+            raise NotImplementedError
+        return result
+except ImportError:
+    from configparser import (
+        ConfigParser,
+        BasicInterpolation,
+        ExtendedInterpolation,
+        )
 
