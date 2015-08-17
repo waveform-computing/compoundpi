@@ -157,7 +157,7 @@ def test_server_list_insert():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.return_value = (
-                b'1 OK\nVERSION %s' % compoundpi.__version__,
+                ('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'),
                 ('192.168.0.1', 5647)
                 )
         l = compoundpi.client.CompoundPiServerList(
@@ -173,7 +173,7 @@ def test_server_list_insert_again():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.return_value = (
-                b'1 OK\nVERSION %s' % compoundpi.__version__,
+                ('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'),
                 ('192.168.0.1', 5647)
                 )
         l = compoundpi.client.CompoundPiServerList(
@@ -217,7 +217,7 @@ def test_server_list_append():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.return_value = (
-                b'1 OK\nVERSION %s' % compoundpi.__version__,
+                ('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'),
                 ('192.168.0.2', 5647)
                 )
         l = compoundpi.client.CompoundPiServerList(
@@ -236,8 +236,8 @@ def test_server_list_extend():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
-                (b'2 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
+                (('2 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -265,7 +265,7 @@ def test_server_list_set_item():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.3', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.3', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -325,8 +325,8 @@ def test_server_list_find_count():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -358,8 +358,8 @@ def test_server_list_find_all():
             patch('compoundpi.client.time.time', side_effect=time_effect()), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -379,8 +379,8 @@ def test_server_list_wrong_port():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 6000)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 6000)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -395,9 +395,9 @@ def test_server_list_multi_response():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -412,8 +412,8 @@ def test_server_list_unknown_address():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -430,7 +430,7 @@ def test_server_list_bad_response():
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
                 (b'FOO', ('192.168.0.1', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -445,8 +445,8 @@ def test_server_list_stale_response():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
-                (b'11 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
+                (('11 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
@@ -462,8 +462,8 @@ def test_server_list_future_response():
             patch('compoundpi.client.time.time', return_value=1000.0), \
             patch('compoundpi.client.NetworkRepeater') as m:
         client_sock.recvfrom.side_effect = [
-                (b'11 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
-                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
+                (('11 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.2', 5647)),
+                (('1 OK\nVERSION %s' % compoundpi.__version__).encode('utf-8'), ('192.168.0.1', 5647)),
                 ]
         l = compoundpi.client.CompoundPiServerList(
                 progress=compoundpi.client.CompoundPiProgressHandler())
