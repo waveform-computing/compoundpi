@@ -605,10 +605,10 @@ with patch.dict('sys.modules', {
                     MagicMock(client_address=('localhost', 1), seqno=1, files=[f]))
             m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
             send_sock.connect.assert_called_once_with(('localhost', 5647))
-            send_file.write.assert_has_calls((
+            send_file.write.assert_has_calls([
                 call(b'\x00\x00\x00\x0A'),
                 call(b'\x10' * 10),
-                ))
+                ])
             send_file.close.assert_called_once_with()
             send_sock.close.assert_called_once_with()
 
