@@ -475,22 +475,22 @@ with patch.dict('sys.modules', {
 
     def test_image_stream_generator():
         with patch('compoundpi.server.NetworkRepeater') as m, \
-                patch('compoundpi.server.time.time', return_value=100.0), \
-                patch('compoundpi.server.io.BytesIO', return_value=sentinel.stream):
+                patch('compoundpi.server.time.time', return_value=100.0):
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 ACK', Mock()), ('localhost', 1),
                     MagicMock(
                         client_address=('localhost', 1), seqno=1,
                         files=[]))
+            streams = []
             for s in handler.image_stream_generator(2):
-                assert s is sentinel.stream
+                streams.append(s)
             assert len(handler.server.files) == 2
             assert handler.server.files[0].filetype == 'IMAGE'
             assert handler.server.files[0].timestamp == 100.0
-            assert handler.server.files[0].stream == sentinel.stream
+            assert handler.server.files[0].stream is streams[0]
             assert handler.server.files[1].filetype == 'IMAGE'
             assert handler.server.files[1].timestamp == 100.0
-            assert handler.server.files[1].stream == sentinel.stream
+            assert handler.server.files[1].stream is streams[1]
 
     def test_capture_handler():
         with patch('compoundpi.server.NetworkRepeater') as m, \
@@ -536,8 +536,7 @@ with patch.dict('sys.modules', {
                 socket, ('localhost', 1), b'2 ERROR\nSync time in past')
 
     def test_record_handler():
-        with patch('compoundpi.server.NetworkRepeater') as m, \
-                patch('compoundpi.server.io.BytesIO', return_value=sentinel.stream):
+        with patch('compoundpi.server.NetworkRepeater') as m:
             socket = Mock()
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 RECORD 5,mjpeg', socket), ('localhost', 1),
@@ -547,18 +546,16 @@ with patch.dict('sys.modules', {
             assert handler.server.seqno == 2
             assert handler.server.camera.led == True
             handler.server.camera.start_recording.assert_called_once_with(
-                    sentinel.stream, format='mjpeg', quality=0,
+                    handler.server.files[0].stream, format='mjpeg', quality=0,
                     bitrate=17000000, intra_period=None,
                     motion_output=None)
             handler.server.camera.wait_recording.assert_called_once_with(5)
             handler.server.camera.stop_recording.assert_called_once_with()
             assert len(handler.server.files) == 1
             assert handler.server.files[0].filetype == 'VIDEO'
-            assert handler.server.files[0].stream == sentinel.stream
 
     def test_record_handler_with_motion():
-        with patch('compoundpi.server.NetworkRepeater') as m, \
-                patch('compoundpi.server.io.BytesIO', return_value=sentinel.stream):
+        with patch('compoundpi.server.NetworkRepeater') as m:
             socket = Mock()
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 RECORD 5,h264,,,,1', socket), ('localhost', 1),
@@ -568,16 +565,14 @@ with patch.dict('sys.modules', {
             assert handler.server.seqno == 2
             assert handler.server.camera.led == True
             handler.server.camera.start_recording.assert_called_once_with(
-                    sentinel.stream, format='h264', quality=0,
+                    handler.server.files[0].stream, format='h264', quality=0,
                     bitrate=17000000, intra_period=None,
-                    motion_output=sentinel.stream)
+                    motion_output=handler.server.files[1].stream)
             handler.server.camera.wait_recording.assert_called_once_with(5)
             handler.server.camera.stop_recording.assert_called_once_with()
             assert len(handler.server.files) == 2
             assert handler.server.files[0].filetype == 'VIDEO'
-            assert handler.server.files[0].stream == sentinel.stream
             assert handler.server.files[1].filetype == 'MOTION'
-            assert handler.server.files[1].stream == sentinel.stream
 
     def test_record_handler_wrong_codec():
         with patch('compoundpi.server.NetworkRepeater') as m:
