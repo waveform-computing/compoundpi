@@ -26,9 +26,11 @@ from __future__ import (
     )
 native_str = str
 str = type('')
-range = xrange
 try:
+    range = xrange
     from itertools import izip as zip
+except NameError:
+    pass
 except ImportError:
     pass
 
