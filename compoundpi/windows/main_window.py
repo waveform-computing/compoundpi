@@ -48,23 +48,10 @@ from .progress_dialog import ProgressDialog
 class MainWindow(QtGui.QMainWindow):
     "The Compound Pi GUI main window"
 
-    progress_start_signal = QtCore.Signal(int)
-    progress_update_signal = QtCore.Signal(int)
-    progress_finish_signal = QtCore.Signal()
-
     def __init__(self, parent=None):
         super(MainWindow, self).__init__(parent)
         self.setAttribute(QtCore.Qt.WA_DeleteOnClose)
-        self.progress_dialog = None
-        self.progress_time = None
-        self.client = CompoundPiClient(progress=(
-            self.progress_start,
-            self.progress_update,
-            self.progress_finish,
-            ))
-        self.progress_start_signal.connect(self.progress_start_slot)
-        self.progress_update_signal.connect(self.progress_update_slot)
-        self.progress_finish_signal.connect(self.progress_finish_slot)
+        self.client = CompoundPiClient(ProgressHandler(self))
         self.images = defaultdict(OrderedDict)
         self.ui = loadUi(get_ui_file('main_window.ui'), self)
         # Read configuration
@@ -520,25 +507,42 @@ The project homepage and documentation is at
         self.ui.toolbar_action.setChecked(self.ui.tool_bar.isVisible())
         self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
 
+
+class ProgressHandler(QtCore.QObject):
+    "Links progress events to the progress dialog"
+
+    progress_start_signal = QtCore.Signal(int)
+    progress_update_signal = QtCore.Signal(int)
+    progress_finish_signal = QtCore.Signal()
+
+    def __init__(self, parent):
+        super(ProgressHandler, self).__init__(parent)
+        self.parent = parent
+        self.progress_dialog = None
+        self.progress_time = None
+        self.progress_start_signal.connect(self.progress_start_slot)
+        self.progress_update_signal.connect(self.progress_update_slot)
+        self.progress_finish_signal.connect(self.progress_finish_slot)
+
     # All the messing around with signals and slots below is required as the
     # progress handlers aren't necessarily called from the main thread
 
-    def progress_start(self, count):
+    def start(self, count):
         # Before we start another progress window, make sure any events to do
         # with existing progress windows have been processed
         QtGui.QApplication.instance().sendPostedEvents()
         self.progress_start_signal.emit(count)
 
-    def progress_update(self, count):
+    def update(self, count):
         self.progress_update_signal.emit(count)
 
-    def progress_finish(self):
+    def finish(self):
         self.progress_finish_signal.emit()
 
     @QtCore.Slot(int)
     def progress_start_slot(self, count):
         assert not self.progress_dialog
-        self.progress_dialog = ProgressDialog(self)
+        self.progress_dialog = ProgressDialog(self.parent)
         self.progress_dialog.show()
         self.progress_dialog.task = self.tr('Progress')
         self.progress_dialog.limits = (0, count)
@@ -566,52 +570,52 @@ class ServersModel(QtCore.QAbstractTableModel):
     def __init__(self, parent):
         super(ServersModel, self).__init__()
         self.parent = parent
-        self._data = []
+        self._data = {}
 
     def find(self, count=0):
         self.beginResetModel()
         try:
-            self.parent.client.find(count)
-            self._data = sorted(self.parent.client.status().items())
+            self.parent.client.servers.find(count)
+            self._data = self.parent.client.status()
         finally:
             self.endResetModel()
 
     def refresh_all(self, update=False):
         if update:
-            self._data = sorted(self.parent.client.status().items())
+            self._data = self.parent.client.status()
         first = self.index(0, 0)
         last = self.index(self.rowCount(), self.columnCount() - 1)
         self.dataChanged.emit(first, last)
 
     def refresh_selected(self, update=False):
         if update:
-            data = dict(self._data)
-            data.update(self.parent.client.status(self.parent.selected_addresses))
-            self._data = sorted(data.items())
+            self._data.update(self.parent.client.status(self.parent.selected_addresses))
         self.refresh_all()
 
     def add(self, address):
-        self.parent.client.add(address)
-        i = bisect.bisect_left(self._data, (address, None))
-        self.beginInsertRows(QtCore.QModelIndex(), i, i)
+        self.parent.client.servers.append(address)
+        self.beginInsertRows(QtCore.QModelIndex(), len(self._data), len(self._data))
         try:
-            self._data.insert(i,
-                (address, self.parent.client.status([address])[address]))
+            self._data[address] = self.parent.client.status([address])[address]
         finally:
             self.endInsertRows()
 
     def remove(self, addresses):
         for address in addresses:
-            i = bisect.bisect_left(self._data, (address, None))
+            i = self.parent.client.servers.index(address)
             self.beginRemoveRows(QtCore.QModelIndex(), i, i)
             try:
-                self.parent.client.remove(address)
-                del self._data[i]
+                del self._data[address]
+                self.parent.client.servers.remove(address)
             finally:
                 self.endRemoveRows()
 
     def get(self, indexes):
-        return [self._data[index] for index in indexes]
+        return [
+            (address, self._data[address])
+            for index in indexes
+            for address in (self.parent.client.servers[index],)
+            ]
 
     def rowCount(self, parent=None):
         if parent is None:
@@ -629,7 +633,8 @@ class ServersModel(QtCore.QAbstractTableModel):
 
     def data(self, index, role):
         if index.isValid() and role == QtCore.Qt.DisplayRole:
-            (address, status) = self._data[index.row()]
+            address = self.parent.client.servers[index.row()]
+            status = self._data[address]
             return [
                 str(address),
                 '%dx%d@%sfps' % (
