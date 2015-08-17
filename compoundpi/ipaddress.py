@@ -28,13 +28,23 @@ from __future__ import (
     )
 str = type('')
 
+import sys
 
-try:
-    from ipaddr import IPv4Address, IPv4Network as _IPv4Network
 
-    class IPv4Network(_IPv4Network):
+if sys.version_info < (3, 3):
+    import ipaddr
+
+    if sys.version_info > (3, 1):
+        # Monkeypatch ipaddr==2.1.7 to work (mostly) in Python 3.2...
+        ipaddr.long = int
+        ipaddr.xrange = range
+
+    class IPv4Address(ipaddr.IPv4Address):
+        pass
+
+    class IPv4Network(ipaddr.IPv4Network):
         @property
         def broadcast_address(self):
             return self.broadcast
-except ImportError:
+else:
     from ipaddress import IPv4Address, IPv4Network

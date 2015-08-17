@@ -45,10 +45,12 @@ __extra_requires__ = {
     'test':   ['pytest', 'mock', 'coverage'],
     }
 
-if sys.version_info[:2] < (3, 3):
+if sys.version_info[:2] < (3, 0):
     # Python 3.3+ has an equivalent ipaddress module built-in
     __requires__.append('ipaddr')
 if sys.version_info[:2] == (3, 2):
+    # Python 3.2 requires a very specific version of ipaddr...
+    __requires__.append('ipaddr==2.1.7')
     __extra_requires__['doc'].extend([
         # Particular versions are required for Python 3.2 compatibility.
         # The ordering is reverse because that's what easy_install needs...
