@@ -207,3 +207,9 @@ class CompoundPiSendTimeout(CompoundPiServerError):
                 address, 'timed out waiting for SEND connection')
 
 
+class CompoundPiSendTruncated(CompoundPiServerError):
+    "Exception raised when a server doesn't send enough data for SEND"
+
+    def __init__(self, address):
+        super(CompoundPiSendTruncated, self).__init__(
+                address, 'unexpected EOF during SEND')

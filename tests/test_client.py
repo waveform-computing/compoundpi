@@ -41,6 +41,7 @@ from compoundpi.exc import (
         CompoundPiRedefinedServer,
         CompoundPiTransactionFailed,
         CompoundPiInvalidResponse,
+        CompoundPiMissingResponse,
         CompoundPiWrongPort,
         CompoundPiMultiResponse,
         CompoundPiUnknownAddress,
@@ -48,6 +49,9 @@ from compoundpi.exc import (
         CompoundPiStaleResponse,
         CompoundPiFutureResponse,
         CompoundPiSendTimeout,
+        CompoundPiSendTruncated,
+        CompoundPiNoServers,
+        CompoundPiUndefinedServers,
         )
 
 
@@ -401,6 +405,23 @@ def test_server_list_multi_response():
             l.find(2)
             assert w[0].category == CompoundPiMultiResponse
 
+def test_server_list_unknown_address():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.time.time', return_value=1000.0), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        client_sock.recvfrom.side_effect = [
+                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.2', 5647)),
+                (b'1 OK\nVERSION %s' % compoundpi.__version__, ('192.168.0.1', 5647)),
+                ]
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l._items = [compoundpi.client.IPv4Address('192.168.0.1')]
+        with warnings.catch_warnings(record=True) as w:
+            l.transact('FRAMERATE 30')
+            assert w[0].category == CompoundPiUnknownAddress
+
 def test_server_list_bad_response():
     client_sock = Mock()
     with patch('compoundpi.client.socket.socket', return_value=client_sock), \
@@ -449,6 +470,139 @@ def test_server_list_future_response():
         with warnings.catch_warnings(record=True) as w:
             l.find(1)
             assert w[0].category == CompoundPiFutureResponse
+
+def test_server_list_transact_ok():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        client_sock.recvfrom.side_effect = [
+                (b'1 OK', ('192.168.0.2', 5647)),
+                (b'1 OK', ('192.168.0.1', 5647)),
+                ]
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l._items = [
+                compoundpi.client.IPv4Address('192.168.0.1'),
+                compoundpi.client.IPv4Address('192.168.0.2'),
+                ]
+        assert l.transact('FRAMERATE 30') == {
+            compoundpi.client.IPv4Address('192.168.0.1'): None,
+            compoundpi.client.IPv4Address('192.168.0.2'): None,
+            }
+        m.assert_called_once_with(client_sock, ('192.168.255.255', 5647), b'1 FRAMERATE 30')
+
+def test_server_list_transact_subset():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        client_sock.recvfrom.side_effect = [
+                (b'1 OK', ('192.168.0.2', 5647)),
+                (b'1 OK', ('192.168.0.1', 5647)),
+                ]
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l._items = [
+                compoundpi.client.IPv4Address('192.168.0.1'),
+                compoundpi.client.IPv4Address('192.168.0.2'),
+                ]
+        assert l.transact('FRAMERATE 30', [compoundpi.client.IPv4Address('192.168.0.1')]) == {
+            compoundpi.client.IPv4Address('192.168.0.1'): None,
+            }
+        m.assert_called_once_with(client_sock, ('192.168.0.1', 5647), b'1 FRAMERATE 30')
+
+def test_server_list_transact_no_servers():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l._items = []
+        with pytest.raises(CompoundPiNoServers):
+            assert l.transact('FRAMERATE 30')
+
+def test_server_list_transact_undefined_servers():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l._items = [
+                compoundpi.client.IPv4Address('192.168.0.1'),
+                compoundpi.client.IPv4Address('192.168.0.2'),
+                ]
+        with pytest.raises(CompoundPiUndefinedServers):
+            l.transact('FRAMERATE 30', [compoundpi.client.IPv4Address('192.168.0.3')])
+
+def test_server_list_transact_missing_response():
+    client_sock = Mock()
+    def select_effect():
+        # Fake the socket having a packet then nothing
+        yield ([client_sock], [], [])
+        while True:
+            yield ([], [], [])
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', side_effect=select_effect()), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        client_sock.recvfrom.side_effect = [
+                (b'1 OK', ('192.168.0.1', 5647)),
+                ]
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l.timeout = 1
+        l._items = [
+                compoundpi.client.IPv4Address('192.168.0.1'),
+                compoundpi.client.IPv4Address('192.168.0.2'),
+                ]
+        with pytest.raises(CompoundPiTransactionFailed) as excinfo:
+            l.transact('FRAMERATE 30')
+            assert len(excinfo.value.errors) == 1
+            assert isinstance(excinfo.value.errors[0], CompoundPiMissingResponse)
+
+def test_server_list_transact_server_error():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        client_sock.recvfrom.side_effect = [
+                (b'1 OK', ('192.168.0.1', 5647)),
+                (b'1 ERROR\nServer is broken', ('192.168.0.2', 5647)),
+                ]
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l.timeout = 1
+        l._items = [
+                compoundpi.client.IPv4Address('192.168.0.1'),
+                compoundpi.client.IPv4Address('192.168.0.2'),
+                ]
+        with pytest.raises(CompoundPiTransactionFailed) as excinfo:
+            l.transact('FRAMERATE 30')
+            assert len(excinfo.value.errors) == 1
+            assert isinstance(excinfo.value.errors[0], CompoundPiServerError)
+
+def test_server_list_transact_invalid_response():
+    client_sock = Mock()
+    with patch('compoundpi.client.socket.socket', return_value=client_sock), \
+            patch('compoundpi.client.select.select', return_value=([client_sock],)), \
+            patch('compoundpi.client.NetworkRepeater') as m:
+        client_sock.recvfrom.side_effect = [
+                (b'1 OK', ('192.168.0.1', 5647)),
+                (b'1 FOO', ('192.168.0.2', 5647)),
+                ]
+        l = compoundpi.client.CompoundPiServerList(
+                progress=compoundpi.client.CompoundPiProgressHandler())
+        l.timeout = 1
+        l._items = [
+                compoundpi.client.IPv4Address('192.168.0.1'),
+                compoundpi.client.IPv4Address('192.168.0.2'),
+                ]
+        with pytest.raises(CompoundPiTransactionFailed) as excinfo:
+            l.transact('FRAMERATE 30')
+            assert len(excinfo.value.errors) == 1
+            assert isinstance(excinfo.value.errors[0], CompoundPiInvalidResponse)
 
 def test_client_init():
     def download_server_effect(bind, handler):
@@ -826,4 +980,50 @@ def test_client_download_exception():
         with pytest.raises(ValueError) as excinfo:
             client.download('192.168.0.1', 0, io.BytesIO())
             assert excinfo.value.args == ('Foo',)
+
+def test_client_download_handler():
+    server = MagicMock(
+        output=io.BytesIO(),
+        progress=MagicMock(),
+        event=Mock(),
+        exception=None,
+        source='client',
+        )
+    request = MagicMock(
+        makefile=Mock(side_effect=lambda mode, bufsize: io.BytesIO(b'\x00\x00\x00\x07foo bar'))
+        )
+    compoundpi.client.CompoundPiDownloadHandler(request, ('client', 5647), server)
+    server.event.set.assert_called_once_with()
+    server.progress.start.assert_called_once_with(7)
+    server.progress.finish.assert_called_once_with()
+    assert server.output.getvalue() == b'foo bar'
+
+def test_client_download_bad_client():
+    server = MagicMock(
+        output=io.BytesIO(),
+        progress=MagicMock(),
+        event=Mock(),
+        exception=None,
+        source='bad_client',
+        )
+    request = MagicMock(
+        makefile=Mock(side_effect=lambda mode, bufsize: io.BytesIO(b'\x00\x00\x00\x07foo bar'))
+        )
+    with warnings.catch_warnings(record=True) as w:
+        compoundpi.client.CompoundPiDownloadHandler(request, ('client', 5647), server)
+        assert w[0].category == CompoundPiUnknownAddress
+
+def test_client_download_truncated():
+    server = MagicMock(
+        output=io.BytesIO(),
+        progress=MagicMock(),
+        event=Mock(),
+        exception=None,
+        source='client',
+        )
+    request = MagicMock(
+        makefile=Mock(side_effect=lambda mode, bufsize: io.BytesIO(b'\x00\x00\x00\x10foo bar'))
+        )
+    compoundpi.client.CompoundPiDownloadHandler(request, ('client', 5647), server)
+    assert isinstance(server.exception, CompoundPiSendTruncated)
 

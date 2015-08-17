@@ -225,10 +225,10 @@ def handler(command, *params):
 class CompoundPiProtocol(object):
     request_re = re.compile(
             r'(?P<seqno>\d+) '
-            r'(?P<command>[A-Z]+)( (?P<params>.*))?')
+            r'(?P<command>[A-Z]+)( (?P<params>.+))?')
     response_re = re.compile(
             r'(?P<seqno>\d+) '
-            r'(?P<result>OK|ERROR)(\n(?P<data>.*))?', flags=re.DOTALL)
+            r'(?P<result>[A-Z]+)(\n(?P<data>.+))?', flags=re.DOTALL)
 
     """
     This abstract base class describes the Compound Pi protocol. The class

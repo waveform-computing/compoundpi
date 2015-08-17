@@ -71,6 +71,7 @@ from .exc import (
     CompoundPiNoServers,
     CompoundPiRedefinedServer,
     CompoundPiSendTimeout,
+    CompoundPiSendTruncated,
     CompoundPiServerError,
     CompoundPiStaleResponse,
     CompoundPiTransactionFailed,
@@ -703,13 +704,18 @@ class CompoundPiServerList(object):
         if addresses is None:
             if not self._items:
                 raise CompoundPiNoServers()
-            addresses = self._items
-        elif set(addresses) - set(self._items):
-            raise CompoundPiUndefinedServers(set(addresses) - set(self._items))
+            addresses = set(self._items)
+        else:
+            addresses = set(
+                addr if isinstance(addr, IPv4Address) else IPv4Address(addr)
+                for addr in addresses
+                )
+            if addresses - set(self._items):
+                raise CompoundPiUndefinedServers(addresses - set(self._items))
         errors = []
         self._seqno += 1
         data = '%d %s' % (self._seqno, data)
-        if set(addresses) == self._items:
+        if addresses == set(self._items):
             self._send_command(
                 (str(self.network.broadcast), self.port), self._seqno, data)
         else:
@@ -1400,7 +1406,7 @@ class CompoundPiDownloadHandler(socketserver.StreamRequestHandler):
                 while self.server.output.tell() < size:
                     data = self.rfile.read(16384)
                     if not data:
-                        break
+                        raise CompoundPiSendTruncated(self.server.source)
                     self.server.output.write(data)
                     self.server.progress.update(self.server.output.tell())
             except Exception as e:
