@@ -170,7 +170,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'FOO', socket), ('localhost', 1), MagicMock(seqno=2))
             m.assert_called_once_with(
-                socket, ('localhost', 1), '0 ERROR\nUnable to parse request')
+                socket, ('localhost', 1), b'0 ERROR\nUnable to parse request')
 
     def test_handler_unknown_command():
         with patch('compoundpi.server.NetworkRepeater') as m:
@@ -179,7 +179,7 @@ with patch.dict('sys.modules', {
                     (b'3 FOO', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=2))
             m.assert_called_once_with(
-                socket, ('localhost', 1), '3 ERROR\nUnknown command FOO')
+                socket, ('localhost', 1), b'3 ERROR\nUnknown command FOO')
 
     def test_handler_unknown_command_with_params():
         with patch('compoundpi.server.NetworkRepeater') as m:
@@ -188,7 +188,7 @@ with patch.dict('sys.modules', {
                     (b'3 FOO 1 2 3', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=2))
             m.assert_called_once_with(
-                socket, ('localhost', 1), '3 ERROR\nUnknown command FOO')
+                socket, ('localhost', 1), b'3 ERROR\nUnknown command FOO')
 
     def test_handler_invalid_client():
         with patch('compoundpi.server.NetworkRepeater') as m:
@@ -199,7 +199,7 @@ with patch.dict('sys.modules', {
                     (b'0 LIST', socket), ('localhost', 1), server)
             m.assert_called_once_with(
                 socket, ('localhost', 1),
-                '0 ERROR\nlocalhost: Invalid client or protocol error')
+                b'0 ERROR\nlocalhost: Invalid client or protocol error')
 
     def test_handler_stale_seqno():
         with patch('compoundpi.server.NetworkRepeater') as m:
@@ -209,7 +209,7 @@ with patch.dict('sys.modules', {
                     MagicMock(client_address=('localhost', 1), seqno=10))
             m.assert_called_once_with(
                 socket, ('localhost', 1),
-                '0 ERROR\nlocalhost: Stale sequence number 0')
+                b'0 ERROR\nlocalhost: Stale sequence number 0')
 
     def test_ack_handler():
         with patch('compoundpi.server.NetworkRepeater') as m:
@@ -232,7 +232,7 @@ with patch.dict('sys.modules', {
                         client_timestamp=2000.0))
             m.assert_called_once_with(
                 socket, ('localhost', 1),
-                '0 ERROR\nlocalhost: Stale client time 1000.000000')
+                b'0 ERROR\nlocalhost: Stale client time 1000.000000')
 
     def test_hello_handler():
         with patch('compoundpi.server.NetworkRepeater') as m:
@@ -243,7 +243,7 @@ with patch.dict('sys.modules', {
                     (b'0 HELLO 1000.0', socket), ('localhost', 1), server)
             m.assert_called_once_with(
                     socket, ('localhost', 1),
-                    '0 OK\nVERSION %s' % compoundpi.__version__)
+                    b'0 OK\nVERSION %s' % compoundpi.__version__)
             assert server.client_address == ('localhost', 1)
             assert server.client_timestamp == 1000.0
             assert server.seqno == 0
@@ -292,22 +292,22 @@ with patch.dict('sys.modules', {
                         files=[], camera=camera))
             m.assert_called_once_with(
                     socket, ('localhost', 1),
-                    '2 OK\n'
-                    'RESOLUTION 1280,720\n'
-                    'FRAMERATE 30\n'
-                    'AWB auto,1.5,1.3\n'
-                    'AGC off,8.0,2.0\n'
-                    'EXPOSURE off,100.0\n'
-                    'ISO 100\n'
-                    'METERING spot\n'
-                    'BRIGHTNESS 50\n'
-                    'CONTRAST 25\n'
-                    'SATURATION 15\n'
-                    'EV 0\n'
-                    'FLIP 1,0\n'
-                    'DENOISE 0\n'
-                    'TIMESTAMP 2000.0\n'
-                    'FILES 0\n')
+                    b'2 OK\n'
+                    b'RESOLUTION 1280,720\n'
+                    b'FRAMERATE 30\n'
+                    b'AWB auto,1.5,1.3\n'
+                    b'AGC off,8.0,2.0\n'
+                    b'EXPOSURE off,100.0\n'
+                    b'ISO 100\n'
+                    b'METERING spot\n'
+                    b'BRIGHTNESS 50\n'
+                    b'CONTRAST 25\n'
+                    b'SATURATION 15\n'
+                    b'EV 0\n'
+                    b'FLIP 1,0\n'
+                    b'DENOISE 0\n'
+                    b'TIMESTAMP 2000.0\n'
+                    b'FILES 0\n')
             assert handler.server.seqno == 2
 
     def test_resolution_handler():
@@ -336,7 +336,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 AWB auto,1.0,1.0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.awb_mode == 'auto'
 
@@ -346,7 +346,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 AWB off,1.5,1.3', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.awb_mode == 'off'
             assert handler.server.camera.awb_gains == (Fraction(3, 2), Fraction(13, 10))
@@ -357,7 +357,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 AGC auto', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.exposure_mode == 'auto'
 
@@ -367,7 +367,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 AGC off', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.exposure_mode == 'off'
 
@@ -377,7 +377,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 EXPOSURE auto,1000.0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.shutter_speed == 0
 
@@ -387,7 +387,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 EXPOSURE off,1000.0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.shutter_speed == 1000000
 
@@ -397,7 +397,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 METERING spot', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.meter_mode == 'spot'
 
@@ -407,7 +407,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 ISO 400', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.iso == 400
 
@@ -417,7 +417,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 BRIGHTNESS 50', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.brightness == 50
 
@@ -427,7 +427,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 CONTRAST 25', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.contrast == 25
 
@@ -437,7 +437,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 SATURATION 15', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.saturation == 15
 
@@ -447,7 +447,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 EV -6', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.exposure_compensation == -6
 
@@ -457,7 +457,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 DENOISE 0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert not handler.server.camera.image_denoise
             assert not handler.server.camera.video_denoise
@@ -468,7 +468,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 FLIP 1,0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.hflip == True
             assert handler.server.camera.vflip == False
@@ -500,7 +500,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 CAPTURE 1,1', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             handler.server.camera.capture_sequence.assert_called_once_with(
                     sentinel.iterator, format='jpeg', use_video_port=True,
                     burst=False, quality=85)
@@ -517,7 +517,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 CAPTURE 1,0,95,1050.0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             sleep.assert_called_once_with(50.0)
             handler.server.camera.capture_sequence.assert_called_once_with(
                     sentinel.iterator, format='jpeg',
@@ -533,7 +533,7 @@ with patch.dict('sys.modules', {
                     (b'2 CAPTURE 1,0,,900.0', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1))
             m.assert_called_once_with(
-                socket, ('localhost', 1), '2 ERROR\nSync time in past')
+                socket, ('localhost', 1), b'2 ERROR\nSync time in past')
 
     def test_record_handler():
         with patch('compoundpi.server.NetworkRepeater') as m, \
@@ -543,7 +543,7 @@ with patch.dict('sys.modules', {
                     (b'2 RECORD 5,mjpeg', socket), ('localhost', 1),
                     MagicMock(
                         client_address=('localhost', 1), seqno=1, files=[]))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.led == True
             handler.server.camera.start_recording.assert_called_once_with(
@@ -564,7 +564,7 @@ with patch.dict('sys.modules', {
                     (b'2 RECORD 5,h264,,,,1', socket), ('localhost', 1),
                     MagicMock(
                         client_address=('localhost', 1), seqno=1, files=[]))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.camera.led == True
             handler.server.camera.start_recording.assert_called_once_with(
@@ -588,7 +588,7 @@ with patch.dict('sys.modules', {
                         client_address=('localhost', 1), seqno=1))
             m.assert_called_once_with(
                 socket, ('localhost', 1),
-                '2 ERROR\nFormat must be h264 for motion output')
+                b'2 ERROR\nFormat must be h264 for motion output')
 
     def test_send_handler():
         with patch('compoundpi.server.NetworkRepeater') as m, \
@@ -603,7 +603,7 @@ with patch.dict('sys.modules', {
             handler = compoundpi.server.CompoundPiServerProtocol(
                     (b'2 SEND 0,5647', socket), ('localhost', 1),
                     MagicMock(client_address=('localhost', 1), seqno=1, files=[f]))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             send_sock.connect.assert_called_once_with(('localhost', 5647))
             send_file.write.assert_has_calls([
                 call(b'\x00\x00\x00\x0A'),
@@ -626,9 +626,9 @@ with patch.dict('sys.modules', {
                         files=[file1, file2]))
             m.assert_called_once_with(
                 socket, ('localhost', 1),
-                '2 OK\n'
-                'IMAGE,0,100.000000,10\n'
-                'VIDEO,1,200.000000,20')
+                b'2 OK\n'
+                b'IMAGE,0,100.000000,10\n'
+                b'VIDEO,1,200.000000,20')
             assert handler.server.seqno == 2
 
     def test_clear_handler():
@@ -641,7 +641,7 @@ with patch.dict('sys.modules', {
                     MagicMock(
                         client_address=('localhost', 1), seqno=1,
                         files=[file1, file2]))
-            m.assert_called_once_with(socket, ('localhost', 1), '2 OK\n')
+            m.assert_called_once_with(socket, ('localhost', 1), b'2 OK\n')
             assert handler.server.seqno == 2
             assert handler.server.files == []
 

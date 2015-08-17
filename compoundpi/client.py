@@ -612,7 +612,7 @@ class CompoundPiServerList(object):
         self._seqno += 1
         data = '%d %s' % (self._seqno, self._protocol.do_hello(time.time()))
         self._send_command(
-            (str(self.network.broadcast), self.port), self._seqno, data)
+            (str(self.network.broadcast_address), self.port), self._seqno, data)
         self._items = self._parse_ping(self._responses(count=count))
 
     def _parse_ping(self, responses):
@@ -717,7 +717,7 @@ class CompoundPiServerList(object):
         data = '%d %s' % (self._seqno, data)
         if addresses == set(self._items):
             self._send_command(
-                (str(self.network.broadcast), self.port), self._seqno, data)
+                (str(self.network.broadcast_address), self.port), self._seqno, data)
         else:
             for address in addresses:
                 self._send_command(
