@@ -25,7 +25,10 @@ from __future__ import (
     division,
     )
 str = type('')
-range = xrange
+try:
+    range = xrange
+except NameError:
+    pass
 
 import io
 import os
