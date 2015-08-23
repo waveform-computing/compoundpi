@@ -233,15 +233,10 @@ def _load_pyside(required_modules, optional_modules):
 
                 return widget
 
-        loader = CustomUiLoader(baseinstance, custom_widgets)
-
-        # instead of passing the custom widgets, they should be registered
-        # using QUiLoader.registerCustomWidget(),
-        # but this does not work in PySide 1.0.6: it simply segfaults...
-        #loader = CustomUiLoader(baseinstance)
-        #custom_widgets = custom_widgets or {}
-        #for custom_widget in custom_widgets.values():
-        #    loader.registerCustomWidget(custom_widget)
+        loader = CustomUiLoader(baseinstance)
+        custom_widgets = custom_widgets or {}
+        for custom_widget in custom_widgets.values():
+            loader.registerCustomWidget(custom_widget)
 
         ui = loader.load(uifile)
         QMetaObject.connectSlotsByName(ui)
