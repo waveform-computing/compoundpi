@@ -81,6 +81,10 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.clear_action.setIcon(get_icon('edit-clear'))
         self.ui.export_action.setIcon(get_icon('document-save'))
         self.ui.refresh_action.setIcon(get_icon('view-refresh'))
+        self.ui.move_top_action.setIcon(get_icon('go-top'))
+        self.ui.move_up_action.setIcon(get_icon('go-up'))
+        self.ui.move_down_action.setIcon(get_icon('go-down'))
+        self.ui.move_bottom_action.setIcon(get_icon('go-bottom'))
         # Configure status bar elements
         self.ui.progress_label = QtGui.QLabel('')
         self.statusBar().addWidget(self.ui.progress_label)
@@ -99,9 +103,15 @@ class MainWindow(QtGui.QMainWindow):
         self.ui.export_action.triggered.connect(self.images_export)
         self.ui.clear_action.triggered.connect(self.images_clear)
         self.ui.refresh_action.triggered.connect(self.view_refresh)
-        self.ui.toolbar_action.triggered.connect(self.view_toolbar)
+        self.ui.toolbars_servers_action.triggered.connect(self.view_toolbars_servers)
+        self.ui.toolbars_actions_action.triggered.connect(self.view_toolbars_actions)
         self.ui.status_bar_action.triggered.connect(self.view_status_bar)
+        self.ui.move_top_action.triggered.connect(self.servers_move_top)
+        self.ui.move_up_action.triggered.connect(self.servers_move_up)
+        self.ui.move_down_action.triggered.connect(self.servers_move_down)
+        self.ui.move_bottom_action.triggered.connect(self.servers_move_bottom)
         self.ui.view_menu.aboutToShow.connect(self.update_view)
+        self.ui.toolbars_menu.aboutToShow.connect(self.update_toolbars)
         # Connect the lists to their models
         self.ui.server_list.setModel(ServersModel(self))
         self.ui.image_list.setModel(ImagesModel(self))
@@ -131,15 +141,47 @@ class MainWindow(QtGui.QMainWindow):
             [i.row() for i in self.ui.image_list.selectionModel().selectedIndexes()]
             )
 
+    def _get_selected_indexes(self):
+        return [i.row() for i in self.ui.server_list.selectionModel().selectedRows()]
+    def _set_selected_indexes(self, value):
+        model = self.ui.server_list.model()
+        selection = QtGui.QItemSelection()
+        for index in value:
+            selection.select(model.index(index, 0), model.index(index, model.columnCount() - 1))
+        self.ui.server_list.selectionModel().select(selection, QtGui.QItemSelectionModel.ClearAndSelect)
+    selected_indexes = property(_get_selected_indexes, _set_selected_indexes, doc="""
+        The list of all selected indexes in the server_list. This property can
+        be queried to determine the currently selected indexes, or set to
+        change the currently selected indexes.
+        """)
+
+    def _get_current_index(self):
+        return self.ui.server_list.selectionModel().currentIndex().row()
+    def _set_current_index(self, value):
+        self.ui.server_list.selectionModel().setCurrentIndex(
+            self.ui.server_list.model().index(value, 0), QtGui.QItemSelectionModel.Current)
+    current_index = property(_get_current_index, _set_current_index, doc="""
+        The current index in the server_list. This property can be queried to
+        determine the index with focus (the current index), or set to change
+        the index with focus.
+        """)
+
     @property
-    def selected_servers(self):
-        return self.ui.server_list.model().get(
-            [i.row() for i in self.ui.server_list.selectionModel().selectedRows()]
-            )
+    def selected_data(self):
+        """
+        Returns a list of (address, status) tuples. This list is guaranteed to
+        be in the same order as that returned by :attr:`selected_indexes`
+        provided no alteration occurs between queries.
+        """
+        return self.ui.server_list.model().get(self.selected_indexes)
 
     @property
     def selected_addresses(self):
-        return [a for (a, s) in self.selected_servers]
+        """
+        Returns a list of all selected addresses, in the same order as that
+        returned by :attr:`selected_indexes`.
+        """
+        return [a for (a, s) in self.selected_data]
 
     def closeEvent(self, event):
         app = QtGui.QApplication.instance()
@@ -202,8 +244,7 @@ The project homepage and documentation is at
                 self.client.port = dialog.port
                 self.client.timeout = dialog.timeout
                 self.ui.server_list.model().find(count=dialog.expected_count)
-                for col in range(self.ui.server_list.model().columnCount()):
-                    self.ui.server_list.resizeColumnToContents(col)
+                self.servers_resize_columns()
         finally:
             self.settings.endGroup()
 
@@ -211,11 +252,29 @@ The project homepage and documentation is at
         dialog = AddDialog(self)
         if dialog.exec_():
             self.ui.server_list.model().add(dialog.server)
-            for col in range(self.ui.server_list.model().columnCount()):
-                self.ui.server_list.resizeColumnToContents(col)
+            self.servers_resize_columns()
 
     def servers_remove(self):
         self.ui.server_list.model().remove(self.selected_addresses)
+        self.servers_resize_columns()
+
+    def servers_move_top(self):
+        self.selected_indexes = self.ui.server_list.model().move_top(self.selected_indexes)
+        self.current_index = 0
+
+    def servers_move_up(self):
+        self.selected_indexes = self.ui.server_list.model().move_up(self.selected_indexes)
+        self.current_index -= 1
+
+    def servers_move_down(self):
+        self.selected_indexes = self.ui.server_list.model().move_down(self.selected_indexes)
+        self.current_index += 1
+
+    def servers_move_bottom(self):
+        self.selected_indexes = self.ui.server_list.model().move_bottom(self.selected_indexes)
+        self.current_index = self.ui.server_list.model().rowCount() - 1
+
+    def servers_resize_columns(self):
         for col in range(self.ui.server_list.model().columnCount()):
             self.ui.server_list.resizeColumnToContents(col)
 
@@ -260,7 +319,7 @@ The project homepage and documentation is at
 
     def servers_configure(self):
         settings = {
-            attr: set(getattr(status, attr) for (addr, status) in self.selected_servers)
+            attr: set(getattr(status, attr) for (addr, status) in self.selected_data)
             for attr in (
                 'resolution',
                 'framerate',
@@ -361,7 +420,7 @@ The project homepage and documentation is at
 
     def servers_reference(self):
         # There can be only one! ... selected server that is
-        addr, status = next(iter(self.selected_servers))
+        addr, status = next(iter(self.selected_data))
         try:
             # Before we go setting resolution and framerate (which will reset
             # the cameras, ensure AGC gains are allowed to float)
@@ -434,20 +493,33 @@ The project homepage and documentation is at
         self.ui.server_list.model().refresh_selected()
         self.ui.image_list.model().refresh()
 
-    def view_refresh(self):
-        self.ui.server_list.model().refresh_all(update=True)
+    def update_view(self):
+        self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
 
-    def view_toolbar(self):
-        if self.ui.tool_bar.isVisible():
-            self.ui.tool_bar.hide()
+    def update_toolbars(self):
+        self.ui.toolbars_servers_action.setChecked(self.ui.servers_toolbar.isVisible())
+        self.ui.toolbars_actions_action.setChecked(self.ui.actions_toolbar.isVisible())
+
+    def view_toolbars_servers(self):
+        if self.ui.servers_toolbar.isVisible():
+            self.ui.servers_toolbar.hide()
         else:
-            self.ui.tool_bar.show()
+            self.ui.servers_toolbar.show()
+
+    def view_toolbars_actions(self):
+        if self.ui.actions_toolbar.isVisible():
+            self.ui.actions_toolbar.hide()
+        else:
+            self.ui.actions_toolbar.show()
 
     def view_status_bar(self):
         if self.statusBar().isVisible():
             self.statusBar().hide()
         else:
             self.statusBar().show()
+
+    def view_refresh(self):
+        self.ui.server_list.model().refresh_all(update=True)
 
     def server_list_model_reset(self):
         self.update_server_actions()
@@ -486,15 +558,23 @@ The project homepage and documentation is at
         menu.popup(self.ui.image_list.viewport().mapToGlobal(pos))
 
     def update_server_actions(self):
-        has_rows = self.ui.server_list.model().rowCount() > 0
-        has_selection = self.ui.server_list.selectionModel().hasSelection()
-        one_selected = len(self.ui.server_list.selectionModel().selectedRows()) == 1
+        row_count = self.ui.server_list.model().rowCount()
+        selected_indexes = self.selected_indexes
+        has_rows = row_count > 0
+        has_selection = bool(selected_indexes)
+        one_selected = len(selected_indexes) == 1
+        top_selected = 0 in selected_indexes
+        bottom_selected = (row_count - 1) in selected_indexes
         self.ui.remove_action.setEnabled(has_selection)
         self.ui.identify_action.setEnabled(has_selection)
         self.ui.capture_action.setEnabled(has_selection)
         self.ui.configure_action.setEnabled(has_selection)
         self.ui.reference_action.setEnabled(one_selected)
         self.ui.refresh_action.setEnabled(has_rows)
+        self.ui.move_top_action.setEnabled(has_selection and not top_selected)
+        self.ui.move_up_action.setEnabled(has_selection and not top_selected)
+        self.ui.move_down_action.setEnabled(has_selection and not bottom_selected)
+        self.ui.move_bottom_action.setEnabled(has_selection and not bottom_selected)
         self.ui.image_list.model().refresh()
 
     def update_image_actions(self):
@@ -503,10 +583,6 @@ The project homepage and documentation is at
         self.ui.copy_action.setEnabled(one_selected)
         self.ui.export_action.setEnabled(has_selection)
         self.ui.clear_action.setEnabled(has_selection)
-
-    def update_view(self):
-        self.ui.toolbar_action.setChecked(self.ui.tool_bar.isVisible())
-        self.ui.status_bar_action.setChecked(self.statusBar().isVisible())
 
 
 class ProgressHandler(QtCore.QObject):
@@ -591,6 +667,7 @@ class ServersModel(QtCore.QAbstractTableModel):
     def refresh_selected(self, update=False):
         if update:
             self._data.update(self.parent.client.status(self.parent.selected_addresses))
+        # XXX This is lazy
         self.refresh_all()
 
     def add(self, address):
@@ -610,6 +687,35 @@ class ServersModel(QtCore.QAbstractTableModel):
                 self.parent.client.servers.remove(address)
             finally:
                 self.endRemoveRows()
+
+    def move_up(self, indexes, by=1):
+        indexes = sorted(indexes)
+        for index in indexes:
+            assert index >= by
+            self.parent.client.servers.move(index - by, self.parent.client.servers[index])
+        first = self.index(indexes[0] - (by - 1), 0)
+        last = self.index(indexes[-1] + 1, self.columnCount() - 1)
+        self.dataChanged.emit(first, last)
+        return [i - by for i in indexes]
+
+    def move_down(self, indexes, by=1):
+        indexes = sorted(indexes, reverse=True)
+        final = self.rowCount() - by
+        for index in indexes:
+            assert index < final
+            self.parent.client.servers.move(index + by, self.parent.client.servers[index])
+        first = self.index(indexes[-1] - 1, 0)
+        last = self.index(indexes[0] + by, self.columnCount() - 1)
+        self.dataChanged.emit(first, last)
+        return [i + by for i in indexes]
+
+    def move_top(self, indexes):
+        indexes = sorted(indexes)
+        return self.move_up(indexes, by=indexes[0])
+
+    def move_bottom(self, indexes):
+        indexes = sorted(indexes, reverse=True)
+        return self.move_down(indexes, by=self.rowCount() - 1 - indexes[0])
 
     def get(self, indexes):
         return [
@@ -683,6 +789,15 @@ class ServersModel(QtCore.QAbstractTableModel):
                 ][section]
         elif orientation == QtCore.Qt.Vertical and role == QtCore.Qt.DisplayRole:
             return section + 1
+
+    def flags(self, index):
+        flags = super(ServersModel, self).flags(index) | QtCore.Qt.ItemIsDropEnabled
+        if index.isValid():
+            flags |= QtCore.Qt.ItemIsDragEnabled
+        return flags
+
+    def supportedDropActions(self):
+        return QtCore.Qt.MoveAction
 
 
 class ImagesModel(QtCore.QAbstractListModel):

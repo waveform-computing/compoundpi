@@ -886,8 +886,20 @@ class CompoundPiClient(object):
     def _get_servers(self):
         return self._servers
     def _set_servers(self, value):
-        #XXX
-        raise NotImplementedError
+        value = [
+                a if isinstance(a, IPv4Address) else IPv4Address(a)
+                for a in value
+                ]
+        added = set(value) - set(self._servers)
+        for address in added:
+            self._servers.append(address)
+        removed = set(self._servers) - set(value)
+        for address in removed:
+            self._servers.remove(address)
+        if len(value) != len(self._servers):
+            raise ValueError('duplicate addresses in servers')
+        for index, address in value:
+            self._servers.move(index, address)
     servers = property(_get_servers, _set_servers)
 
     def _get_bind(self):

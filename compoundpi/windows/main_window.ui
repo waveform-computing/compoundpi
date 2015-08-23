@@ -90,10 +90,10 @@
     <addaction name="add_action"/>
     <addaction name="remove_action"/>
     <addaction name="separator"/>
-    <addaction name="identify_action"/>
-    <addaction name="configure_action"/>
-    <addaction name="reference_action"/>
-    <addaction name="capture_action"/>
+    <addaction name="move_top_action"/>
+    <addaction name="move_up_action"/>
+    <addaction name="move_down_action"/>
+    <addaction name="move_bottom_action"/>
     <addaction name="separator"/>
     <addaction name="quit_action"/>
    </widget>
@@ -116,20 +116,37 @@
     <property name="title">
      <string>&amp;View</string>
     </property>
+    <widget class="QMenu" name="toolbars_menu">
+     <property name="title">
+      <string>&amp;Toolbars</string>
+     </property>
+     <addaction name="toolbars_servers_action"/>
+     <addaction name="toolbars_actions_action"/>
+    </widget>
     <addaction name="refresh_action"/>
     <addaction name="separator"/>
-    <addaction name="toolbar_action"/>
+    <addaction name="toolbars_menu"/>
     <addaction name="status_bar_action"/>
    </widget>
+   <widget class="QMenu" name="actions_menu">
+    <property name="title">
+     <string>&amp;Actions</string>
+    </property>
+    <addaction name="identify_action"/>
+    <addaction name="configure_action"/>
+    <addaction name="reference_action"/>
+    <addaction name="capture_action"/>
+   </widget>
    <addaction name="servers_menu"/>
+   <addaction name="actions_menu"/>
    <addaction name="images_menu"/>
    <addaction name="view_menu"/>
    <addaction name="help_menu"/>
   </widget>
   <widget class="QStatusBar" name="status_bar"/>
-  <widget class="QToolBar" name="tool_bar">
-   <property name="windowTitle">
-    <string>toolBar</string>
+  <widget class="QToolBar" name="servers_toolbar">
+   <property name="toolButtonStyle">
+    <enum>Qt::ToolButtonIconOnly</enum>
    </property>
    <attribute name="toolBarArea">
     <enum>TopToolBarArea</enum>
@@ -141,12 +158,27 @@
    <addaction name="add_action"/>
    <addaction name="remove_action"/>
    <addaction name="separator"/>
+   <addaction name="move_top_action"/>
+   <addaction name="move_up_action"/>
+   <addaction name="move_down_action"/>
+   <addaction name="move_bottom_action"/>
+   <addaction name="separator"/>
+   <addaction name="quit_action"/>
+  </widget>
+  <widget class="QToolBar" name="actions_toolbar">
+   <property name="windowTitle">
+    <string>toolBar</string>
+   </property>
+   <attribute name="toolBarArea">
+    <enum>TopToolBarArea</enum>
+   </attribute>
+   <attribute name="toolBarBreak">
+    <bool>false</bool>
+   </attribute>
    <addaction name="identify_action"/>
    <addaction name="configure_action"/>
    <addaction name="reference_action"/>
    <addaction name="capture_action"/>
-   <addaction name="separator"/>
-   <addaction name="quit_action"/>
   </widget>
   <action name="find_action">
    <property name="text">
@@ -302,17 +334,6 @@
     <string>Ctrl+S</string>
    </property>
   </action>
-  <action name="toolbar_action">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Show &amp;Toolbar</string>
-   </property>
-   <property name="toolTip">
-    <string>Toggle visibility of the toolbar</string>
-   </property>
-  </action>
   <action name="reference_action">
    <property name="enabled">
     <bool>false</bool>
@@ -322,6 +343,66 @@
    </property>
    <property name="toolTip">
     <string>Copy the selected server's settings to all other servers</string>
+   </property>
+  </action>
+  <action name="move_top_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Move to &amp;Top</string>
+   </property>
+   <property name="toolTip">
+    <string>Move the selected servers to the top of the list</string>
+   </property>
+  </action>
+  <action name="move_up_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Move &amp;Up</string>
+   </property>
+   <property name="toolTip">
+    <string>Move the selected servers up one position</string>
+   </property>
+  </action>
+  <action name="move_down_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Move &amp;Down</string>
+   </property>
+   <property name="toolTip">
+    <string>Move the selected servers down one position</string>
+   </property>
+  </action>
+  <action name="move_bottom_action">
+   <property name="enabled">
+    <bool>false</bool>
+   </property>
+   <property name="text">
+    <string>Move to &amp;Bottom</string>
+   </property>
+   <property name="toolTip">
+    <string>Move the selected servers to the bottom of the list</string>
+   </property>
+  </action>
+  <action name="toolbars_servers_action">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Servers</string>
+   </property>
+  </action>
+  <action name="toolbars_actions_action">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>&amp;Actions</string>
    </property>
   </action>
  </widget>
