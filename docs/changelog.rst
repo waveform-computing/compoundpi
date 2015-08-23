@@ -5,6 +5,30 @@ Change log
 ==========
 
 
+Release 0.4 (2015-08-24)
+========================
+
+Major enhancements in this release:
+
+* Fixed bug where restarting client quickly after quit would fail (`#21`_)
+* Added an officially documented batch interface (`#22`_)
+* Added ability to control denoise algorithm on servers (`#23`_)
+* Added video support to the protocol (accessible from command line and
+  batch client, but not GUI) (`#24`_)
+* Added ability to copy settings from one server to all others (`#25`_)
+* Added ability to order servers; supported in all clients but only really
+  useful in the batch client currently (`#26`_)
+* Added ability to configure quality of captures (`#29`_)
+
+.. _#21: https://github.com/waveform80/compoundpi/issues/21
+.. _#22: https://github.com/waveform80/compoundpi/issues/22
+.. _#23: https://github.com/waveform80/compoundpi/issues/23
+.. _#24: https://github.com/waveform80/compoundpi/issues/24
+.. _#25: https://github.com/waveform80/compoundpi/issues/25
+.. _#26: https://github.com/waveform80/compoundpi/issues/26
+.. _#29: https://github.com/waveform80/compoundpi/issues/29
+
+
 Release 0.3 (2014-05-23)
 ========================
 
