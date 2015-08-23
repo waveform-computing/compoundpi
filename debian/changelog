@@ -1,3 +1,17 @@
+compoundpi (0.4-1) stable; urgency=low
+
+  * Fixed bug where restarting client quickly after quit would fail (#21)
+  * Added an officially documented batch interface (#22)
+  * Added ability to control denoise algorithm on servers (#23)
+  * Added video support to the protocol (accessible from command line and
+    batch client, but not GUI) (#24)
+  * Added ability to copy settings from one server to all others (#25)
+  * Added ability to order servers; supported in all clients but only really
+    useful in the batch client currently (#26)
+  * Added ability to configure quality of captures (#29)
+
+ -- Dave Hughes <dave@waveform.org.uk>  Mon, 24 Aug 2015 00:49:02 +0100
+
 compoundpi (0.3-1ubuntu1) precise; urgency=medium
 
   * Ubuntu release of 0.3
