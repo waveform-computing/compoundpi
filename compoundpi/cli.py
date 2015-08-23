@@ -293,7 +293,7 @@ class CompoundPiCmd(Cmd):
 
     def postloop(self):
         Cmd.postloop(self)
-        self.client.bind = None
+        self.client.close()
 
     def onecmd(self, line):
         # Don't crash'n'burn for standard client errors

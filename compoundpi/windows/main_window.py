@@ -142,7 +142,6 @@ class MainWindow(QtGui.QMainWindow):
         return [a for (a, s) in self.selected_servers]
 
     def closeEvent(self, event):
-        super(MainWindow, self).closeEvent(event)
         app = QtGui.QApplication.instance()
         if app.clipboard().ownsClipboard():
             app.clipboard().clear()
@@ -152,6 +151,8 @@ class MainWindow(QtGui.QMainWindow):
             self.settings.setValue('position', self.pos())
         finally:
             self.settings.endGroup()
+        self.client.close()
+        super(MainWindow, self).closeEvent(event)
 
     def help_about(self):
         QtGui.QMessageBox.about(self,
