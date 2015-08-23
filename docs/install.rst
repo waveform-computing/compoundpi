@@ -42,6 +42,10 @@ available. On Ubuntu, the Waveform PPA can be used for simple installation::
     $ sudo apt-get update
     $ sudo apt-get install compoundpi-client
 
+On Raspbian (assuming you want to use a Raspberry Pi as a client), use the same
+procedure as for Ubuntu (above) but omit the ``add-apt-repository`` step. Be
+aware that the GUI client is untested under Raspbian.
+
 On other platforms, the package can be installed from PyPI. First, ensure that
 you have the ``pip`` command installed (this is in the ``python-pip`` package
 on Debian and RedHat based distros). Use this to install compound pi,
