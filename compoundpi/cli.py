@@ -488,7 +488,7 @@ class CompoundPiCmd(Cmd):
         client expects to communicate with. The content of the list can be
         manipulated with the 'find', 'add', and 'remove' commands.
 
-        See also: find, add, remove.
+        See also: find, add, remove, move, sort.
 
         cpi> servers
         """
@@ -602,6 +602,12 @@ class CompoundPiCmd(Cmd):
         'to' arguments specify absolute positions. Alternatively, 'above'
         and 'below' can be used to specify a position relative to another
         address.
+
+        See also: add, remove, sort, servers.
+
+        cpi> move 192.168.0.1 top
+        cpi> move 192.168.0.2 below 192.168.0.1
+        cpi> move 192.168.0.3 to 2
         """
         match = re.match(
                 r' *(?P<addr>[^ ]+)'
@@ -671,7 +677,7 @@ class CompoundPiCmd(Cmd):
         The 'sort' command is used to sort the list of defined servers
         numerically forwards or, if "reverse" is specified, backwards.
 
-        See also: add, remove, find.
+        See also: add, remove, move, find.
 
         cpi> sort
         cpi> sort reverse

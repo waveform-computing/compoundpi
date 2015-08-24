@@ -877,6 +877,19 @@ class CompoundPiClient(object):
         self.bind = ('0.0.0.0', 5647)
 
     def close(self):
+        """
+        Closes the client. This must be called once you are finished using
+        the client to ensure that the background thread used for receiving
+        downloaded data is shut down along with its listening socket. You can
+        use the class as a context handler to ensure this happens easily::
+
+            import compoundpi.client
+
+            with compoundpi.client.CompoundPiClient() as client:
+                # When this block terminates, close() will be called
+                # implicitly
+                client.servers.find(10)
+        """
         self.servers = []
         self.bind = None
 
@@ -903,7 +916,28 @@ class CompoundPiClient(object):
             raise ValueError('duplicate addresses in servers')
         for index, address in value:
             self._servers.move(index, address)
-    servers = property(_get_servers, _set_servers)
+    servers = property(_get_servers, _set_servers, doc="""
+        Stores the list of servers that the client controls.
+
+        See :class:`CompoundPiServerList` for full documentation of the methods
+        of the server list. For most purposes you can treat this as a normal
+        Python list (e.g. :meth:`~CompoundPiServerList.append`,
+        :meth:`~CompoundPiServerList.remove`, along with item access, length,
+        etc). However, duplicate entries are not permitted, and there are a few
+        extra methods like :meth:`~CompoundPiServerList.find` and
+        :meth:`~CompoundPiServerList.move`.
+
+        This property is also writeable; setting it to a list of addresses will
+        cause the server list to insert, remove, and move addresses as
+        necessary to match the specified list. For example, this is a valid way
+        to add a series of addresses to the list::
+
+            import compoundpi.client
+
+            with compoundpi.client.CompoundPiClient() as client:
+                client.servers = [
+                    '192.168.0.%d' % i for i in range(1, 11)]
+        """)
 
     def _get_bind(self):
         if self._server:

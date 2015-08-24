@@ -190,7 +190,7 @@ sent to each server in turn.  While this is still reasonably quick there will
 be a measurable difference between the timestamps of the last and first
 captures.
 
-See also: :ref:`command_download`, :ref:`command_clear`.
+See also: :ref:`command_record`, :ref:`command_download`, :ref:`command_clear`.
 
 ::
 
@@ -534,6 +534,29 @@ See also: :ref:`command_status`, :ref:`command_awb`, :ref:`command_exposure`.
     cpi> metering backlit 192.168.0.1-192.168.0.10
 
 
+.. _command_move:
+
+move
+====
+
+**Syntax:** move *address* (top|bottom|to *index*\|(above|below) *address*)
+
+The :ref:`command_move` command is used to move a server to another position
+within the server list. The first address specified is moved to the position
+described by the subsequent parameters. The ``top``, ``bottom``, and ``to``
+arguments specify absolute positions. Alternatively, ``above`` and ``below``
+can be used to specify a position relative to another address.
+
+See also: :ref:`command_add`, :ref:`command_remove`, :ref:`command_sort`,
+:ref:`command_servers`.
+
+::
+
+    cpi> move 192.168.0.1 top
+    cpi> move 192.168.0.2 below 192.168.0.1
+    cpi> move 192.168.0.3 to 2
+
+
 .. _command_quit:
 
 quit
@@ -543,6 +566,35 @@ quit
 
 The :ref:`command_exit` command is used to terminate the application. You can
 also use the standard UNIX :kbd:`Ctrl+D` end of file sequence to quit.
+
+
+.. _command_record:
+
+record
+======
+
+**Syntax:** record *length* *[addresses]*
+
+The :ref:`command_record` command causes the servers to record video. Note that
+this does not cause the recorded video to be sent to the client. See the
+:ref:`command_download` command for more information. The length of time to
+record for is specified as a number of seconds.
+
+If no addresses are specified, a broadcast message to all defined servers will
+be used in which case the timestamp of the recorded video are likely to be
+extremely close together. If addresses are specified, unicast messages will be
+sent to each server in turn.  While this is still reasonably quick there will
+be a measurable difference between the timestamps of the last and first
+recordings.
+
+See also: :ref:`command_capture`, :ref:`command_download`,
+:ref:`command_clear`.
+
+::
+
+  cpi> record 5
+  cpi> record 10 192.168.0.1
+  cpi> record 2.5 192.168.0.50-192.168.0.53
 
 
 .. _command_remove:
@@ -626,7 +678,8 @@ client expects to communicate with. The content of the list can be manipulated
 with the :ref:`command_find`, :ref:`command_add`, and :ref:`command_remove`
 commands.
 
-See also: :ref:`command_find`, :ref:`command_add`, :ref:`command_remove`.
+See also: :ref:`command_find`, :ref:`command_add`, :ref:`command_remove`,
+:ref:`command_move`, :ref:`command_sort`.
 
 ::
 
@@ -651,6 +704,25 @@ See also: :ref:`command_config`.
   cpi> set timeout 10
   cpi> set output ~/Pictures/
   cpi> set capture_count 5
+
+
+.. _command_sort:
+
+sort
+====
+
+**Syntax:** sort *[reverse]*
+
+The :ref:`command_sort` command is used to sort the list of defined servers
+numerically forwards or, if ``reverse`` is specified, backwards.
+
+See also: :ref:`command_add`, :ref:`command_remove`, :ref:`command_move`,
+:ref:`command_find`.
+
+::
+
+    cpi> sort
+    cpi> sort reverse
 
 
 .. _command_status:
