@@ -387,6 +387,9 @@ class CompoundPiServerList(object):
         self.port = 5647
         self.timeout = 15
 
+    def __repr__(self):
+        return '[%s]' % ', '.join(repr(a) for a in self)
+
     def __len__(self):
         return len(self._items)
 
