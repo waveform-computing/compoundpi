@@ -1368,7 +1368,7 @@ class CompoundPiClient(object):
         responses = {
             address: [
                 self.list_line_re.match(line)
-                for line in data.splitlines()
+                for line in (data or '').splitlines()
                 ]
             for (address, data) in self.servers.transact(
                 self._protocol.do_list(), addresses).items()
