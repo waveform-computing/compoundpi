@@ -10,7 +10,29 @@ using an automatic network configuration, then clone its SD card for all the
 other Pis.
 
 This quick start tutorial assumes you are using the Raspbian operating system
-on your Pis, and Ubuntu as your client.
+on your Pi servers, and Ubuntu as your client.
+
+
+Terminology
+===========
+
+You may have noted above that we refer to the Pis as "servers" and the
+controlling computer as the "client". This may seem confusing, but there is a
+logic to it: each Pi is a server insofar as it sits there listening for orders
+from a network client. When it receives orders, it carries them out and sends
+back the results. This is akin to the way web servers sit on the Internet
+waiting for a browser to request pages from them. When a request comes along
+they look up, or generate the HTML response, and send it back to the browser.
+
+The differences here are that Compound Pi operates over broadcast UDP rather
+than point-to-point TCP, and thus that it is limited to LAN operation.
+
+.. warning::
+
+    You cannot (and should not attempt to) operate Compound Pi over the
+    Internet; the Compound Pi server has almost no security features. It's
+    intended to be a LAN-only daemon so don't open its port (5647 by default)
+    to the Internet at large!
 
 
 Hardware Selection
