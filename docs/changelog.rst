@@ -20,13 +20,13 @@ Major enhancements in this release:
   useful in the batch client currently (`#26`_)
 * Added ability to configure quality of captures (`#29`_)
 
-.. _#21: https://github.com/waveform80/compoundpi/issues/21
-.. _#22: https://github.com/waveform80/compoundpi/issues/22
-.. _#23: https://github.com/waveform80/compoundpi/issues/23
-.. _#24: https://github.com/waveform80/compoundpi/issues/24
-.. _#25: https://github.com/waveform80/compoundpi/issues/25
-.. _#26: https://github.com/waveform80/compoundpi/issues/26
-.. _#29: https://github.com/waveform80/compoundpi/issues/29
+.. _#21: https://github.com/waveform-computing/compoundpi/issues/21
+.. _#22: https://github.com/waveform-computing/compoundpi/issues/22
+.. _#23: https://github.com/waveform-computing/compoundpi/issues/23
+.. _#24: https://github.com/waveform-computing/compoundpi/issues/24
+.. _#25: https://github.com/waveform-computing/compoundpi/issues/25
+.. _#26: https://github.com/waveform-computing/compoundpi/issues/26
+.. _#29: https://github.com/waveform-computing/compoundpi/issues/29
 
 
 Release 0.3 (2014-05-23)
@@ -42,9 +42,9 @@ Several major enhancements in this release:
 * All UDP messages (client and server) are now retried to ensure reliability,
   particularly during multiple unicast messages (`#13`_)
 
-.. _#3: https://github.com/waveform80/compoundpi/issues/3
-.. _#12: https://github.com/waveform80/compoundpi/issues/12
-.. _#13: https://github.com/waveform80/compoundpi/issues/13
+.. _#3: https://github.com/waveform-computing/compoundpi/issues/3
+.. _#12: https://github.com/waveform-computing/compoundpi/issues/12
+.. _#13: https://github.com/waveform-computing/compoundpi/issues/13
 
 
 Release 0.2 (2014-04-27)

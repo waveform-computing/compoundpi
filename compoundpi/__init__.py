@@ -1,6 +1,6 @@
 # vim: set et sw=4 sts=4 fileencoding=utf-8:
 #
-# Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
+# Copyright 2014 Dave Jones <dave@waveform.org.uk>.
 #
 # This file is part of compoundpi.
 #
@@ -31,9 +31,9 @@ import sys
 __project__      = 'compoundpi'
 __version__      = '0.4'
 __keywords__     = ['raspberrypi', 'camera', 'multi']
-__author__       = 'Dave Hughes'
+__author__       = 'Dave Jones'
 __author_email__ = 'dave@waveform.org.uk'
-__url__          = 'http://compoundpi.readthedocs.org/'
+__url__          = 'http://compoundpi.readthedocs.io/'
 __platforms__    = 'ALL'
 
 __requires__ = []

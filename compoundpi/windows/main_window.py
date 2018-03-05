@@ -1,6 +1,6 @@
 # vim: set et sw=4 sts=4 fileencoding=utf-8:
 
-# Copyright 2014 Dave Hughes <dave@waveform.org.uk>.
+# Copyright 2014 Dave Jones <dave@waveform.org.uk>.
 #
 # This file is part of compoundpi.
 #
@@ -210,7 +210,7 @@ The project homepage and documentation is at
                 application=QtGui.QApplication.instance().applicationName(),
                 version=QtGui.QApplication.instance().applicationVersion(),
                 url='http://compoundpi.readthedocs.org/',
-                author='Dave Hughes',
+                author='Dave Jones',
                 author_email='dave@waveform.org.uk',
             ))
 

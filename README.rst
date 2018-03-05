@@ -24,6 +24,6 @@ Links
 .. _cameras: http://www.raspberrypi.org/camera
 .. _downloaded: http://pypi.python.org/pypi/compoundpi
 .. _documentation: http://compoundpi.readthedocs.org/
-.. _source code: https://github.com/waveform80/compoundpi
-.. _bug tracker: https://github.com/waveform80/compoundpi/issues
+.. _source code: https://github.com/waveform-computing/compoundpi
+.. _bug tracker: https://github.com/waveform-computing/compoundpi/issues
 .. _GPL v2: https://www.gnu.org/licenses/gpl-2.0.html

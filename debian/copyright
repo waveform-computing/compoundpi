@@ -3,12 +3,12 @@ Upstream-Name: compoundpi
 Source: http://compoundpi.readthedocs.org/
 
 Files: *
-Copyright: 2014, Dave Hughes <dave@waveform.org.uk>
+Copyright: 2014, Dave Jones <dave@waveform.org.uk>
 License: GPL-2+
 
 Files: compoundpi/qt/*
 Copyright: 2011, Dirk Thomas, Dorian Scholz, TU Darmstadt
-           2014, Dave Hughes <dave@waveform.org.uk>
+           2014, Dave Jones <dave@waveform.org.uk>
 License: BSD-3-Clause
 
 License: GPL-2+

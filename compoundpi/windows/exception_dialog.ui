@@ -28,7 +28,7 @@
        <item>
         <widget class="QLabel" name="report_label">
          <property name="text">
-          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A problem has occured in the Compound Pi application. The details of the error are given in the box below. The Compound Pi bug tracker is hosted by GitHub at the address below:&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/waveform80/compoundpi/issues&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;https://github.com/waveform80/compoundpi/issues&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;If you wish to file a bug report, please check the issue is not already known. When filing a report, please include all details from the box below, along with a description of the actions that led up to the error occuring.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
+          <string>&lt;html&gt;&lt;head/&gt;&lt;body&gt;&lt;p&gt;A problem has occured in the Compound Pi application. The details of the error are given in the box below. The Compound Pi bug tracker is hosted by GitHub at the address below:&lt;/p&gt;&lt;p&gt;&lt;a href=&quot;https://github.com/waveform-computing/compoundpi/issues&quot;&gt;&lt;span style=&quot; text-decoration: underline; color:#0000ff;&quot;&gt;https://github.com/waveform-computing/compoundpi/issues&lt;/span&gt;&lt;/a&gt;&lt;/p&gt;&lt;p&gt;If you wish to file a bug report, please check the issue is not already known. When filing a report, please include all details from the box below, along with a description of the actions that led up to the error occuring.&lt;/p&gt;&lt;/body&gt;&lt;/html&gt;</string>
          </property>
          <property name="wordWrap">
           <bool>true</bool>
