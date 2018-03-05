@@ -1,11 +1,10 @@
 sudo: false
 language: python
 python:
+    - "3.5"
     - "3.4"
     - "3.3"
-    - "3.2"
-    - "2.7"
-    - "pypy"
+    - "pypy3"
 install: "pip install --allow-external ipaddr --allow-unverified ipaddr -e .[test]"
 script: make test
 before_install:
